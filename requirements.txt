@@ -1,0 +1,9 @@
+networkx
+matplotlib
+google-generativeai # Add this when you integrate the LLM fully
+Flask # Add when starting web app
+Flask-SQLAlchemy # Add when starting web app
+Flask-Login # Add when starting web app
+Flask-WTF # Add when starting web app
+SQLAlchemy-Utils # Add when starting web app
+python-dotenv # Add when starting web app
