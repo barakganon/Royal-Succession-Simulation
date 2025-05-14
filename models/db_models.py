@@ -53,12 +53,16 @@ class DynastyDB(db.Model):
 
     # This will link to the PersonDB record of the founder
     founder_person_db_id = db.Column(db.Integer, db.ForeignKey('person_db.id'), nullable=True)
-    # founder = db.relationship('PersonDB', foreign_keys=[founder_person_db_id], backref=db.backref('founded_this_dynasty', uselist=False))
+    founder = db.relationship('PersonDB', foreign_keys=[founder_person_db_id], backref=db.backref('founded_this_dynasty', uselist=False))
 
     # Relationships to related simulation data for this dynasty
     # 'dynamic' allows for querying, e.g., dynasty.persons.filter_by(...).all()
     # 'cascade="all, delete-orphan"' means if a DynastyDB is deleted, its associated persons and history logs are also deleted.
-    persons = db.relationship('PersonDB', backref='dynasty_owner', lazy='dynamic', cascade="all, delete-orphan")
+    persons = db.relationship('PersonDB',
+                             primaryjoin="DynastyDB.id == PersonDB.dynasty_id",
+                             backref='dynasty_owner',
+                             lazy='dynamic',
+                             cascade="all, delete-orphan")
     history_logs = db.relationship('HistoryLogEntryDB', backref='dynasty_context', lazy='dynamic',
                                    cascade="all, delete-orphan")
 

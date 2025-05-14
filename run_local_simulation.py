@@ -53,29 +53,28 @@ if __name__ == "__main__":
     use_story_mode_flag = False
     # Make sure loaded_themes_data is not empty before trying to pick a theme
     if loaded_themes_data:
-        # input_identifier_for_sim = "MEDIEVAL_EUROPEAN"
+        # Randomly select a theme from available themes
         input_identifier_for_sim = random.choice(list(loaded_themes_data.keys()))
+        print(f"Selected theme: {input_identifier_for_sim}")
     else:  # Should only happen if file was missing AND we proceed for LLM custom story
         input_identifier_for_sim = "CUSTOM_ONLY_NO_FALLBACK"  # Special case
         if not use_story_mode_flag:  # If not in story mode and no themes, this is an issue
             print("Error: No predefined themes and not in custom story mode. Cannot proceed.")
             exit()
 
-    # Option B: Use a custom story (Uncomment to use this)
+    # Option B: Use a custom story (uncomment to use)
     # use_story_mode_flag = True
     # user_story_text_input = """
-    # The Sunken City of Aethel-Mare was once a proud coastal metropolis before the Great Tide of year 250.
-    # Its survivors, the Wavekin, now live in precarious settlements built on stilts and salvaged ships, forever battling the encroaching sea and mutated sea creatures.
-    # They are led by a Tide-Speaker, chosen by their ability to commune with the ocean spirits.
-    # Their culture values resilience, knowledge of the old world, and mastery of sea-craft. Surnames often relate to sea features or lost city districts.
-    # They hope one day to reclaim their city from the depths.
+    # Your custom dynasty story here.
+    # Describe the setting, culture, and key historical events.
+    # The more details you provide, the better the simulation will be.
     # """
     # input_identifier_for_sim = user_story_text_input
 
     # --- Simulation Parameters (Overrides) ---
     sim_years_to_run = 100  # Number of years to simulate for this run
-    start_year_for_run = None  # None to use theme/LLM suggestion, or e.g., 750 for a specific start
-    succession_rule_for_run = None  # None for theme default, or e.g., "PRIMOGENITURE_ABSOLUTE"
+    start_year_for_run = None  # None to use theme default, or specify a year
+    succession_rule_for_run = None  # None to use theme default, or specify a rule
 
     # --- Global Settings for this Run ---
     g_verbose_logging_run = True

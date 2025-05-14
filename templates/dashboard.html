@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - {{ current_user.username }}{% endblock %}
+
+{% block content %}
+  <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Your Dashboard</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+      <a href="{{ url_for('create_dynasty_placeholder') }}" class="btn btn-sm btn-outline-success">
+        <!-- Add SVG icon for new dynasty -->
+        <span data-feather="plus-circle"></span>
+        Start New Dynasty
+      </a>
+    </div>
+  </div>
+
+  <h4>Your Active Dynasties:</h4>
+  {% if dynasties %}
+    <div class="list-group">
+      {% for dynasty in dynasties %}
+        <a href="{{ url_for('view_dynasty_placeholder', dynasty_id=dynasty.id) }}" class="list-group-item list-group-item-action">
+          <div class="d-flex w-100 justify-content-between">
+            <h5 class="mb-1">{{ dynasty.name }}</h5>
+            <small>Year: {{ dynasty.current_simulation_year }}</small>
+          </div>
+          <p class="mb-1">Wealth: {{ dynasty.current_wealth }} (Theme: {{ dynasty.theme_identifier_or_json if dynasty.theme_identifier_or_json|length < 30 else dynasty.theme_identifier_or_json[:27] + '...' }})</p>
+          <small>Last played: {{ dynasty.last_played_at.strftime('%Y-%m-%d %H:%M') if dynasty.last_played_at else 'Never' }}</small>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="alert alert-info" role="alert">
+      You haven't started any dynasties yet. Time to forge your legacy!
+    </div>
+  {% endif %}
+
+  <!-- Feather Icons Script (for the plus icon) -->
+  <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+  <script>
+    feather.replace()
+  </script>
+{% endblock %}
