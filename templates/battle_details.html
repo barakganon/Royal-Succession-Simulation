@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block title %}Battle Details{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="mt-4 mb-3">Battle Details</h1>
+    
+    <div class="row">
+        <!-- Battle Information -->
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Battle Information</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Location:</strong> <a href="{{ url_for('territory_details', territory_id=battle.territory_id) }}">{{ battle.territory.name }}</a></p>
+                    <p><strong>Year:</strong> {{ battle.year }}</p>
+                    <p><strong>Attacker:</strong> <a href="{{ url_for('view_dynasty', dynasty_id=battle.attacker_dynasty_id) }}">{{ attacker_dynasty.name }}</a></p>
+                    <p><strong>Defender:</strong> <a href="{{ url_for('view_dynasty', dynasty_id=battle.defender_dynasty_id) }}">{{ defender_dynasty.name }}</a></p>
+                    
+                    {% if battle.winner_dynasty_id %}
+                    <p><strong>Winner:</strong> 
+                        {% if battle.winner_dynasty_id == battle.attacker_dynasty_id %}
+                        <span class="text-success">{{ attacker_dynasty.name }} (Attacker)</span>
+                        {% else %}
+                        <span class="text-success">{{ defender_dynasty.name }} (Defender)</span>
+                        {% endif %}
+                    </p>
+                    {% else %}
+                    <p><strong>Winner:</strong> <span class="text-warning">Inconclusive</span></p>
+                    {% endif %}
+                    
+                    <p><strong>Attacker Casualties:</strong> <span class="text-danger">{{ battle.attacker_casualties }}</span></p>
+                    <p><strong>Defender Casualties:</strong> <span class="text-danger">{{ battle.defender_casualties }}</span></p>
+                    
+                    {% if battle.war_id %}
+                    <p><strong>War:</strong> 
+                        {% if battle.war.attacker_dynasty_id == attacker_dynasty.id %}
+                        War against {{ defender_dynasty.name }}
+                        {% else %}
+                        War against {{ attacker_dynasty.name }}
+                        {% endif %}
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Armies</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Attacker Army</h6>
+                    {% if battle.attacker_army %}
+                    <p><strong>Name:</strong> <a href="{{ url_for('army_details', army_id=battle.attacker_army_id) }}">{{ battle.attacker_army.name }}</a></p>
+                    <p><strong>Commander:</strong> 
+                        {% if battle.attacker_army.commander_id %}
+                        {{ battle.attacker_army.commander.name }} {{ battle.attacker_army.commander.surname }}
+                        {% else %}
+                        <span class="text-muted">No commander</span>
+                        {% endif %}
+                    </p>
+                    {% else %}
+                    <p><span class="text-muted">Army information not available</span></p>
+                    {% endif %}
+                    
+                    <hr>
+                    
+                    <h6>Defender Army</h6>
+                    {% if battle.defender_army %}
+                    <p><strong>Name:</strong> <a href="{{ url_for('army_details', army_id=battle.defender_army_id) }}">{{ battle.defender_army.name }}</a></p>
+                    <p><strong>Commander:</strong> 
+                        {% if battle.defender_army.commander_id %}
+                        {{ battle.defender_army.commander.name }} {{ battle.defender_army.commander.surname }}
+                        {% else %}
+                        <span class="text-muted">No commander</span>
+                        {% endif %}
+                    </p>
+                    {% else %}
+                    <p><span class="text-muted">Army information not available</span></p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Battle Visualization -->
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Battle Analysis</h5>
+                </div>
+                <div class="card-body">
+                    {% if battle_result %}
+                    <div class="text-center">
+                        <img src="data:image/png;base64,{{ battle_result }}" class="img-fluid" alt="Battle Result">
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning">
+                        <p>Battle visualization not available.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Battle Details</h5>
+                </div>
+                <div class="card-body">
+                    {% set details = battle.get_details() %}
+                    {% if details and details.rounds %}
+                    <h6>Battle Rounds</h6>
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Round</th>
+                                    <th>Attacker Strength</th>
+                                    <th>Defender Strength</th>
+                                    <th>Attacker Casualties</th>
+                                    <th>Defender Casualties</th>
+                                    <th>Attacker Remaining</th>
+                                    <th>Defender Remaining</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for round in details.rounds %}
+                                <tr>
+                                    <td>{{ round.round }}</td>
+                                    <td>{{ round.attacker_strength|round(1) }}</td>
+                                    <td>{{ round.defender_strength|round(1) }}</td>
+                                    <td>
+                                        {% if round.round > 0 %}
+                                        {{ round.attacker_casualties }}
+                                        {% else %}
+                                        -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if round.round > 0 %}
+                                        {{ round.defender_casualties }}
+                                        {% else %}
+                                        -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if round.attacker_remaining is defined %}
+                                        {{ round.attacker_remaining }}
+                                        {% elif round.attacker_troops is defined %}
+                                        {{ round.attacker_troops }}
+                                        {% else %}
+                                        -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if round.defender_remaining is defined %}
+                                        {{ round.defender_remaining }}
+                                        {% elif round.defender_troops is defined %}
+                                        {{ round.defender_troops }}
+                                        {% else %}
+                                        -
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <h6 class="mt-4">Battle Statistics</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Initial Attacker Strength:</strong> {{ details.initial_attacker_strength|round(1) }}</p>
+                            <p><strong>Final Attacker Strength:</strong> {{ details.final_attacker_strength|round(1) }}</p>
+                            <p><strong>Attacker Casualty Ratio:</strong> {{ (details.attacker_casualty_ratio * 100)|round(1) }}%</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Initial Defender Strength:</strong> {{ details.initial_defender_strength|round(1) }}</p>
+                            <p><strong>Final Defender Strength:</strong> {{ details.final_defender_strength|round(1) }}</p>
+                            <p><strong>Defender Casualty Ratio:</strong> {{ (details.defender_casualty_ratio * 100)|round(1) }}%</p>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning">
+                        <p>Detailed battle information not available.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-12">
+            <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                <a href="{{ url_for('military_view', dynasty_id=attacker_dynasty.id if attacker_dynasty.owner_user == current_user else defender_dynasty.id) }}" class="btn btn-primary">Back to Military View</a>
+                <a href="{{ url_for('territory_details', territory_id=battle.territory_id) }}" class="btn btn-secondary">View Territory</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -7,9 +7,41 @@ import os
 import json  # For theme handling
 import random
 import datetime
+import signal
+import sys
+import logging
+import atexit
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("flask_app.log"),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger("royal_succession.flask")
 
 # Import database models (adjust path if your structure differs slightly)
-from models.db_models import db, User, DynastyDB, PersonDB, HistoryLogEntryDB
+from models.db_models import (
+    db, User, DynastyDB, PersonDB, HistoryLogEntryDB, Territory, Region, Province,
+    MilitaryUnit, UnitType, Army, Battle, Siege, War, DiplomaticRelation, Treaty, TreatyType
+)
+from models.map_system import MapGenerator, TerritoryManager, MovementSystem, BorderSystem
+from models.military_system import MilitarySystem
+from models.diplomacy_system import DiplomacySystem
+from models.economy_system import EconomySystem
+from models.time_system import TimeSystem, Season, EventType, EventPriority, GamePhase
+from models.game_manager import GameManager
+from models.db_initialization import DatabaseInitializer
+from simulation_engine import SimulationEngine
+
+from visualization.map_renderer import MapRenderer
+from visualization.military_renderer import MilitaryRenderer
+from visualization.diplomacy_renderer import DiplomacyRenderer
+from visualization.economy_renderer import EconomyRenderer
+from visualization.time_renderer import TimeRenderer
 
 # Import theme utilities
 from utils.theme_manager import load_cultural_themes, get_all_theme_names, generate_theme_from_story_llm, get_theme
@@ -34,6 +66,9 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # Recommended to disable
 # Initialize SQLAlchemy with the Flask app
 db.init_app(app)
 
+# Initialize database initializer
+db_initializer = DatabaseInitializer(app)
+
 # Flask-Login Configuration
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'  # The route Flask-Login redirects to if @login_required fails
@@ -51,19 +86,43 @@ try:
         genai.configure(api_key=FLASK_APP_API_KEY)
         FLASK_APP_LLM_MODEL = genai.GenerativeModel("gemini-1.5-flash-latest")  # Or your preferred model
         FLASK_APP_GOOGLE_API_KEY_PRESENT = True
-        print("LLM Initialized successfully for Flask App.")
+        logger.info("LLM Initialized successfully for Flask App.")
     else:
-        print("LLM API Key not found for Flask App. Custom theme generation from story will be disabled.")
+        logger.warning("LLM API Key not found for Flask App. Custom theme generation from story will be disabled.")
 except ImportError:
-    print("google-generativeai package not found. LLM features disabled for Flask App.")
+    logger.warning("google-generativeai package not found. LLM features disabled for Flask App.")
 except Exception as e_flask_llm:
-    print(f"Error initializing LLM for Flask App: {type(e_flask_llm).__name__} - {e_flask_llm}")
+    logger.error(f"Error initializing LLM for Flask App: {type(e_flask_llm).__name__} - {e_flask_llm}")
 
 # Pass LLM status to helper functions (used by theme_manager.generate_theme_from_story_llm)
 set_llm_globals_for_helpers(FLASK_APP_LLM_MODEL, FLASK_APP_GOOGLE_API_KEY_PRESENT)
 
 
 # --- End LLM Setup ---
+
+# --- Signal Handling ---
+def signal_handler(sig, frame):
+    """Handle interrupt signals gracefully"""
+    logger.info("Received interrupt signal. Shutting down Flask application gracefully...")
+    sys.exit(0)
+
+# Register signal handlers
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
+
+# Cleanup function to run on exit
+def cleanup():
+    """Perform cleanup operations before exit"""
+    logger.info("Performing cleanup before application shutdown")
+    # Close database connections
+    try:
+        db.session.remove()
+        logger.info("Database connections closed")
+    except Exception as e:
+        logger.error(f"Error during cleanup: {str(e)}")
+
+# Register cleanup function
+atexit.register(cleanup)
 
 
 @login_manager.user_loader
@@ -170,9 +229,34 @@ def logout():
 @login_required
 def dashboard():
     """User's main dashboard after login."""
-    # In later phases, this will query DynastyDB for the user's dynasties
+    # Query DynastyDB for the user's dynasties
     user_dynasties = DynastyDB.query.filter_by(user_id=current_user.id).order_by(DynastyDB.name).all()
-    return render_template('dashboard.html', title='Dashboard', dynasties=user_dynasties)
+    
+    # Initialize game systems
+    game_manager = GameManager(db.session)
+    
+    # Get active players
+    active_players = game_manager.get_active_players()
+    
+    # Get game statistics
+    game_stats = {
+        'total_dynasties': DynastyDB.query.count(),
+        'total_territories': Territory.query.count(),
+        'total_battles': Battle.query.count(),
+        'total_treaties': Treaty.query.count()
+    }
+    
+    # Get recent global events
+    recent_global_events = HistoryLogEntryDB.query.order_by(
+        HistoryLogEntryDB.year.desc(), HistoryLogEntryDB.id.desc()
+    ).limit(10).all()
+    
+    return render_template('dashboard.html',
+                          title='Dashboard',
+                          dynasties=user_dynasties,
+                          active_players=active_players,
+                          game_stats=game_stats,
+                          recent_global_events=recent_global_events)
 
 
 # Dynasty creation route
@@ -349,6 +433,1816 @@ def advance_turn(dynasty_id):
     db.session.commit()
     
     return redirect(url_for('view_dynasty', dynasty_id=dynasty.id))
+
+
+# Dynasty deletion route
+@app.route('/dynasty/<int:dynasty_id>/delete', methods=['GET', 'POST'])
+@login_required
+def delete_dynasty(dynasty_id):
+    """Delete a dynasty and all associated data."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    
+    # Check ownership
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    if request.method == 'POST':
+        dynasty_name = dynasty.name  # Store for flash message
+        
+        try:
+            # Fix for circular dependency: manually break relationships before deletion
+            # 1. Get all persons in this dynasty
+            persons = PersonDB.query.filter_by(dynasty_id=dynasty.id).all()
+            
+            # 2. Break circular references between persons
+            for person in persons:
+                # Clear relationship references
+                person.spouse_sim_id = None
+                person.mother_sim_id = None
+                person.father_sim_id = None
+            
+            # 3. Commit these changes first
+            db.session.commit()
+            
+            # 4. Delete history logs
+            HistoryLogEntryDB.query.filter_by(dynasty_id=dynasty.id).delete()
+            
+            # 5. Delete persons
+            PersonDB.query.filter_by(dynasty_id=dynasty.id).delete()
+            
+            # 6. Finally delete the dynasty
+            db.session.delete(dynasty)
+            db.session.commit()
+            
+            flash(f'Dynasty "{dynasty_name}" has been permanently deleted.', 'success')
+            return redirect(url_for('dashboard'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error deleting dynasty: {str(e)}', 'danger')
+            return redirect(url_for('view_dynasty', dynasty_id=dynasty_id))
+    
+    # GET request - show confirmation page
+    return render_template('delete_dynasty.html', dynasty=dynasty)
+
+
+# Dynasty economy view route
+@app.route('/dynasty/<int:dynasty_id>/economy')
+@login_required
+def dynasty_economy(dynasty_id):
+    """View a dynasty's economic details."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    # Load theme configuration
+    theme_config = {}
+    if dynasty.theme_identifier_or_json:
+        if dynasty.theme_identifier_or_json in get_all_theme_names():
+            # Predefined theme
+            theme_config = get_theme(dynasty.theme_identifier_or_json)
+        else:
+            # Custom theme stored as JSON
+            try:
+                theme_config = json.loads(dynasty.theme_identifier_or_json)
+            except json.JSONDecodeError:
+                pass
+    
+    # Get economy data for this dynasty
+    economy_data = None
+    try:
+        # Import the economy system
+        from models.economy_system import EconomySystem
+        
+        # Create economy system
+        economy_system = EconomySystem(db.session)
+        
+        # Get economy data
+        economy_data = economy_system.calculate_dynasty_economy(dynasty.id)
+        
+        # Generate visualizations
+        from visualization.economy_renderer import EconomyRenderer
+        economy_renderer = EconomyRenderer(db.session)
+        
+        # Generate resource production visualization
+        production_chart = economy_renderer.render_resource_production(dynasty.id)
+        production_chart_url = production_chart.replace('static/', '/static/')
+        
+        # Generate trade network visualization
+        trade_chart = economy_renderer.render_trade_network(dynasty.id)
+        trade_chart_url = trade_chart.replace('static/', '/static/')
+        
+        # Generate economic trends visualization
+        trends_chart = economy_renderer.render_economic_trends(dynasty.id)
+        trends_chart_url = trends_chart.replace('static/', '/static/')
+        
+    except (ImportError, Exception) as e:
+        # Economy system not available or error
+        flash(f"Error loading economy system: {str(e)}", "warning")
+        economy_data = None
+        production_chart_url = None
+        trade_chart_url = None
+        trends_chart_url = None
+    
+    return render_template('economy_view.html',
+                          dynasty=dynasty,
+                          theme_config=theme_config,
+                          economy_data=economy_data,
+                          production_chart_url=production_chart_url,
+                          trade_chart_url=trade_chart_url,
+                          trends_chart_url=trends_chart_url)
+
+
+# World economy view route
+@app.route('/world/economy')
+@login_required
+def world_economy_view():
+    """View the world economy and interactions between dynasties."""
+    # Get all dynasties
+    dynasties = DynastyDB.query.all()
+    
+    # Get global economy data
+    try:
+        # Import the economy system
+        from models.economy_system import EconomySystem
+        from visualization.economy_renderer import EconomyRenderer
+        
+        # Create economy system and renderer
+        economy_system = EconomySystem(db.session)
+        economy_renderer = EconomyRenderer(db.session)
+        
+        # Get all trade routes
+        trade_routes = db.session.query(TradeRoute).filter_by(is_active=True).all()
+        
+        # Generate market prices visualization
+        market_chart = economy_renderer.render_market_prices()
+        market_chart_url = market_chart.replace('static/', '/static/')
+        
+        # Generate global trade network visualization
+        trade_network_chart = economy_renderer.render_trade_network()
+        trade_network_url = trade_network_chart.replace('static/', '/static/')
+        
+        # Get resources
+        resources = db.session.query(Resource).all()
+        
+    except (ImportError, Exception) as e:
+        # Economy system not available or error
+        flash(f"Error loading economy system: {str(e)}", "warning")
+        trade_routes = []
+        market_chart_url = None
+        trade_network_url = None
+        resources = []
+    
+    # Get recent economic events
+    economic_events = db.session.query(HistoryLogEntryDB).filter(
+        HistoryLogEntryDB.event_type.like('economic_%')
+    ).order_by(HistoryLogEntryDB.year.desc()).limit(10).all()
+    
+    return render_template('world_economy.html',
+                          dynasties=dynasties,
+                          trade_routes=trade_routes,
+                          market_chart_url=market_chart_url,
+                          trade_network_url=trade_network_url,
+                          resources=resources,
+                          economic_events=economic_events)
+# --- Map System Routes ---
+
+# --- Economy System Routes ---
+
+@app.route('/dynasty/<int:dynasty_id>/construct_building', methods=['POST'])
+@login_required
+def construct_building(dynasty_id):
+    """Construct a new building in a territory."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    territory_id = request.form.get('territory_id', type=int)
+    building_type_str = request.form.get('building_type')
+    
+    if not territory_id or not building_type_str:
+        flash("Missing required parameters.", "danger")
+        return redirect(url_for('dynasty_economy', dynasty_id=dynasty_id))
+    
+    try:
+        # Convert string to BuildingType enum
+        building_type = BuildingType[building_type_str.upper()]
+        
+        # Import the economy system
+        from models.economy_system import EconomySystem
+        
+        # Create economy system
+        economy_system = EconomySystem(db.session)
+        
+        # Construct building
+        success, message = economy_system.construct_building(territory_id, building_type)
+        
+        if success:
+            flash(message, "success")
+        else:
+            flash(message, "warning")
+            
+    except (ValueError, KeyError, ImportError, Exception) as e:
+        flash(f"Error constructing building: {str(e)}", "danger")
+    
+    return redirect(url_for('dynasty_economy', dynasty_id=dynasty_id))
+
+@app.route('/dynasty/<int:dynasty_id>/upgrade_building/<int:building_id>', methods=['POST'])
+@login_required
+def upgrade_building(dynasty_id, building_id):
+    """Upgrade an existing building."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    try:
+        # Import the economy system
+        from models.economy_system import EconomySystem
+        
+        # Create economy system
+        economy_system = EconomySystem(db.session)
+        
+        # Upgrade building
+        success, message = economy_system.upgrade_building(building_id)
+        
+        if success:
+            flash(message, "success")
+        else:
+            flash(message, "warning")
+            
+    except Exception as e:
+        flash(f"Error upgrading building: {str(e)}", "danger")
+    
+    return redirect(url_for('dynasty_economy', dynasty_id=dynasty_id))
+
+@app.route('/dynasty/<int:dynasty_id>/repair_building/<int:building_id>', methods=['POST'])
+@login_required
+def repair_building(dynasty_id, building_id):
+    """Repair a damaged building."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    try:
+        # Import the economy system
+        from models.economy_system import EconomySystem
+        
+        # Create economy system
+        economy_system = EconomySystem(db.session)
+        
+        # Repair building
+        success, message = economy_system.repair_building(building_id)
+        
+        if success:
+            flash(message, "success")
+        else:
+            flash(message, "warning")
+            
+    except Exception as e:
+        flash(f"Error repairing building: {str(e)}", "danger")
+    
+    return redirect(url_for('dynasty_economy', dynasty_id=dynasty_id))
+
+@app.route('/dynasty/<int:dynasty_id>/develop_territory/<int:territory_id>', methods=['POST'])
+@login_required
+def develop_territory_economy(dynasty_id, territory_id):
+    """Develop a territory to increase its development level."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    try:
+        # Import the economy system
+        from models.economy_system import EconomySystem
+        
+        # Create economy system
+        economy_system = EconomySystem(db.session)
+        
+        # Develop territory
+        success, message = economy_system.develop_territory(territory_id)
+        
+        if success:
+            flash(message, "success")
+        else:
+            flash(message, "warning")
+            
+    except Exception as e:
+        flash(f"Error developing territory: {str(e)}", "danger")
+    
+    return redirect(url_for('dynasty_economy', dynasty_id=dynasty_id))
+
+@app.route('/dynasty/<int:dynasty_id>/establish_trade', methods=['POST'])
+@login_required
+def establish_trade(dynasty_id):
+    """Establish a trade route with another dynasty."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    target_dynasty_id = request.form.get('target_dynasty_id', type=int)
+    resource_type_str = request.form.get('resource_type')
+    amount = request.form.get('amount', type=float)
+    
+    if not target_dynasty_id or not resource_type_str or not amount:
+        flash("Missing required parameters.", "danger")
+        return redirect(url_for('dynasty_economy', dynasty_id=dynasty_id))
+    
+    try:
+        # Convert string to ResourceType enum
+        resource_type = ResourceType[resource_type_str.upper()]
+        
+        # Import the economy system
+        from models.economy_system import EconomySystem
+        
+        # Create economy system
+        economy_system = EconomySystem(db.session)
+        
+        # Establish trade route
+        success, message, _ = economy_system.establish_trade_route(
+            dynasty_id, target_dynasty_id, resource_type, amount
+        )
+        
+        if success:
+            flash(message, "success")
+        else:
+            flash(message, "warning")
+            
+    except (ValueError, KeyError, ImportError, Exception) as e:
+        flash(f"Error establishing trade route: {str(e)}", "danger")
+    
+    return redirect(url_for('dynasty_economy', dynasty_id=dynasty_id))
+
+@app.route('/dynasty/<int:dynasty_id>/cancel_trade/<int:trade_route_id>', methods=['POST'])
+@login_required
+def cancel_trade(dynasty_id, trade_route_id):
+    """Cancel an existing trade route."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    try:
+        # Import the economy system
+        from models.economy_system import EconomySystem
+        
+        # Create economy system
+        economy_system = EconomySystem(db.session)
+        
+        # Cancel trade route
+        success, message = economy_system.cancel_trade_route(trade_route_id, dynasty_id)
+        
+        if success:
+            flash(message, "success")
+        else:
+            flash(message, "warning")
+            
+    except Exception as e:
+        flash(f"Error canceling trade route: {str(e)}", "danger")
+    
+    return redirect(url_for('dynasty_economy', dynasty_id=dynasty_id))
+
+@app.route('/territory/<int:territory_id>/economy')
+@login_required
+def territory_economy(territory_id):
+    """View economic details for a specific territory."""
+    territory = Territory.query.get_or_404(territory_id)
+    
+    # Check if user has access to this territory
+    if territory.controller_dynasty_id:
+        dynasty = DynastyDB.query.get(territory.controller_dynasty_id)
+        if dynasty and dynasty.owner_user != current_user:
+            flash("Not authorized.", "warning")
+            return redirect(url_for('dashboard'))
+    
+    try:
+        # Import the economy system
+        from models.economy_system import EconomySystem
+        from visualization.economy_renderer import EconomyRenderer
+        
+        # Create economy system and renderer
+        economy_system = EconomySystem(db.session)
+        economy_renderer = EconomyRenderer(db.session)
+        
+        # Get production and consumption data
+        production = economy_system.calculate_territory_production(territory_id)
+        consumption = economy_system.calculate_territory_consumption(territory_id)
+        tax_income = economy_system.calculate_territory_tax_income(territory_id)
+        
+        # Get buildings
+        buildings = Building.query.filter_by(territory_id=territory_id).all()
+        
+        # Generate territory economy visualization
+        economy_chart = economy_renderer.render_territory_economy(territory_id)
+        economy_chart_url = economy_chart.replace('static/', '/static/')
+        
+    except (ImportError, Exception) as e:
+        # Economy system not available or error
+        flash(f"Error loading economy data: {str(e)}", "warning")
+        production = {}
+        consumption = {}
+        tax_income = 0
+        buildings = []
+        economy_chart_url = None
+    
+    return render_template('territory_economy.html',
+                          territory=territory,
+                          production=production,
+                          consumption=consumption,
+                          tax_income=tax_income,
+                          buildings=buildings,
+                          economy_chart_url=economy_chart_url)
+
+@app.route('/world/map')
+@login_required
+def world_map():
+    """Display the world map with territories and units."""
+    # Get user dynasties
+    user_dynasties = DynastyDB.query.filter_by(user_id=current_user.id).all()
+    
+    # Get all territories
+    territories = Territory.query.all()
+    
+    # Check if we have territories, if not, we need to generate a map
+    if not territories:
+        # Create a map generator
+        map_generator = MapGenerator(db.session)
+        
+        # Generate a procedural map
+        map_data = map_generator.generate_procedural_map()
+        
+        # Assign some territories to user dynasties
+        territory_manager = TerritoryManager(db.session)
+        
+        # For each user dynasty, assign a random territory as capital
+        for dynasty in user_dynasties:
+            # Get a random territory
+            territory = Territory.query.order_by(db.func.random()).first()
+            if territory:
+                territory_manager.assign_territory(territory.id, dynasty.id, is_capital=True)
+    
+    # Create map renderer
+    map_renderer = MapRenderer(db.session)
+    
+    # Render map
+    map_image = None
+    try:
+        # Determine if we should highlight a specific dynasty
+        highlight_dynasty = None
+        if len(user_dynasties) == 1:
+            highlight_dynasty = user_dynasties[0].id
+        
+        # Render the map
+        map_image = map_renderer.render_world_map(
+            show_terrain=True,
+            show_territories=True,
+            show_settlements=True,
+            show_units=True,
+            highlight_dynasty_id=highlight_dynasty
+        )
+    except Exception as e:
+        print(f"Error rendering map: {e}")
+    
+    # Get regions and provinces for filtering
+    regions = Region.query.all()
+    provinces = Province.query.all()
+    
+    return render_template('world_map.html',
+                          user_dynasties=user_dynasties,
+                          territories=territories,
+                          regions=regions,
+                          provinces=provinces,
+                          map_image=map_image)
+
+@app.route('/territory/<int:territory_id>')
+@login_required
+def territory_details(territory_id):
+    """View details of a specific territory."""
+    # Get territory
+    territory = Territory.query.get_or_404(territory_id)
+    
+    # Check if territory is controlled by user's dynasty
+    user_dynasties = DynastyDB.query.filter_by(user_id=current_user.id).all()
+    user_dynasty_ids = [d.id for d in user_dynasties]
+    
+    is_owned = territory.controller_dynasty_id in user_dynasty_ids
+    
+    # Get settlements in this territory
+    settlements = territory.settlements
+    
+    # Get resources in this territory
+    resources = territory.resources
+    
+    # Get buildings in this territory
+    buildings = territory.buildings
+    
+    # Get units in this territory
+    units = territory.units_present
+    
+    # Get armies in this territory
+    armies = territory.armies_present
+    
+    # Create map renderer
+    map_renderer = MapRenderer(db.session)
+    
+    # Render territory map
+    territory_image = None
+    try:
+        territory_image = map_renderer.render_territory_map(territory_id)
+    except Exception as e:
+        print(f"Error rendering territory map: {e}")
+    
+    return render_template('territory_details.html',
+                          territory=territory,
+                          is_owned=is_owned,
+                          settlements=settlements,
+                          resources=resources,
+                          buildings=buildings,
+                          units=units,
+                          armies=armies,
+                          territory_image=territory_image)
+
+@app.route('/dynasty/<int:dynasty_id>/territories')
+@login_required
+def dynasty_territories(dynasty_id):
+    """View and manage territories controlled by a dynasty."""
+    # Get dynasty
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    
+    # Check ownership
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    # Get territories controlled by this dynasty
+    territories = Territory.query.filter_by(controller_dynasty_id=dynasty_id).all()
+    
+    # Get border territories
+    border_system = BorderSystem(db.session)
+    border_territories = border_system.get_border_territories(dynasty_id)
+    
+    # Create map renderer
+    map_renderer = MapRenderer(db.session)
+    
+    # Render map highlighting dynasty territories
+    dynasty_map = None
+    try:
+        dynasty_map = map_renderer.render_world_map(
+            show_terrain=False,  # Show dynasty colors instead
+            show_territories=True,
+            show_settlements=True,
+            show_units=True,
+            highlight_dynasty_id=dynasty_id
+        )
+    except Exception as e:
+        print(f"Error rendering dynasty map: {e}")
+    
+    return render_template('dynasty_territories.html',
+                          dynasty=dynasty,
+                          territories=territories,
+                          border_territories=border_territories,
+                          contested_territories=contested_territories)
+
+# Military routes
+@app.route('/dynasty/<int:dynasty_id>/military')
+@login_required
+def military_view(dynasty_id):
+    """View and manage military units and armies for a dynasty."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    # Get military units and armies
+    units = MilitaryUnit.query.filter_by(dynasty_id=dynasty_id, army_id=None).all()
+    armies = Army.query.filter_by(dynasty_id=dynasty_id).all()
+    
+    # Get potential commanders
+    commanders = PersonDB.query.filter_by(
+        dynasty_id=dynasty_id,
+        death_year=None
+    ).all()
+    
+    # Filter to those who can lead armies
+    potential_commanders = [p for p in commanders if p.can_lead_army()]
+    
+    # Get controlled territories for recruitment
+    territories = Territory.query.filter_by(controller_dynasty_id=dynasty_id).all()
+    
+    # Get military overview visualization
+    from visualization.military_renderer import MilitaryRenderer
+    military_renderer = MilitaryRenderer(db.session)
+    military_overview = military_renderer.render_military_overview(dynasty_id)
+    
+    return render_template('military_view.html',
+                          dynasty=dynasty,
+                          units=units,
+                          armies=armies,
+                          potential_commanders=potential_commanders,
+                          territories=territories,
+                          military_overview=military_overview)
+
+@app.route('/dynasty/<int:dynasty_id>/recruit_unit', methods=['POST'])
+@login_required
+def recruit_unit(dynasty_id):
+    """Recruit a new military unit."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    # Get form data
+    unit_type_str = request.form.get('unit_type')
+    size = request.form.get('size', type=int)
+    territory_id = request.form.get('territory_id', type=int)
+    name = request.form.get('name')
+    
+    # Validate data
+    if not unit_type_str or not size or not territory_id:
+        flash("Missing required fields.", "danger")
+        return redirect(url_for('military_view', dynasty_id=dynasty_id))
+    
+    try:
+        unit_type = UnitType(unit_type_str)
+    except ValueError:
+        flash("Invalid unit type.", "danger")
+        return redirect(url_for('military_view', dynasty_id=dynasty_id))
+    
+    # Recruit unit
+    from models.military_system import MilitarySystem
+    military_system = MilitarySystem(db.session)
+    success, message, unit = military_system.recruit_unit(
+        dynasty_id=dynasty_id,
+        unit_type=unit_type,
+        size=size,
+        territory_id=territory_id,
+        name=name
+    )
+    
+    if success:
+        flash(message, "success")
+    else:
+        flash(message, "danger")
+    
+    return redirect(url_for('military_view', dynasty_id=dynasty_id))
+
+@app.route('/dynasty/<int:dynasty_id>/form_army', methods=['POST'])
+@login_required
+def form_army(dynasty_id):
+    """Form a new army from individual units."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    # Get form data
+    unit_ids = request.form.getlist('unit_ids', type=int)
+    name = request.form.get('name')
+    commander_id = request.form.get('commander_id', type=int)
+    
+    # Validate data
+    if not unit_ids or not name:
+        flash("Missing required fields.", "danger")
+        return redirect(url_for('military_view', dynasty_id=dynasty_id))
+    
+    # Form army
+    from models.military_system import MilitarySystem
+    military_system = MilitarySystem(db.session)
+    success, message, army = military_system.form_army(
+        dynasty_id=dynasty_id,
+        unit_ids=unit_ids,
+        name=name,
+        commander_id=commander_id
+    )
+    
+    if success:
+        flash(message, "success")
+    else:
+        flash(message, "danger")
+    
+    return redirect(url_for('military_view', dynasty_id=dynasty_id))
+
+@app.route('/dynasty/<int:dynasty_id>/assign_commander', methods=['POST'])
+@login_required
+def assign_commander(dynasty_id):
+    """Assign a commander to an army."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    # Get form data
+    army_id = request.form.get('army_id', type=int)
+    commander_id = request.form.get('commander_id', type=int)
+    
+    # Validate data
+    if not army_id or not commander_id:
+        flash("Missing required fields.", "danger")
+        return redirect(url_for('military_view', dynasty_id=dynasty_id))
+    
+    # Assign commander
+    from models.military_system import MilitarySystem
+    military_system = MilitarySystem(db.session)
+    success, message = military_system.assign_commander(
+        army_id=army_id,
+        commander_id=commander_id
+    )
+    
+    if success:
+        flash(message, "success")
+    else:
+        flash(message, "danger")
+    
+    return redirect(url_for('military_view', dynasty_id=dynasty_id))
+
+@app.route('/army/<int:army_id>')
+@login_required
+def army_details(army_id):
+    """View details of an army."""
+    army = Army.query.get_or_404(army_id)
+    dynasty = DynastyDB.query.get_or_404(army.dynasty_id)
+    
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    # Get army composition visualization
+    from visualization.military_renderer import MilitaryRenderer
+    military_renderer = MilitaryRenderer(db.session)
+    army_composition = military_renderer.render_army_composition(army_id)
+    
+    # Get potential commanders
+    commanders = PersonDB.query.filter_by(
+        dynasty_id=dynasty.id,
+        death_year=None
+    ).all()
+    
+    # Filter to those who can lead armies
+    potential_commanders = [p for p in commanders if p.can_lead_army()]
+    
+    return render_template('army_details.html',
+                          army=army,
+                          dynasty=dynasty,
+                          army_composition=army_composition,
+                          potential_commanders=potential_commanders)
+
+@app.route('/battle/<int:battle_id>')
+@login_required
+def battle_details(battle_id):
+    """View details of a battle."""
+    battle = Battle.query.get_or_404(battle_id)
+    
+    # Check if user has access to this battle
+    attacker_dynasty = DynastyDB.query.get(battle.attacker_dynasty_id)
+    defender_dynasty = DynastyDB.query.get(battle.defender_dynasty_id)
+    
+    if (attacker_dynasty and attacker_dynasty.owner_user == current_user) or \
+       (defender_dynasty and defender_dynasty.owner_user == current_user):
+        # Get battle visualization
+        from visualization.military_renderer import MilitaryRenderer
+        military_renderer = MilitaryRenderer(db.session)
+        battle_result = military_renderer.render_battle_result(battle_id)
+        
+        return render_template('battle_details.html',
+                              battle=battle,
+                              attacker_dynasty=attacker_dynasty,
+                              defender_dynasty=defender_dynasty,
+                              battle_result=battle_result)
+    else:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+
+@app.route('/siege/<int:siege_id>')
+@login_required
+def siege_details(siege_id):
+    """View details of a siege."""
+    siege = Siege.query.get_or_404(siege_id)
+    
+    # Check if user has access to this siege
+    attacker_dynasty = DynastyDB.query.get(siege.attacker_dynasty_id)
+    defender_dynasty = DynastyDB.query.get(siege.defender_dynasty_id)
+    
+    if (attacker_dynasty and attacker_dynasty.owner_user == current_user) or \
+       (defender_dynasty and defender_dynasty.owner_user == current_user):
+        # Get siege visualization
+        from visualization.military_renderer import MilitaryRenderer
+        military_renderer = MilitaryRenderer(db.session)
+        siege_progress = military_renderer.render_siege_progress(siege_id)
+        
+        return render_template('siege_details.html',
+                              siege=siege,
+                              attacker_dynasty=attacker_dynasty,
+                              defender_dynasty=defender_dynasty,
+                              siege_progress=siege_progress)
+    else:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+
+@app.route('/dynasty/<int:dynasty_id>/initiate_battle', methods=['POST'])
+@login_required
+def initiate_battle(dynasty_id):
+    """Initiate a battle between two armies."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    # Get form data
+    attacker_army_id = request.form.get('attacker_army_id', type=int)
+    defender_army_id = request.form.get('defender_army_id', type=int)
+    territory_id = request.form.get('territory_id', type=int)
+    war_id = request.form.get('war_id', type=int)
+    
+    # Validate data
+    if not attacker_army_id or not defender_army_id or not territory_id:
+        flash("Missing required fields.", "danger")
+        return redirect(url_for('military_view', dynasty_id=dynasty_id))
+    
+    # Initiate battle
+    from models.military_system import MilitarySystem
+    military_system = MilitarySystem(db.session)
+    success, message, battle = military_system.initiate_battle(
+        attacker_army_id=attacker_army_id,
+        defender_army_id=defender_army_id,
+        territory_id=territory_id,
+        war_id=war_id
+    )
+    
+    if success:
+        flash(message, "success")
+        if battle:
+            return redirect(url_for('battle_details', battle_id=battle.id))
+    else:
+        flash(message, "danger")
+    
+    return redirect(url_for('military_view', dynasty_id=dynasty_id))
+
+@app.route('/dynasty/<int:dynasty_id>/initiate_siege', methods=['POST'])
+@login_required
+def initiate_siege(dynasty_id):
+    """Initiate a siege of a territory."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    # Get form data
+    army_id = request.form.get('army_id', type=int)
+    territory_id = request.form.get('territory_id', type=int)
+    war_id = request.form.get('war_id', type=int)
+    
+    # Validate data
+    if not army_id or not territory_id:
+        flash("Missing required fields.", "danger")
+        return redirect(url_for('military_view', dynasty_id=dynasty_id))
+    
+    # Initiate siege
+    from models.military_system import MilitarySystem
+    military_system = MilitarySystem(db.session)
+    success, message, siege = military_system.initiate_siege(
+        army_id=army_id,
+        territory_id=territory_id,
+        war_id=war_id
+    )
+    
+    if success:
+        flash(message, "success")
+        if siege:
+            return redirect(url_for('siege_details', siege_id=siege.id))
+    else:
+        flash(message, "danger")
+    
+    return redirect(url_for('military_view', dynasty_id=dynasty_id))
+
+@app.route('/dynasty/<int:dynasty_id>/update_siege/<int:siege_id>')
+@login_required
+def update_siege(dynasty_id, siege_id):
+    """Update the progress of a siege."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    # Update siege
+    from models.military_system import MilitarySystem
+    military_system = MilitarySystem(db.session)
+    success, message, siege = military_system.update_siege(siege_id=siege_id)
+    
+    if success:
+        flash(message, "success")
+        if siege:
+            return redirect(url_for('siege_details', siege_id=siege.id))
+    else:
+        return False, "Not enough gold for military maintenance. Troops' morale has decreased.", costs
+
+# Diplomacy routes
+@app.route('/dynasty/<int:dynasty_id>/diplomacy')
+@login_required
+def diplomacy_view(dynasty_id):
+    """View and manage diplomatic relations for a dynasty."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    # Get all other dynasties
+    other_dynasties = DynastyDB.query.filter(DynastyDB.id != dynasty_id).all()
+    
+    # Create diplomacy system
+    diplomacy_system = DiplomacySystem(db.session)
+    
+    # Get diplomatic relations
+    relations = []
+    for other_dynasty in other_dynasties:
+        status, score = diplomacy_system.get_relation_status(dynasty_id, other_dynasty.id)
+        relations.append({
+            'dynasty': other_dynasty,
+            'status': status,
+            'score': score
+        })
+    
+    # Get active treaties
+    active_treaties = []
+    for other_dynasty in other_dynasties:
+        relation = diplomacy_system.get_diplomatic_relation(dynasty_id, other_dynasty.id, create_if_not_exists=False)
+        if relation:
+            treaties = Treaty.query.filter_by(diplomatic_relation_id=relation.id, active=True).all()
+            for treaty in treaties:
+                active_treaties.append({
+                    'treaty': treaty,
+                    'other_dynasty': other_dynasty,
+                    'treaty_type': treaty.treaty_type.value.replace('_', ' ').title(),
+                    'start_year': treaty.start_year,
+                    'duration': treaty.duration
+                })
+    
+    # Get active wars
+    active_wars = []
+    wars_as_attacker = War.query.filter_by(attacker_dynasty_id=dynasty_id, is_active=True).all()
+    wars_as_defender = War.query.filter_by(defender_dynasty_id=dynasty_id, is_active=True).all()
+    
+    for war in wars_as_attacker:
+        defender = DynastyDB.query.get(war.defender_dynasty_id)
+        if defender:
+            active_wars.append({
+                'war': war,
+                'other_dynasty': defender,
+                'is_attacker': True,
+                'war_goal': war.war_goal.value.replace('_', ' ').title(),
+                'start_year': war.start_year,
+                'war_score': war.attacker_war_score
+            })
+    
+    for war in wars_as_defender:
+        attacker = DynastyDB.query.get(war.attacker_dynasty_id)
+        if attacker:
+            active_wars.append({
+                'war': war,
+                'other_dynasty': attacker,
+                'is_attacker': False,
+                'war_goal': war.war_goal.value.replace('_', ' ').title(),
+                'start_year': war.start_year,
+                'war_score': war.defender_war_score
+            })
+    
+    # Generate diplomatic relations visualization
+    diplomacy_renderer = DiplomacyRenderer(db.session)
+    relations_image = diplomacy_renderer.render_diplomatic_relations(dynasty_id=dynasty_id)
+    treaty_image = diplomacy_renderer.render_treaty_network()
+    history_image = diplomacy_renderer.render_diplomatic_history(dynasty_id=dynasty_id)
+    
+    # Get reputation metrics
+    reputation = {
+        'prestige': dynasty.prestige,
+        'honor': dynasty.honor,
+        'infamy': dynasty.infamy
+    }
+    
+    return render_template('diplomacy_view.html',
+                          dynasty=dynasty,
+                          relations=relations,
+                          active_treaties=active_treaties,
+                          active_wars=active_wars,
+                          reputation=reputation,
+                          relations_image=relations_image,
+                          treaty_image=treaty_image,
+                          history_image=history_image)
+
+@app.route('/dynasty/<int:dynasty_id>/treaties')
+@login_required
+def treaty_view(dynasty_id):
+    """View and manage treaties for a dynasty."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    # Get all treaties
+    treaties = []
+    relations = DiplomaticRelation.query.filter((DiplomaticRelation.dynasty1_id == dynasty_id) | 
+                                              (DiplomaticRelation.dynasty2_id == dynasty_id)).all()
+    
+    for relation in relations:
+        other_dynasty_id = relation.dynasty2_id if relation.dynasty1_id == dynasty_id else relation.dynasty1_id
+        other_dynasty = DynastyDB.query.get(other_dynasty_id)
+        
+        if other_dynasty:
+            relation_treaties = Treaty.query.filter_by(diplomatic_relation_id=relation.id).all()
+            
+            for treaty in relation_treaties:
+                treaties.append({
+                    'treaty': treaty,
+                    'other_dynasty': other_dynasty,
+                    'treaty_type': treaty.treaty_type.value.replace('_', ' ').title(),
+                    'start_year': treaty.start_year,
+                    'duration': treaty.duration,
+                    'active': treaty.active,
+                    'terms': treaty.get_terms() if hasattr(treaty, 'get_terms') else {}
+                })
+    
+    # Generate treaty network visualization
+    diplomacy_renderer = DiplomacyRenderer(db.session)
+    treaty_image = diplomacy_renderer.render_treaty_network()
+    
+    return render_template('treaty_view.html',
+                          dynasty=dynasty,
+                          treaties=treaties,
+                          treaty_image=treaty_image)
+
+@app.route('/dynasty/<int:dynasty_id>/diplomatic_action', methods=['POST'])
+@login_required
+def perform_diplomatic_action(dynasty_id):
+    """Perform a diplomatic action."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    # Get form data
+    target_dynasty_id = request.form.get('target_dynasty_id', type=int)
+    action_type = request.form.get('action_type')
+    
+    if not target_dynasty_id or not action_type:
+        flash("Missing required parameters.", "danger")
+        return redirect(url_for('diplomacy_view', dynasty_id=dynasty_id))
+    
+    # Create diplomacy system
+    diplomacy_system = DiplomacySystem(db.session)
+    
+    # Perform action
+    success, message = diplomacy_system.perform_diplomatic_action(
+        dynasty_id, target_dynasty_id, action_type
+    )
+    
+    if success:
+        flash(message, "success")
+    else:
+        flash(message, "danger")
+    
+    return redirect(url_for('diplomacy_view', dynasty_id=dynasty_id))
+
+@app.route('/dynasty/<int:dynasty_id>/create_treaty', methods=['POST'])
+@login_required
+def create_treaty(dynasty_id):
+    """Create a treaty between dynasties."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    # Get form data
+    target_dynasty_id = request.form.get('target_dynasty_id', type=int)
+    treaty_type = request.form.get('treaty_type')
+    duration = request.form.get('duration', type=int)
+    
+    if not target_dynasty_id or not treaty_type:
+        flash("Missing required parameters.", "danger")
+        return redirect(url_for('diplomacy_view', dynasty_id=dynasty_id))
+    
+    # Convert treaty_type string to enum
+    try:
+        treaty_type_enum = TreatyType[treaty_type]
+    except (KeyError, ValueError):
+        flash("Invalid treaty type.", "danger")
+        return redirect(url_for('diplomacy_view', dynasty_id=dynasty_id))
+    
+    # Create diplomacy system
+    diplomacy_system = DiplomacySystem(db.session)
+    
+    # Create treaty
+    success, message, _ = diplomacy_system.create_treaty(
+        dynasty_id, target_dynasty_id, treaty_type_enum, duration
+    )
+    
+    if success:
+        flash(message, "success")
+    else:
+        flash(message, "danger")
+    
+    return redirect(url_for('diplomacy_view', dynasty_id=dynasty_id))
+
+@app.route('/dynasty/<int:dynasty_id>/break_treaty/<int:treaty_id>', methods=['POST'])
+@login_required
+def break_treaty(dynasty_id, treaty_id):
+    """Break a treaty."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    # Create diplomacy system
+    diplomacy_system = DiplomacySystem(db.session)
+    
+    # Break treaty
+    success, message = diplomacy_system.break_treaty(treaty_id, dynasty_id)
+    
+    if success:
+        flash(message, "success")
+    else:
+        flash(message, "danger")
+    
+    return redirect(url_for('diplomacy_view', dynasty_id=dynasty_id))
+
+@app.route('/dynasty/<int:dynasty_id>/declare_war', methods=['POST'])
+@login_required
+def declare_war(dynasty_id):
+    """Declare war on another dynasty."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    # Get form data
+    target_dynasty_id = request.form.get('target_dynasty_id', type=int)
+    war_goal = request.form.get('war_goal')
+    target_territory_id = request.form.get('target_territory_id', type=int)
+    
+    if not target_dynasty_id or not war_goal:
+        flash("Missing required parameters.", "danger")
+        return redirect(url_for('diplomacy_view', dynasty_id=dynasty_id))
+    
+    # Convert war_goal string to enum
+    try:
+        war_goal_enum = WarGoal[war_goal]
+    except (KeyError, ValueError):
+        flash("Invalid war goal.", "danger")
+        return redirect(url_for('diplomacy_view', dynasty_id=dynasty_id))
+    
+    # Create diplomacy system
+    diplomacy_system = DiplomacySystem(db.session)
+    
+    # Declare war
+    success, message, _ = diplomacy_system.declare_war(
+        dynasty_id, target_dynasty_id, war_goal_enum, target_territory_id
+    )
+    
+    if success:
+        flash(message, "success")
+    else:
+        flash(message, "danger")
+    
+    return redirect(url_for('diplomacy_view', dynasty_id=dynasty_id))
+
+@app.route('/dynasty/<int:dynasty_id>/negotiate_peace/<int:war_id>', methods=['POST'])
+@login_required
+def negotiate_peace(dynasty_id, war_id):
+    """Negotiate peace to end a war."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    # Get war
+    war = War.query.get_or_404(war_id)
+    
+    # Check if dynasty is involved in the war
+    if war.attacker_dynasty_id != dynasty_id and war.defender_dynasty_id != dynasty_id:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('diplomacy_view', dynasty_id=dynasty_id))
+    
+    # Determine if dynasty is attacker or defender
+    is_attacker = (war.attacker_dynasty_id == dynasty_id)
+    
+    # Get form data
+    terms = {}
+    
+    # Territory transfer
+    territory_id = request.form.get('territory_id', type=int)
+    if territory_id:
+        terms['territory_transfer'] = territory_id
+    
+    # Gold payment
+    gold_payment = request.form.get('gold_payment', type=int)
+    if gold_payment:
+        terms['gold_payment'] = gold_payment
+    
+    # Vassalization
+    vassalize = request.form.get('vassalize') == 'on'
+    if vassalize:
+        terms['vassalize'] = True
+    
+    # Create diplomacy system
+    diplomacy_system = DiplomacySystem(db.session)
+    
+    # Negotiate peace
+    success, message = diplomacy_system.negotiate_peace(
+        war_id, is_attacker, terms
+    )
+    
+    if success:
+        flash(message, "success")
+    else:
+        flash(message, "danger")
+    
+    return redirect(url_for('diplomacy_view', dynasty_id=dynasty_id))
+
+@app.route('/dynasty/<int:dynasty_id>/move_unit', methods=['POST'])
+@login_required
+def move_unit(dynasty_id):
+    """Move a military unit to a target territory."""
+    # Get dynasty
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    
+    # Check ownership
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    # Get form data
+    unit_id = request.form.get('unit_id', type=int)
+    target_territory_id = request.form.get('target_territory_id', type=int)
+    
+    if not unit_id or not target_territory_id:
+        flash("Missing unit ID or target territory ID.", "danger")
+        return redirect(url_for('dynasty_territories', dynasty_id=dynasty_id))
+    
+    # Create movement system
+    movement_system = MovementSystem(db.session)
+    
+    # Move unit
+    success, message = movement_system.move_unit(unit_id, target_territory_id)
+    
+    if success:
+        flash(message, "success")
+    else:
+        flash(f"Failed to move unit: {message}", "danger")
+    
+    # Redirect back to territories page
+    return redirect(url_for('dynasty_territories', dynasty_id=dynasty_id))
+
+@app.route('/dynasty/<int:dynasty_id>/move_army', methods=['POST'])
+@login_required
+def move_army(dynasty_id):
+    """Move an army to a target territory."""
+    # Get dynasty
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    
+    # Check ownership
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    # Get form data
+    army_id = request.form.get('army_id', type=int)
+    target_territory_id = request.form.get('target_territory_id', type=int)
+    
+    if not army_id or not target_territory_id:
+        flash("Missing army ID or target territory ID.", "danger")
+        return redirect(url_for('dynasty_territories', dynasty_id=dynasty_id))
+    
+    # Create movement system
+    movement_system = MovementSystem(db.session)
+    
+    # Move army
+    success, message = movement_system.move_army(army_id, target_territory_id)
+    
+    if success:
+        flash(message, "success")
+    else:
+        flash(f"Failed to move army: {message}", "danger")
+    
+    # Redirect back to territories page
+# Time system routes
+@app.route('/dynasty/<int:dynasty_id>/time')
+@login_required
+def time_view(dynasty_id):
+    """View time management interface for a dynasty."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    # Get current year and season
+    current_year = dynasty.current_simulation_year
+    
+    try:
+        # Import the time system
+        from models.time_system import TimeSystem, Season
+        from visualization.time_renderer import TimeRenderer
+        
+        # Create time system and renderer
+        time_system = TimeSystem(db.session)
+        time_renderer = TimeRenderer(db.session)
+        
+        # Get current season
+        current_season = time_system.get_current_season(current_year)
+        
+        # Get historical timeline
+        timeline_events = time_system.get_historical_timeline(dynasty_id, 
+                                                            start_year=current_year-10 if current_year > dynasty.start_year+10 else dynasty.start_year,
+                                                            end_year=current_year)
+        
+        # Get scheduled events
+        scheduled_events = time_system.get_scheduled_timeline(dynasty_id)
+        
+        # Generate timeline visualization
+        timeline_image = time_renderer.render_timeline(dynasty_id, 
+                                                     start_year=current_year-10 if current_year > dynasty.start_year+10 else dynasty.start_year,
+                                                     end_year=current_year)
+        if timeline_image:
+            timeline_image_url = timeline_image.replace('static/', '/static/')
+        else:
+            timeline_image_url = None
+        
+        # Generate scheduled events visualization if there are any
+        if scheduled_events:
+            scheduled_events_image = time_renderer.render_scheduled_events(dynasty_id)
+            if scheduled_events_image:
+                scheduled_events_image_url = scheduled_events_image.replace('static/', '/static/')
+            else:
+                scheduled_events_image_url = None
+        else:
+            scheduled_events_image_url = None
+        
+        # Generate seasonal map
+        seasonal_map_image = time_renderer.render_seasonal_map(current_year)
+        if seasonal_map_image:
+            seasonal_map_image_url = seasonal_map_image.replace('static/', '/static/')
+        else:
+            seasonal_map_image_url = None
+        
+        # Calculate action points
+        action_points = time_system.calculate_action_points(dynasty_id)
+        
+        # Get population growth rates
+        population_growth_rates = time_system.get_population_growth_rates()
+        
+    except Exception as e:
+        flash(f"Error loading time system: {str(e)}", "danger")
+        return render_template('time_view.html', 
+                              dynasty=dynasty,
+                              current_year=current_year,
+                              current_season=None,
+                              timeline_events=[],
+                              scheduled_events=[],
+                              timeline_image_url=None,
+                              scheduled_events_image_url=None,
+                              seasonal_map_image_url=None,
+                              action_points=0,
+                              population_growth_rates={})
+    
+    return render_template('time_view.html', 
+                          dynasty=dynasty,
+                          current_year=current_year,
+                          current_season=current_season,
+                          timeline_events=timeline_events,
+                          scheduled_events=scheduled_events,
+                          timeline_image_url=timeline_image_url,
+                          scheduled_events_image_url=scheduled_events_image_url,
+                          seasonal_map_image_url=seasonal_map_image_url,
+                          action_points=action_points,
+                          population_growth_rates=population_growth_rates)
+
+@app.route('/dynasty/<int:dynasty_id>/advance_time', methods=['POST'])
+@login_required
+def advance_time(dynasty_id):
+    """Advance time for a dynasty by processing a turn."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    try:
+        # Import the time system
+        from models.time_system import TimeSystem
+        
+        # Create time system
+        time_system = TimeSystem(db.session)
+        
+        # Process turn
+        success, message = time_system.process_turn(dynasty_id)
+        
+        if success:
+            flash(message, "success")
+        else:
+            flash(f"Error advancing time: {message}", "danger")
+        
+    except Exception as e:
+        flash(f"Error advancing time: {str(e)}", "danger")
+    
+    return redirect(url_for('time_view', dynasty_id=dynasty_id))
+
+@app.route('/dynasty/<int:dynasty_id>/schedule_event', methods=['POST'])
+@login_required
+def schedule_event(dynasty_id):
+    """Schedule a new event for a dynasty."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    try:
+        # Import the time system
+        from models.time_system import TimeSystem, EventType, EventPriority
+        
+        # Get form data
+        event_type_str = request.form.get('event_type')
+        year = request.form.get('year')
+        priority_str = request.form.get('priority', 'MEDIUM')
+        action = request.form.get('action')
+        target_dynasty_id = request.form.get('target_dynasty_id')
+        territory_id = request.form.get('territory_id')
+        
+        # Validate data
+        if not event_type_str or not year or not action:
+            flash("Missing required fields for scheduling an event.", "danger")
+            return redirect(url_for('time_view', dynasty_id=dynasty_id))
+        
+        # Convert year to int
+        try:
+            year = int(year)
+        except ValueError:
+            flash("Year must be a number.", "danger")
+            return redirect(url_for('time_view', dynasty_id=dynasty_id))
+        
+        # Check if year is in the future
+        if year <= dynasty.current_simulation_year:
+            flash("Events can only be scheduled for future years.", "danger")
+            return redirect(url_for('time_view', dynasty_id=dynasty_id))
+        
+        # Create event data
+        event_data = {
+            "action": action,
+            "actor_dynasty_id": dynasty_id
+        }
+        
+        if target_dynasty_id:
+            event_data["target_dynasty_id"] = int(target_dynasty_id)
+        
+        if territory_id:
+            event_data["territory_id"] = int(territory_id)
+        
+        # Create time system
+        time_system = TimeSystem(db.session)
+        
+        # Schedule event
+        event_id = time_system.schedule_event(
+            event_type=EventType[event_type_str],
+            year=year,
+            data=event_data,
+            priority=EventPriority[priority_str]
+        )
+        
+        flash(f"Event scheduled successfully for year {year}.", "success")
+        
+    except Exception as e:
+        flash(f"Error scheduling event: {str(e)}", "danger")
+    
+    return redirect(url_for('time_view', dynasty_id=dynasty_id))
+
+@app.route('/dynasty/<int:dynasty_id>/cancel_event/<int:event_id>', methods=['POST'])
+@login_required
+def cancel_event(dynasty_id, event_id):
+    """Cancel a scheduled event."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    try:
+        # Import the time system
+        from models.time_system import TimeSystem
+        
+        # Create time system
+        time_system = TimeSystem(db.session)
+        
+        # Cancel event
+        success = time_system.cancel_event(event_id)
+        
+        if success:
+            flash("Event cancelled successfully.", "success")
+        else:
+            flash("Event not found or already processed.", "warning")
+        
+    except Exception as e:
+        flash(f"Error cancelling event: {str(e)}", "danger")
+    
+    return redirect(url_for('time_view', dynasty_id=dynasty_id))
+
+@app.route('/dynasty/<int:dynasty_id>/timeline')
+@login_required
+def timeline_view(dynasty_id):
+    """View the historical timeline for a dynasty."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    # Get start and end years from query parameters
+    start_year = request.args.get('start_year')
+    end_year = request.args.get('end_year')
+    
+    if start_year:
+        try:
+            start_year = int(start_year)
+        except ValueError:
+            start_year = dynasty.start_year
+    else:
+        start_year = dynasty.start_year
+    
+    if end_year:
+        try:
+            end_year = int(end_year)
+        except ValueError:
+            end_year = dynasty.current_simulation_year
+    else:
+        end_year = dynasty.current_simulation_year
+    
+    try:
+        # Import the time system
+        from models.time_system import TimeSystem
+        from visualization.time_renderer import TimeRenderer
+        
+        # Create time system and renderer
+        time_system = TimeSystem(db.session)
+        time_renderer = TimeRenderer(db.session)
+        
+        # Get historical timeline
+        timeline_events = time_system.get_historical_timeline(dynasty_id, start_year, end_year)
+        
+        # Generate timeline visualization
+        timeline_image = time_renderer.render_timeline(dynasty_id, start_year, end_year)
+        if timeline_image:
+            timeline_image_url = timeline_image.replace('static/', '/static/')
+        else:
+            timeline_image_url = None
+        
+    except Exception as e:
+        flash(f"Error loading timeline: {str(e)}", "danger")
+        return render_template('timeline_view.html', 
+                              dynasty=dynasty,
+                              start_year=start_year,
+                              end_year=end_year,
+                              timeline_events=[],
+                              timeline_image_url=None)
+    
+    return render_template('timeline_view.html', 
+                          dynasty=dynasty,
+                          start_year=start_year,
+                          end_year=end_year,
+                          timeline_events=timeline_events,
+                          timeline_image_url=timeline_image_url)
+
+@app.route('/world/seasons/<int:year>')
+@login_required
+def seasonal_map(year):
+    """View the seasonal map for a specific year."""
+    try:
+        # Import the time system
+        from models.time_system import TimeSystem
+        from visualization.time_renderer import TimeRenderer
+        
+        # Create time system and renderer
+        time_system = TimeSystem(db.session)
+        time_renderer = TimeRenderer(db.session)
+        
+        # Get current season
+        current_season = time_system.get_current_season(year)
+        
+        # Generate seasonal map
+        seasonal_map_image = time_renderer.render_seasonal_map(year)
+        if seasonal_map_image:
+            seasonal_map_image_url = seasonal_map_image.replace('static/', '/static/')
+        else:
+            seasonal_map_image_url = None
+        
+    except Exception as e:
+        flash(f"Error generating seasonal map: {str(e)}", "danger")
+        return render_template('seasonal_map.html', 
+                              year=year,
+                              current_season=None,
+                              seasonal_map_image_url=None)
+    
+    return render_template('seasonal_map.html', 
+                          year=year,
+                          current_season=current_season,
+                          seasonal_map_image_url=seasonal_map_image_url)
+
+@app.route('/world/synchronize_turns', methods=['POST'])
+@login_required
+def synchronize_turns():
+    """Synchronize turns for multiple dynasties."""
+    # Get dynasty IDs from form
+    dynasty_ids = request.form.getlist('dynasty_ids')
+    
+    if not dynasty_ids:
+        flash("No dynasties selected for synchronization.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    # Convert to integers
+    try:
+        dynasty_ids = [int(did) for did in dynasty_ids]
+    except ValueError:
+        flash("Invalid dynasty IDs.", "danger")
+        return redirect(url_for('dashboard'))
+    
+    # Check if user owns all dynasties
+    for dynasty_id in dynasty_ids:
+        dynasty = DynastyDB.query.get(dynasty_id)
+        if not dynasty or dynasty.owner_user != current_user:
+            flash("You can only synchronize dynasties that you own.", "warning")
+            return redirect(url_for('dashboard'))
+    
+    try:
+        # Import the time system
+        from models.time_system import TimeSystem
+        
+        # Create time system
+        time_system = TimeSystem(db.session)
+        
+        # Synchronize turns
+        success, message = time_system.synchronize_turns(dynasty_ids)
+        
+        if success:
+            flash(message, "success")
+        else:
+            flash(f"Error synchronizing turns: {message}", "danger")
+        
+    except Exception as e:
+        flash(f"Error synchronizing turns: {str(e)}", "danger")
+    
+    return redirect(url_for('dashboard'))
+    return redirect(url_for('dynasty_territories', dynasty_id=dynasty_id))
+
+@app.route('/dynasty/<int:dynasty_id>/develop_territory', methods=['POST'])
+@login_required
+def develop_territory(dynasty_id):
+    """Develop a territory by increasing its development level or adding buildings."""
+    # Get dynasty
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    
+    # Check ownership
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    # Get form data
+    territory_id = request.form.get('territory_id', type=int)
+    development_type = request.form.get('development_type')
+    
+    if not territory_id or not development_type:
+        flash("Missing territory ID or development type.", "danger")
+        return redirect(url_for('dynasty_territories', dynasty_id=dynasty_id))
+    
+    # Check if territory is controlled by this dynasty
+    territory = Territory.query.get_or_404(territory_id)
+    if territory.controller_dynasty_id != dynasty_id:
+        flash("You don't control this territory.", "danger")
+        return redirect(url_for('dynasty_territories', dynasty_id=dynasty_id))
+    
+    # Create territory manager
+    territory_manager = TerritoryManager(db.session)
+    
+    try:
+        # Develop territory
+        territory_manager.develop_territory(territory_id, development_type)
+        flash(f"Territory {territory.name} developed successfully.", "success")
+    except Exception as e:
+        flash(f"Failed to develop territory: {e}", "danger")
+    
+    # Redirect back to territory details page
+    return redirect(url_for('territory_details', territory_id=territory_id))
+
+@app.route('/generate_map', methods=['POST'])
+@login_required
+def generate_map():
+    """Generate a new map."""
+    # Only allow admins to generate maps
+    if current_user.username != 'admin':
+        flash("Only administrators can generate maps.", "danger")
+        return redirect(url_for('dashboard'))
+    
+    # Get form data
+    template_name = request.form.get('template_name', 'default')
+    
+    # Create map generator
+    map_generator = MapGenerator(db.session)
+    
+    try:
+        # Generate map
+        if template_name != 'default':
+            map_data = map_generator.generate_predefined_map(template_name)
+        else:
+            map_data = map_generator.generate_procedural_map()
+        
+        flash(f"Map generated successfully with {len(map_data['territories'])} territories.", "success")
+    except Exception as e:
+        flash(f"Failed to generate map: {e}", "danger")
+    
+    # Redirect to world map
+    return redirect(url_for('world_map'))
+
+
+# Add holding route
+@app.route('/dynasty/<int:dynasty_id>/add_holding', methods=['POST'])
+@login_required
+def add_holding(dynasty_id):
+    """Add a new holding to a dynasty."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('dashboard'))
+    
+    # Get form data
+    name = request.form.get('name')
+    holding_type = request.form.get('holding_type')
+    size = float(request.form.get('size', 1.0))
+    
+    # Validate
+    if not name or not holding_type:
+        flash("Name and holding type are required.", "danger")
+        return redirect(url_for('dynasty_economy', dynasty_id=dynasty_id))
+    
+    # Cost based on size and type
+    base_costs = {
+        "farm": 50,
+        "mine": 100,
+        "forest": 40,
+        "coastal": 80,
+        "urban": 150
+    }
+    
+    cost = base_costs.get(holding_type, 50) * size
+    
+    # Check if dynasty can afford it
+    if dynasty.current_wealth < cost:
+        flash(f"Not enough wealth to purchase this holding. Cost: {cost}, Available: {dynasty.current_wealth}", "danger")
+        return redirect(url_for('dynasty_economy', dynasty_id=dynasty_id))
+    
+    try:
+        # Import the economy module
+        from models.economy import EconomyManager
+        
+        # Load theme configuration
+        theme_config = {}
+        if dynasty.theme_identifier_or_json:
+            if dynasty.theme_identifier_or_json in get_all_theme_names():
+                theme_config = get_theme(dynasty.theme_identifier_or_json)
+            else:
+                try:
+                    theme_config = json.loads(dynasty.theme_identifier_or_json)
+                except json.JSONDecodeError:
+                    pass
+        
+        # Create or get economy manager
+        economy = EconomyManager(dynasty_id=dynasty.id, theme_config=theme_config)
+        
+        # Add the holding
+        economy.add_holding(name, holding_type, size)
+        
+        # Deduct cost
+        dynasty.current_wealth -= cost
+        db.session.commit()
+        
+        flash(f"Added new {holding_type} holding: {name}", "success")
+    except ImportError:
+        flash("Economy system not available.", "danger")
+    except Exception as e:
+        flash(f"Error adding holding: {str(e)}", "danger")
+    
+    return redirect(url_for('dynasty_economy', dynasty_id=dynasty_id))
+
+
+# Placeholder routes for multi-agent game functionality
+@app.route('/propose_trade', methods=['POST'])
+@login_required
+def propose_trade():
+    """Propose a trade agreement with another dynasty."""
+    flash("Trade proposal functionality will be implemented in a future update.", "info")
+    return redirect(url_for('world_economy_view'))
+
+
+@app.route('/form_alliance', methods=['POST'])
+@login_required
+def form_alliance():
+    """Form an alliance with another dynasty."""
+    flash("Alliance formation functionality will be implemented in a future update.", "info")
+    return redirect(url_for('world_economy_view'))
 
 
 # Placeholder routes for backward compatibility
@@ -947,19 +2841,81 @@ def process_world_events(dynasty: DynastyDB, current_year: int, theme_config: di
 
 def generate_family_tree_visualization(dynasty: DynastyDB, theme_config: dict):
     """Generate a family tree visualization for the dynasty."""
-    # This is a placeholder for actual visualization logic
-    # In a real implementation, this would use NetworkX and matplotlib
-    # to generate a family tree image similar to visualization/plotter.py
+    from visualization.plotter import visualize_family_tree_snapshot
+    from models.family_tree import FamilyTree
+    from models.person import Person
     
-    # For now, we'll just create a directory for visualizations
+    # Create a directory for visualizations
     visualizations_dir = os.path.join('static', 'visualizations')
     os.makedirs(visualizations_dir, exist_ok=True)
     
-    # In a full implementation, this would save the image to:
-    # f"{visualizations_dir}/family_tree_{dynasty.name.replace(' ', '_')}_year_{dynasty.current_simulation_year}_living_nobles.png"
-    
-    # For now, we'll just log that visualization would be generated
-    print(f"Family tree visualization would be generated for {dynasty.name} in year {dynasty.current_simulation_year}")
+    try:
+        # Create a FamilyTree object from the database
+        family_tree = FamilyTree(dynasty.name, theme_config)
+        family_tree.current_year = dynasty.current_simulation_year
+        
+        # Load all persons from the database into the family tree
+        persons = PersonDB.query.filter_by(dynasty_id=dynasty.id).all()
+        
+        # First pass: Create Person objects
+        person_objects = {}
+        for db_person in persons:
+            person = Person(
+                id=db_person.id,
+                name=db_person.name,
+                surname=db_person.surname,
+                gender=db_person.gender,
+                birth_year=db_person.birth_year,
+                death_year=db_person.death_year,
+                is_noble=db_person.is_noble
+            )
+            person.is_monarch = db_person.is_monarch
+            person.reign_start_year = db_person.reign_start_year
+            person.reign_end_year = db_person.reign_end_year
+            person.titles = db_person.get_titles()
+            person.traits = db_person.get_traits()
+            
+            person_objects[db_person.id] = person
+            family_tree.members[db_person.id] = person
+            
+            if db_person.is_monarch and db_person.death_year is None:
+                family_tree.current_monarch = person
+        
+        # Second pass: Set relationships
+        for db_person in persons:
+            person = person_objects.get(db_person.id)
+            if not person:
+                continue
+                
+            # Set parents
+            if db_person.father_sim_id and db_person.father_sim_id in person_objects:
+                person.father = person_objects[db_person.father_sim_id]
+                if person not in person.father.children:
+                    person.father.children.append(person)
+                    
+            if db_person.mother_sim_id and db_person.mother_sim_id in person_objects:
+                person.mother = person_objects[db_person.mother_sim_id]
+                if person not in person.mother.children:
+                    person.mother.children.append(person)
+            
+            # Set spouse
+            if db_person.spouse_sim_id and db_person.spouse_sim_id in person_objects:
+                person.spouse = person_objects[db_person.spouse_sim_id]
+        
+        # Generate the visualization
+        visualize_family_tree_snapshot(
+            family_tree_obj=family_tree,
+            year=dynasty.current_simulation_year,
+            display_mode="living_nobles"
+        )
+        
+        print(f"Family tree visualization generated for {dynasty.name} in year {dynasty.current_simulation_year}")
+        return True
+    except Exception as e:
+        print(f"Error generating family tree visualization: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return False
 
 
 # --- Initialize Test User ---
@@ -973,24 +2929,41 @@ def initialize_test_user():
             test_user.set_password("password")
             db.session.add(test_user)
             db.session.commit()
-            print("Test user created.")
+            logger.info("Test user created.")
         else:
-            print("Test user already exists.")
+            logger.info("Test user already exists.")
         return test_user
 
 
 if __name__ == '__main__':
-    # Ensure the database tables are created if they don't exist
-    # This should be run once, or can be handled by Flask-Migrate for schema changes
-    with app.app_context():
-        db.create_all()
-        print("Database tables checked/created.")
-        
-        # Initialize test user
-        initialize_test_user()
+    try:
+        # Initialize database with integrity checks and migrations
+        with app.app_context():
+            # Initialize database
+            success = db_initializer.initialize_database()
+            if not success:
+                logger.error("Database initialization failed. Attempting to continue anyway.")
+            
+            # Perform migrations if needed
+            migration_success = db_initializer.perform_migrations()
+            if not migration_success:
+                logger.warning("Database migrations failed. Some features may not work correctly.")
+            
+            # Initialize test user
+            initialize_test_user()
+            
+            logger.info("Database initialization completed.")
 
-    # Pre-load themes from JSON file into theme_manager when app starts
-    load_cultural_themes()  # From utils.theme_manager
+        # Pre-load themes from JSON file into theme_manager when app starts
+        load_cultural_themes()  # From utils.theme_manager
+        logger.info("Cultural themes loaded.")
 
-    app.run(debug=True,
-            use_reloader=False)  # debug=True for development, use_reloader=False often helps with PyCharm debugger
+        # Start the Flask application
+        logger.info("Starting Flask application...")
+        app.run(debug=True,
+                use_reloader=False)  # debug=True for development, use_reloader=False often helps with PyCharm debugger
+    except Exception as e:
+        logger.critical(f"Fatal error starting application: {str(e)}")
+        import traceback
+        logger.critical(traceback.format_exc())
+        sys.exit(1)

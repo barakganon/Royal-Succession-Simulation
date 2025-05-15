@@ -1,0 +1,348 @@
+{% extends "base.html" %}
+
+{% block title %}{{ dynasty.name }} - Military{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="mt-4 mb-3">{{ dynasty.name }} - Military Management</h1>
+    
+    <div class="row">
+        <!-- Military Controls -->
+        <div class="col-md-3">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Military Information</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Dynasty:</strong> {{ dynasty.name }}</p>
+                    <p><strong>Current Year:</strong> {{ dynasty.current_simulation_year }}</p>
+                    <p><strong>Wealth:</strong> {{ dynasty.current_wealth }}</p>
+                    <p><strong>Units:</strong> {{ units|length }}</p>
+                    <p><strong>Armies:</strong> {{ armies|length }}</p>
+                    
+                    <div class="d-grid gap-2 mt-3">
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#recruitUnitModal">Recruit Unit</button>
+                        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#formArmyModal">Form Army</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Military Commanders</h5>
+                </div>
+                <div class="card-body">
+                    {% if potential_commanders %}
+                    <ul class="list-group">
+                        {% for commander in potential_commanders %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ commander.name }} {{ commander.surname }}
+                            <span class="badge bg-primary">Skill: {{ commander.military_skill }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted">No potential commanders available.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Military Overview -->
+        <div class="col-md-9">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Military Overview</h5>
+                </div>
+                <div class="card-body">
+                    {% if military_overview %}
+                    <div class="text-center">
+                        <img src="data:image/png;base64,{{ military_overview }}" class="img-fluid" alt="Military Overview">
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning">
+                        <p>Military overview visualization not available.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Armies</h5>
+                </div>
+                <div class="card-body">
+                    {% if armies %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Location</th>
+                                    <th>Units</th>
+                                    <th>Commander</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for army in armies %}
+                                <tr>
+                                    <td>{{ army.name }}</td>
+                                    <td>
+                                        {% if army.territory_id %}
+                                        <a href="{{ url_for('territory_details', territory_id=army.territory_id) }}">
+                                            {{ army.current_territory.name }}
+                                        </a>
+                                        {% else %}
+                                        Not deployed
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ army.units.count() }} units</td>
+                                    <td>
+                                        {% if army.commander_id %}
+                                        {{ army.commander.name }} {{ army.commander.surname }}
+                                        {% else %}
+                                        <span class="text-warning">No commander</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('army_details', army_id=army.id) }}" class="btn btn-sm btn-primary">View</a>
+                                        <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#assignCommanderModal" data-army-id="{{ army.id }}">Assign Commander</button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No armies formed yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Individual Units</h5>
+                </div>
+                <div class="card-body">
+                    {% if units %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Location</th>
+                                    <th>Size</th>
+                                    <th>Quality</th>
+                                    <th>Morale</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for unit in units %}
+                                <tr>
+                                    <td>{{ unit.name or unit.unit_type.value.replace('_', ' ').title() }}</td>
+                                    <td>{{ unit.unit_type.value.replace('_', ' ').title() }}</td>
+                                    <td>
+                                        {% if unit.territory_id %}
+                                        <a href="{{ url_for('territory_details', territory_id=unit.territory_id) }}">
+                                            {{ unit.current_territory.name }}
+                                        </a>
+                                        {% else %}
+                                        Not deployed
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ unit.size }}</td>
+                                    <td>{{ unit.quality }}</td>
+                                    <td>
+                                        <div class="progress">
+                                            <div class="progress-bar {% if unit.morale < 0.5 %}bg-danger{% elif unit.morale < 0.8 %}bg-warning{% else %}bg-success{% endif %}" 
+                                                 role="progressbar" 
+                                                 style="width: {{ unit.morale * 100 }}%;" 
+                                                 aria-valuenow="{{ unit.morale * 100 }}" 
+                                                 aria-valuemin="0" 
+                                                 aria-valuemax="100">
+                                                {{ (unit.morale * 100)|int }}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No individual units available.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recruit Unit Modal -->
+<div class="modal fade" id="recruitUnitModal" tabindex="-1" aria-labelledby="recruitUnitModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="recruitUnitModalLabel">Recruit Military Unit</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{ url_for('recruit_unit', dynasty_id=dynasty.id) }}" method="post">
+                    <div class="form-group mb-3">
+                        <label for="unit_type">Unit Type:</label>
+                        <select class="form-select" name="unit_type" id="unit_type" required>
+                            <optgroup label="Infantry">
+                                <option value="levy_spearmen">Levy Spearmen</option>
+                                <option value="professional_swordsmen">Professional Swordsmen</option>
+                                <option value="elite_guards">Elite Guards</option>
+                                <option value="archers">Archers</option>
+                            </optgroup>
+                            <optgroup label="Cavalry">
+                                <option value="light_cavalry">Light Cavalry</option>
+                                <option value="heavy_cavalry">Heavy Cavalry</option>
+                                <option value="horse_archers">Horse Archers</option>
+                                <option value="knights">Knights</option>
+                            </optgroup>
+                            <optgroup label="Siege">
+                                <option value="battering_ram">Battering Ram</option>
+                                <option value="siege_tower">Siege Tower</option>
+                                <option value="catapult">Catapult</option>
+                                <option value="trebuchet">Trebuchet</option>
+                            </optgroup>
+                            <optgroup label="Naval">
+                                <option value="transport_ship">Transport Ship</option>
+                                <option value="war_galley">War Galley</option>
+                                <option value="heavy_warship">Heavy Warship</option>
+                                <option value="fire_ship">Fire Ship</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group mb-3">
+                        <label for="size">Unit Size:</label>
+                        <input type="number" class="form-control" name="size" id="size" min="100" max="1000" step="100" value="100" required>
+                        <small class="form-text text-muted">Number of troops in the unit (100-1000)</small>
+                    </div>
+                    
+                    <div class="form-group mb-3">
+                        <label for="territory_id">Recruitment Territory:</label>
+                        <select class="form-select" name="territory_id" id="territory_id" required>
+                            {% for territory in territories %}
+                            <option value="{{ territory.id }}">{{ territory.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="form-group mb-3">
+                        <label for="name">Unit Name (Optional):</label>
+                        <input type="text" class="form-control" name="name" id="name">
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Recruit Unit</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Form Army Modal -->
+<div class="modal fade" id="formArmyModal" tabindex="-1" aria-labelledby="formArmyModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="formArmyModalLabel">Form Army</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{ url_for('form_army', dynasty_id=dynasty.id) }}" method="post">
+                    <div class="form-group mb-3">
+                        <label for="name">Army Name:</label>
+                        <input type="text" class="form-control" name="name" id="name" required>
+                    </div>
+                    
+                    <div class="form-group mb-3">
+                        <label>Select Units:</label>
+                        <div class="form-text text-muted mb-2">Units must be in the same territory to form an army.</div>
+                        {% if units %}
+                        <div class="list-group">
+                            {% for unit in units %}
+                            <label class="list-group-item">
+                                <input class="form-check-input me-1" type="checkbox" name="unit_ids" value="{{ unit.id }}">
+                                {{ unit.name or unit.unit_type.value.replace('_', ' ').title() }} 
+                                ({{ unit.size }} troops, 
+                                {% if unit.territory_id %}
+                                in {{ unit.current_territory.name }})
+                                {% else %}
+                                not deployed)
+                                {% endif %}
+                            </label>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="alert alert-warning">
+                            No units available to form an army.
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-group mb-3">
+                        <label for="commander_id">Commander (Optional):</label>
+                        <select class="form-select" name="commander_id" id="commander_id">
+                            <option value="">No Commander</option>
+                            {% for commander in potential_commanders %}
+                            <option value="{{ commander.id }}">{{ commander.name }} {{ commander.surname }} (Skill: {{ commander.military_skill }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary" {% if not units %}disabled{% endif %}>Form Army</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Assign Commander Modal -->
+<div class="modal fade" id="assignCommanderModal" tabindex="-1" aria-labelledby="assignCommanderModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="assignCommanderModalLabel">Assign Commander</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{ url_for('assign_commander', dynasty_id=dynasty.id) }}" method="post">
+                    <input type="hidden" name="army_id" id="assignCommanderArmyId">
+                    
+                    <div class="form-group mb-3">
+                        <label for="commander_id">Select Commander:</label>
+                        <select class="form-select" name="commander_id" id="commander_id" required>
+                            {% for commander in potential_commanders %}
+                            <option value="{{ commander.id }}">{{ commander.name }} {{ commander.surname }} (Skill: {{ commander.military_skill }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary" {% if not potential_commanders %}disabled{% endif %}>Assign Commander</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Set army ID when opening assign commander modal
+    var assignCommanderModal = document.getElementById('assignCommanderModal');
+    if (assignCommanderModal) {
+        assignCommanderModal.addEventListener('show.bs.modal', function (event) {
+            var button = event.relatedTarget;
+            var armyId = button.getAttribute('data-army-id');
+            document.getElementById('assignCommanderArmyId').value = armyId;
+        });
+    }
+</script>
+{% endblock %}

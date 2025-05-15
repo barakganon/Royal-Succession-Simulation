@@ -1,27 +1,39 @@
-# Royal Succession Simulation
+# Royal Succession Simulation: Multi-Agent Strategic Game
 
-A historical dynasty simulation system that models the rise and fall of noble houses through generations, with a focus on succession, marriages, births, deaths, and historical events.
+A historical dynasty simulation system that has evolved into a multi-agent strategic game, where noble houses compete for power, territory, and resources. The game combines dynasty management with strategic gameplay elements including map control, military operations, diplomatic relations, and economic development.
 
 ## System Features
 
-### Simulation Engine
+### Core Game Systems
 
-The simulation engine models:
-- **Births and Deaths**: Characters are born, age, and die based on cultural and environmental factors
-- **Marriages**: Strategic alliances through marriage
+The multi-agent strategic game includes several integrated systems:
+
+- **Map System**: Geographic territories with various terrain types, resources, and strategic value
+- **Military System**: Unit recruitment, army management, battles, and sieges
+- **Diplomacy System**: Relations between dynasties, treaties, alliances, and wars
+- **Economy System**: Resource production, trade, building construction, and territory development
+- **Time System**: Turn-based progression with seasons, events, and historical tracking
+- **Game Manager**: Coordinates all systems and manages game state
+
+### Dynasty Management
+
+The dynasty management features include:
+
+- **Character System**: Leaders and nobles with traits, skills, and relationships
 - **Succession**: Various succession rules (primogeniture, elective, etc.)
-- **Events**: Random historical events that affect the dynasty
-- **Traits**: Character traits that influence behavior and outcomes
 - **Family Trees**: Tracking of complex family relationships
+- **Events**: Random historical events that affect the dynasty
 
 ### Web Interface
 
 The Flask web application provides:
+
 - **User Authentication**: Create an account to manage your dynasties
-- **Dynasty Creation**: Start a new dynasty with various cultural themes
-- **Dynasty Management**: View and manage your dynasty's members, wealth, and history
-- **Time Advancement**: Progress the simulation through years and generations
-- **Visualization**: Family tree visualizations
+- **Game Creation**: Start new games with customizable settings
+- **Dynasty Management**: View and manage your dynasty's members, territories, and armies
+- **Strategic Map**: Interactive world map showing territories, resources, and units
+- **Turn Management**: Progress through game phases and turns
+- **Visualizations**: Maps, family trees, battle reports, and diplomatic networks
 
 ## Getting Started
 
@@ -30,6 +42,8 @@ The Flask web application provides:
 - Python 3.8+
 - Flask
 - SQLAlchemy
+- Matplotlib (for visualizations)
+- NumPy (for map generation)
 - (Optional) Google Generative AI API key for enhanced narrative generation
 
 ### Installation
@@ -52,14 +66,67 @@ The Flask web application provides:
 
 4. Access the web interface at `http://localhost:5000`
 
-### Using the House Ganon Saga
+### Creating Your First Game
 
-1. Log in with username `test_user` and password `password`
-2. Navigate to the dashboard to see the House Ganon dynasty
-3. Click on "View Dynasty" to explore the family members and history
-4. Use the "Advance Turn" button to progress the simulation
+1. Log in with username `test_user` and password `password` (or create a new account)
+2. Click "Create New Game" on the dashboard
+3. Choose a map template and number of AI dynasties
+4. Name your dynasty and select a cultural theme
+5. Start the game and explore your territories
 
-### Running Local Simulations
+### Game Phases
+
+Each turn in the game consists of several phases:
+
+1. **Planning Phase**: Review your situation and plan your actions
+2. **Diplomatic Phase**: Manage relations with other dynasties
+3. **Military Phase**: Move armies and conduct battles
+4. **Economic Phase**: Manage resources and construction
+5. **Character Phase**: Handle dynasty members and events
+6. **Resolution Phase**: End of turn processing and event resolution
+
+## Project Structure
+
+- `main_flask_app.py`: Main Flask application with web routes
+- `simulation_engine.py`: Core simulation logic
+- `run_local_simulation.py`: Command-line simulation runner
+- `models/`: Core data models
+  - `person.py`: Person class representing individuals
+  - `family_tree.py`: Family tree management
+  - `history.py`: Historical event tracking
+  - `db_models.py`: Database models for Flask app
+  - `map_system.py`: Map generation and territory management
+  - `military_system.py`: Military units and combat
+  - `diplomacy_system.py`: Diplomatic relations and treaties
+  - `economy_system.py`: Resources and economic development
+  - `time_system.py`: Turn management and events
+  - `game_manager.py`: Game state coordination
+- `utils/`: Utility functions
+  - `theme_manager.py`: Cultural theme management
+  - `helpers.py`: Helper functions
+  - `logging_config.py`: Logging configuration
+- `visualization/`: Visualization tools
+  - `plotter.py`: Family tree visualization
+  - `map_renderer.py`: Map visualization
+  - `military_renderer.py`: Military visualization
+  - `diplomacy_renderer.py`: Diplomacy visualization
+  - `economy_renderer.py`: Economy visualization
+  - `time_renderer.py`: Timeline visualization
+- `themes/`: Cultural theme definitions
+  - `cultural_themes.json`: Predefined cultural themes
+- `templates/`: HTML templates for the web interface
+  - `world_map.html`: Map view template
+  - `military_view.html`: Military interface
+  - `diplomacy_view.html`: Diplomacy interface
+  - `economy_view.html`: Economy interface
+  - `time_view.html`: Time and events interface
+- `static/`: Static assets for the web interface
+- `docs/`: Documentation
+  - `user_guide.md`: How to play the game
+  - `technical_implementation.md`: Developer documentation
+  - `development_guide.md`: Guidelines for further development
+
+## Running Local Simulations
 
 For command-line simulations without the web interface:
 
@@ -69,127 +136,22 @@ python run_local_simulation.py
 
 This will run a simulation using either a random theme or the one specified in the script.
 
-## Project Structure
+## Customizing Games
 
-- `main_flask_app.py`: Main Flask application with web routes
-- `simulation_engine.py`: Core simulation logic
-- `run_local_simulation.py`: Command-line simulation runner
-- `models/`: Core data models
-  - `person.py`: Person class representing individuals
-  - `family_tree.py`: Family tree management
-  - `history.py`: Historical event tracking
-  - `db_models.py`: Database models for Flask app
-- `utils/`: Utility functions
-  - `theme_manager.py`: Cultural theme management
-  - `helpers.py`: Helper functions
-- `visualization/`: Visualization tools
-  - `plotter.py`: Family tree visualization
-- `themes/`: Cultural theme definitions
-  - `cultural_themes.json`: Predefined cultural themes
-  - `house_ganon_theme.json`: House Ganon specific theme
-- `templates/`: HTML templates for the web interface
-- `static/`: Static assets for the web interface
+You can customize your game experience by:
 
-## Customizing Dynasties
+1. Selecting different map templates (small continent, large continent, archipelago)
+2. Adjusting the number of AI dynasties
+3. Choosing different cultural themes for your dynasty
+4. Providing a custom story for LLM-based theme generation (requires API key)
 
-You can create your own dynasty by:
+## Documentation
 
-1. Using the web interface to create a new dynasty with a predefined theme
-2. Providing a custom story for LLM-based theme generation (requires API key)
-3. Creating a custom theme JSON file in the `themes/` directory
-4. Modifying the `run_local_simulation.py` file to use your custom theme or story
+For more detailed information, please refer to:
 
-## Checking Dynasty Status
-
-To check the status of the House Ganon dynasty:
-
-```
-python check_house_ganon.py
-```
-
-This will display information about the dynasty, its members, and historical events.
-
-## System Features
-
-### Simulation Engine
-
-The simulation engine models:
-- **Births and Deaths**: Characters are born, age, and die based on cultural and environmental factors
-- **Marriages**: Strategic alliances through marriage
-- **Succession**: Various succession rules (primogeniture, elective, etc.)
-- **Events**: Random historical events that affect the dynasty
-- **Traits**: Character traits that influence behavior and outcomes
-- **Family Trees**: Tracking of complex family relationships
-
-### Web Interface
-
-The Flask web application provides:
-- **User Authentication**: Create an account to manage your dynasties
-- **Dynasty Creation**: Start a new dynasty with various cultural themes
-- **Dynasty Management**: View and manage your dynasty's members, wealth, and history
-- **Time Advancement**: Progress the simulation through years and generations
-- **Visualization**: Family tree visualizations
-
-## Getting Started
-
-### Prerequisites
-
-- Python 3.8+
-- Flask
-- SQLAlchemy
-- (Optional) Google Generative AI API key for enhanced narrative generation
-
-### Installation
-
-1. Clone the repository:
-   ```
-   git clone https://github.com/yourusername/Royal-Succession-Simulation.git
-   cd Royal-Succession-Simulation
-   ```
-
-2. Install dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
-
-3. Run the Flask application:
-   ```
-   python main_flask_app.py
-   ```
-
-4. Access the web interface at `http://localhost:5000`
-
-## Project Structure
-
-- `main_flask_app.py`: Main Flask application with web routes
-- `simulation_engine.py`: Core simulation logic
-- `run_local_simulation.py`: Command-line simulation runner
-- `models/`: Core data models
-  - `person.py`: Person class representing individuals
-  - `family_tree.py`: Family tree management
-  - `history.py`: Historical event tracking
-  - `db_models.py`: Database models for Flask app
-- `utils/`: Utility functions
-  - `theme_manager.py`: Cultural theme management
-  - `helpers.py`: Helper functions
-- `visualization/`: Visualization tools
-  - `plotter.py`: Family tree visualization
-- `themes/`: Cultural theme definitions
-  - `cultural_themes.json`: Predefined cultural themes
-- `templates/`: HTML templates for the web interface
-- `static/`: Static assets for the web interface
-- `docs/`: Documentation
-  - `user_guide.md`: How to use the system
-  - `technical_implementation.md`: Developer documentation
-
-## Example Usage
-
-The system comes with predefined cultural themes that can be used to create dynasties. You can:
-
-1. Create a new dynasty through the web interface
-2. Choose a cultural theme (Medieval European, Norse, etc.)
-3. Set the starting year and succession rules
-4. Advance the simulation to see how your dynasty evolves
+- `docs/user_guide.md`: Comprehensive guide on how to play the game
+- `docs/technical_implementation.md`: Technical details about the implementation
+- `docs/development_guide.md`: Guidelines for extending the game
 
 ## Contributing
 

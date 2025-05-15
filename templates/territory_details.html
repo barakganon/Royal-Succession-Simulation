@@ -1,0 +1,357 @@
+{% extends "base.html" %}
+
+{% block title %}Territory: {{ territory.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="mt-4 mb-3">Territory: {{ territory.name }}</h1>
+    
+    <div class="row">
+        <!-- Territory Information -->
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Territory Information</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Name:</strong> {{ territory.name }}</p>
+                    <p><strong>Description:</strong> {{ territory.description }}</p>
+                    <p><strong>Terrain:</strong> {{ territory.terrain_type.value }}</p>
+                    <p><strong>Province:</strong> {{ territory.province.name }}</p>
+                    <p><strong>Region:</strong> {{ territory.province.region.name }}</p>
+                    <p><strong>Development Level:</strong> {{ territory.development_level }}</p>
+                    <p><strong>Population:</strong> {{ territory.population }}</p>
+                    <p><strong>Base Tax:</strong> {{ territory.base_tax }}</p>
+                    <p><strong>Base Manpower:</strong> {{ territory.base_manpower }}</p>
+                    
+                    {% if territory.controller_dynasty_id %}
+                    <p><strong>Controlled By:</strong> 
+                        {% if is_owned %}
+                        <span class="text-success">Your Dynasty</span>
+                        {% else %}
+                        Another Dynasty
+                        {% endif %}
+                    </p>
+                    {% else %}
+                    <p><strong>Controlled By:</strong> <span class="text-muted">Uncontrolled</span></p>
+                    {% endif %}
+                    
+                    {% if territory.is_capital %}
+                    <p><strong>Status:</strong> <span class="text-primary">Capital Territory</span></p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            {% if is_owned %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Develop Territory</h5>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('develop_territory', dynasty_id=territory.controller_dynasty_id) }}" method="post">
+                        <input type="hidden" name="territory_id" value="{{ territory.id }}">
+                        
+                        <div class="form-group mb-3">
+                            <label for="development_type">Development Type:</label>
+                            <select class="form-select" name="development_type" id="development_type" required>
+                                <option value="level">Increase Development Level</option>
+                                <option value="building">Add Building</option>
+                                <option value="infrastructure">Add Infrastructure</option>
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Develop</button>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Territory Map -->
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Territory Map</h5>
+                </div>
+                <div class="card-body">
+                    {% if territory_image %}
+                    <div class="text-center">
+                        <img src="data:image/png;base64,{{ territory_image }}" class="img-fluid" alt="Territory Map">
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning">
+                        <p>Territory map visualization not available.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Settlements -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Settlements</h5>
+                </div>
+                <div class="card-body">
+                    {% if settlements %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Population</th>
+                                    <th>Importance</th>
+                                    <th>Trade Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for settlement in settlements %}
+                                <tr>
+                                    <td>{{ settlement.name }}</td>
+                                    <td>{{ settlement.settlement_type }}</td>
+                                    <td>{{ settlement.population }}</td>
+                                    <td>{{ settlement.importance }}</td>
+                                    <td>{{ settlement.trade_value }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No settlements in this territory.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Resources -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Resources</h5>
+                </div>
+                <div class="card-body">
+                    {% if resources %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Resource</th>
+                                    <th>Type</th>
+                                    <th>Base Production</th>
+                                    <th>Quality</th>
+                                    <th>Depletion</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for resource in resources %}
+                                <tr>
+                                    <td>{{ resource.resource.name }}</td>
+                                    <td>
+                                        {% if resource.resource.is_luxury %}
+                                        <span class="badge bg-warning">Luxury</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">Basic</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ resource.base_production }}</td>
+                                    <td>{{ resource.quality }}</td>
+                                    <td>{{ resource.current_depletion * 100 }}%</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No resources in this territory.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Buildings -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Buildings</h5>
+                </div>
+                <div class="card-body">
+                    {% if buildings %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Level</th>
+                                    <th>Condition</th>
+                                    <th>Maintenance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for building in buildings %}
+                                <tr>
+                                    <td>{{ building.name }}</td>
+                                    <td>{{ building.building_type.value }}</td>
+                                    <td>{{ building.level }}</td>
+                                    <td>{{ (building.condition * 100)|int }}%</td>
+                                    <td>{{ building.maintenance_cost }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No buildings in this territory.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Military Units -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Military Units</h5>
+                </div>
+                <div class="card-body">
+                    {% if units or armies %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Size</th>
+                                    <th>Quality</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for unit in units %}
+                                <tr>
+                                    <td>{{ unit.name or unit.unit_type.value }}</td>
+                                    <td>{{ unit.unit_type.value }}</td>
+                                    <td>{{ unit.size }}</td>
+                                    <td>{{ unit.quality }}</td>
+                                    <td>
+                                        {% if is_owned and unit.dynasty_id == territory.controller_dynasty_id %}
+                                        <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#moveUnitModal" data-unit-id="{{ unit.id }}">Move</button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                
+                                {% for army in armies %}
+                                <tr class="table-primary">
+                                    <td>{{ army.name }}</td>
+                                    <td>Army ({{ army.units.count() }} units)</td>
+                                    <td>{{ army.units.with_entities(db.func.sum(MilitaryUnit.size)).scalar() or 0 }}</td>
+                                    <td>-</td>
+                                    <td>
+                                        {% if is_owned and army.dynasty_id == territory.controller_dynasty_id %}
+                                        <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#moveArmyModal" data-army-id="{{ army.id }}">Move</button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No military units in this territory.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Move Unit Modal -->
+<div class="modal fade" id="moveUnitModal" tabindex="-1" aria-labelledby="moveUnitModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="moveUnitModalLabel">Move Unit</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="moveUnitForm" action="{{ url_for('move_unit', dynasty_id=territory.controller_dynasty_id) }}" method="post">
+                    <input type="hidden" name="unit_id" id="moveUnitId">
+                    
+                    <div class="form-group mb-3">
+                        <label for="target_territory_id">Target Territory:</label>
+                        <select class="form-select" name="target_territory_id" id="target_territory_id" required>
+                            <option value="">Select Territory</option>
+                            {% for adjacent_territory in territory.adjacent_territories() %}
+                            <option value="{{ adjacent_territory.id }}">{{ adjacent_territory.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Move Unit</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Move Army Modal -->
+<div class="modal fade" id="moveArmyModal" tabindex="-1" aria-labelledby="moveArmyModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="moveArmyModalLabel">Move Army</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="moveArmyForm" action="{{ url_for('move_army', dynasty_id=territory.controller_dynasty_id) }}" method="post">
+                    <input type="hidden" name="army_id" id="moveArmyId">
+                    
+                    <div class="form-group mb-3">
+                        <label for="target_territory_id_army">Target Territory:</label>
+                        <select class="form-select" name="target_territory_id" id="target_territory_id_army" required>
+                            <option value="">Select Territory</option>
+                            {% for adjacent_territory in territory.adjacent_territories() %}
+                            <option value="{{ adjacent_territory.id }}">{{ adjacent_territory.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Move Army</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Set unit ID when opening move unit modal
+    var moveUnitModal = document.getElementById('moveUnitModal');
+    if (moveUnitModal) {
+        moveUnitModal.addEventListener('show.bs.modal', function (event) {
+            var button = event.relatedTarget;
+            var unitId = button.getAttribute('data-unit-id');
+            document.getElementById('moveUnitId').value = unitId;
+        });
+    }
+    
+    // Set army ID when opening move army modal
+    var moveArmyModal = document.getElementById('moveArmyModal');
+    if (moveArmyModal) {
+        moveArmyModal.addEventListener('show.bs.modal', function (event) {
+            var button = event.relatedTarget;
+            var armyId = button.getAttribute('data-army-id');
+            document.getElementById('moveArmyId').value = armyId;
+        });
+    }
+</script>
+{% endblock %}

@@ -1,52 +1,143 @@
-# Technical Implementation of Royal Succession Simulation
+# Technical Implementation of Royal Succession Multi-Agent Strategic Game
 
-This document provides technical details about how the Royal Succession Simulation system is implemented. It's intended for developers who want to understand the code structure, database schema, and simulation logic.
+This document provides technical details about how the Royal Succession Multi-Agent Strategic Game is implemented. It's intended for developers who want to understand the code structure, database schema, and game systems.
 
 ## Implementation Overview
 
-The simulation system is implemented through several components:
+The game system is implemented through several integrated components:
 
 1. **Theme Configuration**: JSON definitions of cultural elements
-2. **Database Records**: Dynasty, character, and history entries
-3. **Simulation Logic**: Rules for character behavior and event generation
-4. **Web Interface**: Flask routes for viewing and interacting with dynasties
+2. **Database Schema**: Comprehensive data model for game entities
+3. **Game Systems**: Specialized systems for different aspects of gameplay
+4. **Game Manager**: Central coordinator for all game systems
+5. **Web Interface**: Flask routes for viewing and interacting with the game
 
-## Theme Configuration
+## System Architecture
 
-Cultural themes are defined in `themes/cultural_themes.json`. Each theme configuration includes:
+The multi-agent strategic game is built on a modular architecture with several specialized systems:
 
-```json
-{
-  "THEME_KEY": {
-    "description": "Description of the cultural theme",
-    "start_year_suggestion": 1000,
-    "avg_marriage_age_male": 22,
-    "avg_marriage_age_female": 18,
-    "expected_lifespan_avg": 60,
-    "location_flavor": "Geographic/cultural setting",
-    "primary_economy": ["Agriculture", "Trade", "Mining"],
-    ...
-  }
-}
+```
+                    ┌─────────────────┐
+                    │  Game Manager   │
+                    └────────┬────────┘
+                             │
+         ┌──────────┬────────┼────────┬──────────┐
+         │          │        │        │          │
+┌────────▼───┐ ┌────▼─────┐ ┌▼─────┐ ┌▼────────┐ ┌▼────────────┐
+│ Map System │ │ Military │ │ Time │ │ Economy │ │ Diplomacy   │
+│            │ │ System   │ │System│ │ System  │ │ System      │
+└────────────┘ └──────────┘ └──────┘ └─────────┘ └─────────────┘
 ```
 
-Key theme parameters that affect simulation behavior:
+### System Interactions
 
-- **mortality_factor**: Modifies base mortality rate
-- **fertility_factor**: Modifies base fertility rate
-- **max_children_factor**: Modifies maximum children per couple
-- **max_age_factor**: Modifies maximum age
-- **starting_wealth_modifier**: Modifies starting wealth
+- **Game Manager**: Coordinates all systems, manages player sessions, and handles game state
+- **Map System**: Provides territory information to all other systems
+- **Military System**: Uses map data for movement, interacts with diplomacy for wars
+- **Diplomacy System**: Affects military and economic interactions between dynasties
+- **Economy System**: Uses map data for resource production, affected by military and diplomacy
+- **Time System**: Synchronizes all systems through turn-based progression
 
-Themes also define culture-specific events like tournaments, plagues, or religious conflicts.
+## Game Systems
+
+### Map System
+
+The map system (`models/map_system.py`) handles:
+
+1. **Map Generation**: Creates procedural or template-based maps
+2. **Territory Management**: Handles territory ownership and attributes
+3. **Movement Mechanics**: Calculates movement costs and paths
+4. **Border Management**: Determines adjacency and border effects
+
+Key classes:
+- `MapGenerator`: Creates new game maps
+- `TerritoryManager`: Handles territory ownership and attributes
+- `MovementSystem`: Calculates movement costs and paths
+- `BorderSystem`: Manages territory borders and adjacency
+
+### Military System
+
+The military system (`models/military_system.py`) handles:
+
+1. **Unit Management**: Creation and maintenance of military units
+2. **Army Organization**: Grouping units into armies
+3. **Combat Resolution**: Battle and siege mechanics
+4. **Military Movement**: Coordinating with the map system for unit movement
+
+Key classes:
+- `MilitarySystem`: Core class that manages all military aspects
+- `UnitType` (enum): Defines different types of military units
+- `CombatResolver`: Handles battle calculations and outcomes
+
+### Diplomacy System
+
+The diplomacy system (`models/diplomacy_system.py`) handles:
+
+1. **Diplomatic Relations**: Tracks relationships between dynasties
+2. **Treaty Management**: Creation and enforcement of treaties
+3. **War Declaration**: Formal war mechanics and war goals
+4. **Reputation Mechanics**: Honor, prestige, and infamy tracking
+
+Key classes:
+- `DiplomacySystem`: Core class that manages all diplomatic aspects
+- `TreatyType` (enum): Defines different types of treaties
+- `DiplomaticAction`: Represents actions dynasties can take toward each other
+
+### Economy System
+
+The economy system (`models/economy_system.py`) handles:
+
+1. **Resource Production**: Generation of resources based on territory
+2. **Trade Mechanics**: Exchange of resources between territories
+3. **Building Management**: Construction and effects of buildings
+4. **Territory Development**: Improvement of territories over time
+
+Key classes:
+- `EconomySystem`: Core class that manages all economic aspects
+- `ResourceType` (enum): Defines different types of resources
+- `BuildingType` (enum): Defines different types of buildings
+- `TradeManager`: Handles trade routes and resource exchange
+
+### Time System
+
+The time system (`models/time_system.py`) handles:
+
+1. **Turn Management**: Progression through game turns
+2. **Season Effects**: Seasonal modifiers to production and movement
+3. **Event Scheduling**: Timing and triggering of game events
+4. **Historical Recording**: Logging of significant game events
+
+Key classes:
+- `TimeSystem`: Core class that manages time progression
+- `Season` (enum): Defines seasons with different effects
+- `GamePhase` (enum): Defines phases within a game turn
+- `EventType` (enum): Categorizes different types of events
+
+### Game Manager
+
+The game manager (`models/game_manager.py`) serves as the central coordinator:
+
+1. **Game Creation**: Sets up new game instances
+2. **Player Session Management**: Handles player authentication and sessions
+3. **AI Coordination**: Manages AI player decisions
+4. **Game State Management**: Maintains and updates the game state
+5. **System Coordination**: Ensures proper interaction between systems
+
+Key methods:
+- `create_new_game()`: Sets up a new game instance
+- `load_game()`: Loads an existing game state
+- `process_turn()`: Advances the game by one turn
+- `process_ai_turns()`: Handles AI player decisions
 
 ## Database Schema
 
-Dynasty data is stored in several tables defined in `models/db_models.py`:
+The game uses an expanded database schema defined in `models/db_models.py`:
 
-### DynastyDB Table
+### Core Tables
 
-The main dynasty record contains:
+#### DynastyDB Table
+
+The main dynasty record now includes:
 
 ```python
 dynasty = DynastyDB(
@@ -55,13 +146,17 @@ dynasty = DynastyDB(
     theme_identifier_or_json=theme_key_or_json_string,
     current_wealth=initial_wealth,
     start_year=start_year,
-    current_simulation_year=start_year
+    current_simulation_year=start_year,
+    prestige=50,           # New field for dynasty prestige
+    honor=50,              # New field for dynasty honor
+    infamy=0,              # New field for negative reputation
+    is_ai_controlled=False # Whether this dynasty is AI-controlled
 )
 ```
 
-### PersonDB Table
+#### PersonDB Table
 
-Character records for each family member:
+Character records now include additional attributes:
 
 ```python
 person = PersonDB(
@@ -72,222 +167,300 @@ person = PersonDB(
     birth_year=birth_year,
     is_noble=True,
     is_monarch=is_founder,
-    reign_start_year=start_year if is_founder else None
+    diplomacy_skill=5,    # New skill for diplomatic actions
+    stewardship_skill=5,  # New skill for economic management
+    martial_skill=5,      # New skill for military leadership
+    intrigue_skill=5      # New skill for covert actions
 )
 ```
 
-Key fields include:
-- **name**: Character's given name
-- **surname**: Family name or patronymic
-- **gender**: "MALE" or "FEMALE"
-- **birth_year/death_year**: Life span tracking
-- **mother_sim_id/father_sim_id/spouse_sim_id**: Family relationships
-- **titles_json/traits_json**: JSON-serialized lists of titles and traits
-- **is_monarch/reign_start_year/reign_end_year**: Leadership tracking
+### Map-Related Tables
 
-### HistoryLogEntryDB Table
+#### Region Table
 
-Historical events are recorded as:
+Defines large geographic regions:
 
 ```python
-history_log = HistoryLogEntryDB(
+region = Region(
+    name="Region Name",
+    description="Region description",
+    base_climate="temperate"  # Base climate affecting production
+)
+```
+
+#### Province Table
+
+Defines provinces within regions:
+
+```python
+province = Province(
+    region_id=region.id,
+    name="Province Name",
+    description="Province description",
+    primary_terrain=TerrainType.PLAINS
+)
+```
+
+#### Territory Table
+
+Defines individual territories:
+
+```python
+territory = Territory(
+    province_id=province.id,
+    name="Territory Name",
+    description="Territory description",
+    terrain_type=TerrainType.PLAINS,
+    x_coordinate=100.0,
+    y_coordinate=100.0,
+    base_tax=2,
+    base_manpower=100,
+    development_level=1,
+    population=1000,
+    controller_dynasty_id=dynasty.id,
+    is_capital=False
+)
+```
+
+### Military Tables
+
+#### MilitaryUnit Table
+
+Defines individual military units:
+
+```python
+unit = MilitaryUnit(
     dynasty_id=dynasty.id,
-    year=year,
-    event_string="Description of the event",
-    person1_sim_id=person_id,
-    event_type="event_type"
+    name="Unit Name",
+    unit_type=UnitType.LEVY_SPEARMEN,
+    size=100,
+    morale=100,
+    experience=0,
+    territory_id=territory.id,
+    army_id=army.id if army else None
 )
 ```
 
-Key fields include:
-- **year**: When the event occurred (or NULL for timeless events)
-- **event_string**: Human-readable description
-- **person1_sim_id/person2_sim_id**: Characters involved
-- **event_type**: Categorization (birth, death, marriage, etc.)
+#### Army Table
 
-## Initialization Process
-
-Dynasties are initialized in `main_flask_app.py` through the `initialize_dynasty_founder()` function:
-
-1. Create the dynasty record
-2. Create the foundation history log
-3. Create the founder character
-4. Create the founder's spouse (if applicable)
-5. Set up family relationships
-6. Create initial history log entries
-7. Commit all records to the database
-
-The Flask application initializes the database when it starts:
+Groups units into armies:
 
 ```python
-if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-    app.run(debug=True)
+army = Army(
+    dynasty_id=dynasty.id,
+    name="Army Name",
+    territory_id=territory.id,
+    commander_id=commander.id if commander else None,
+    is_moving=False,
+    destination_territory_id=None,
+    arrival_time=None
+)
 ```
 
-## Simulation Logic
+#### Battle and Siege Tables
 
-The simulation engine in `simulation_engine.py` handles the progression of dynasties:
-
-### Character Lifecycle
-
-Characters follow these lifecycle rules:
-
-1. **Birth**: Children are born to married couples based on fertility factors
-2. **Marriage**: Characters marry when they reach marriageable age (varies by culture)
-3. **Children**: Couples can have children up to a maximum (modified by cultural factors)
-4. **Death**: Characters die based on age and mortality factors (modified by cultural factors)
-
-### Succession Rules
-
-The system supports multiple succession types:
-
-1. **PRIMOGENITURE_MALE_PREFERENCE**: Male children inherit before female children
-2. **PRIMOGENITURE_ABSOLUTE**: Oldest child inherits regardless of gender
-3. **ELECTIVE_NOBLE_COUNCIL**: A new ruler is chosen from eligible candidates
-
-This is implemented in `process_succession()` in `simulation_engine.py` and `main_flask_app.py`.
-
-### Event Generation
-
-Culture-specific events are defined in themes and triggered randomly:
+Track military engagements:
 
 ```python
-"events": [
-    {
-        "id": "event_id",
-        "name": "Event Name",
-        "chance_per_year": 0.05,
-        "narrative": "Description with {dynasty_name} and {location_flavor} placeholders",
-        "wealth_change": 30,
-        "trait_grant_on_leader": "Trait"
-    },
-    ...
-]
+battle = Battle(
+    attacker_army_id=attacker_army.id,
+    defender_army_id=defender_army.id,
+    territory_id=territory.id,
+    start_year=year,
+    start_season=Season.SUMMER.value,
+    end_year=None,
+    end_season=None,
+    attacker_casualties=0,
+    defender_casualties=0,
+    winner_side=None
+)
+
+siege = Siege(
+    attacker_army_id=attacker_army.id,
+    territory_id=territory.id,
+    start_year=year,
+    start_season=Season.SUMMER.value,
+    end_year=None,
+    end_season=None,
+    progress=0,
+    is_completed=False
+)
 ```
 
-These events can:
-- Change dynasty wealth
-- Grant traits to characters
-- Affect mortality rates
-- Last for multiple years
+### Diplomacy Tables
+
+#### DiplomaticRelation Table
+
+Tracks relations between dynasties:
+
+```python
+relation = DiplomaticRelation(
+    dynasty1_id=dynasty1.id,
+    dynasty2_id=dynasty2.id,
+    relation_score=0,  # -100 to 100
+    last_action_year=None
+)
+```
+
+#### Treaty Table
+
+Defines treaties between dynasties:
+
+```python
+treaty = Treaty(
+    dynasty1_id=dynasty1.id,
+    dynasty2_id=dynasty2.id,
+    treaty_type=TreatyType.NON_AGGRESSION,
+    start_year=year,
+    end_year=year + 10,  # 10-year treaty
+    terms_json=json.dumps({"tribute": 5})
+)
+```
+
+#### War Table
+
+Tracks ongoing wars:
+
+```python
+war = War(
+    attacker_dynasty_id=attacker.id,
+    defender_dynasty_id=defender.id,
+    start_year=year,
+    end_year=None,
+    attacker_war_score=0,
+    defender_war_score=0,
+    status="ongoing"
+)
+```
+
+### Economy Tables
+
+#### Resource Table
+
+Defines resource types:
+
+```python
+resource = Resource(
+    name="Resource Name",
+    resource_type=ResourceType.FOOD,
+    base_value=10,
+    is_luxury=False
+)
+```
+
+#### TerritoryResource Table
+
+Links territories to resources:
+
+```python
+territory_resource = TerritoryResource(
+    territory_id=territory.id,
+    resource_id=resource.id,
+    amount=100,
+    production_rate=10
+)
+```
+
+#### Building Table
+
+Defines buildings in territories:
+
+```python
+building = Building(
+    territory_id=territory.id,
+    building_type=BuildingType.FARM,
+    level=1,
+    construction_year=year,
+    completion_year=year + 1
+)
+```
 
 ## Web Interface Integration
 
-Dynasties are accessible through the Flask web interface:
+The game is accessible through an enhanced Flask web interface:
 
-### Routes
+### Key Routes
 
-Key routes in `main_flask_app.py`:
+New routes in `main_flask_app.py`:
 
-- **`/dashboard`**: Shows all dynasties for the current user
-- **`/dynasty/<id>/view`**: Detailed view of a specific dynasty
-- **`/dynasty/<id>/advance_turn`**: Progresses the simulation by 5 years
+- **`/games`**: Lists all games for the current user
+- **`/games/new`**: Creates a new game
+- **`/games/<id>/view`**: Main game view
+- **`/world_map`**: Displays the world map
+- **`/territory/<id>`**: Shows territory details
+- **`/military/view`**: Military management interface
+- **`/diplomacy/view`**: Diplomacy management interface
+- **`/economy/view`**: Economy management interface
+- **`/process_turn`**: Advances the game by one turn
 
 ### Templates
 
-The interface uses these templates:
+The interface uses these new templates:
 
-- **`templates/dashboard.html`**: Lists all dynasties
-- **`templates/view_dynasty.html`**: Shows dynasty details, characters, and events
+- **`templates/world_map.html`**: Interactive map view
+- **`templates/territory_details.html`**: Territory management
+- **`templates/military_view.html`**: Military management
+- **`templates/diplomacy_view.html`**: Diplomacy management
+- **`templates/economy_view.html`**: Economy management
+- **`templates/time_view.html`**: Turn and event management
 
-### Visualization
+### Visualization Components
 
-Family tree visualization is handled by:
+Enhanced visualization is handled by:
 
-- **`visualization/plotter.py`**: Generates family tree images
-- **`generate_family_tree_visualization()`**: Flask wrapper function
+- **`visualization/map_renderer.py`**: Renders the world map
+- **`visualization/military_renderer.py`**: Visualizes military units and battles
+- **`visualization/diplomacy_renderer.py`**: Visualizes diplomatic relations
+- **`visualization/economy_renderer.py`**: Visualizes economic data
+- **`visualization/time_renderer.py`**: Visualizes timeline and events
 
-## Advancing the Simulation
+## Game Progression
 
-When a user clicks "Advance Turn", the following happens:
+When a user clicks "Process Turn", the following happens:
 
-1. `advance_turn()` route is called with the dynasty ID
-2. `process_dynasty_turn()` is called to simulate 5 years
-3. For each year:
-   - Process world events
-   - Check for character deaths
-   - Check for marriages
-   - Check for childbirths
-   - Check for succession if the monarch died
-4. Update the dynasty's `current_simulation_year`
-5. Redirect back to the dynasty view
+1. `process_turn()` route is called with the dynasty ID
+2. `game_manager.process_turn()` is called to advance the game
+3. For each phase:
+   - Planning Phase: Review game state
+   - Diplomatic Phase: Process diplomatic actions
+   - Military Phase: Move armies and resolve combat
+   - Economic Phase: Calculate production and consumption
+   - Character Phase: Process character events
+   - Resolution Phase: Finalize the turn and trigger events
+4. Update the game state and advance to the next turn
+5. Redirect back to the game view
 
-## Extending the System
+## AI Player Logic
 
-### Adding New Characters
+AI dynasties are controlled by the game manager:
 
-```python
-new_character = PersonDB(
-    dynasty_id=dynasty_id,
-    name="Character Name",
-    surname="Surname",
-    gender="MALE",  # or "FEMALE"
-    birth_year=year,
-    mother_sim_id=mother_id,  # if applicable
-    father_sim_id=father_id,  # if applicable
-    is_noble=True
-)
-new_character.set_traits(["Trait1", "Trait2"])
-db.session.add(new_character)
-db.session.commit()
-```
-
-### Adding Historical Events
-
-```python
-new_event = HistoryLogEntryDB(
-    dynasty_id=dynasty_id,
-    year=year,
-    event_string="Description of the event",
-    person1_sim_id=character_id,  # if applicable
-    event_type="event_type"  # e.g., "birth", "death", "generic_event"
-)
-db.session.add(new_event)
-db.session.commit()
-```
-
-### Creating New Cultural Themes
-
-Add a new theme to `themes/cultural_themes.json`:
-```json
-"NEW_THEME_KEY": {
-  "description": "Theme description",
-  "names_male": ["Male names list"],
-  "names_female": ["Female names list"],
-  ...
-}
-```
+1. `process_ai_turns()` is called after the human player's turn
+2. For each AI dynasty:
+   - Analyze the current situation
+   - Determine diplomatic strategy
+   - Plan military movements
+   - Manage economic development
+   - Execute actions through the same systems as human players
+3. Update the game state to reflect AI actions
 
 ## Performance Considerations
 
-The simulation system has these performance characteristics:
+The enhanced game system has these performance characteristics:
 
-- **Database Growth**: Each 5-year turn generates approximately 2-5 new records
-- **Visualization Cost**: Family tree generation is the most resource-intensive operation
-- **Memory Usage**: Minimal for normal usage, primarily database-bound
-- **Scaling**: Can support multiple dynasties in parallel
+- **Database Growth**: Each turn generates many new records across multiple tables
+- **Visualization Cost**: Map rendering is the most resource-intensive operation
+- **Memory Usage**: Moderate, with caching of frequently accessed data
+- **Scaling**: Can support multiple games in parallel with reasonable performance
 
 ## Known Limitations
 
 Current implementation limitations:
 
-1. **Name Uniqueness**: The system doesn't prevent duplicate names
-2. **Historical Accuracy**: Some cultural elements are simplified
-3. **Event Variety**: Limited set of culture-specific events
-4. **Character Depth**: Traits don't significantly affect behavior yet
-
-## Future Enhancements
-
-Potential improvements for the system:
-
-1. **Religion System**: Add religious practices and beliefs
-2. **Military System**: More detailed warfare mechanics
-3. **Character Portraits**: Visual representations of dynasty members
-4. **Interactive Decisions**: Allow users to make choices for the dynasty
-5. **Extended Family**: More detailed tracking of extended family relationships
+1. **AI Sophistication**: AI players have limited strategic depth
+2. **Combat Complexity**: Battle resolution is somewhat simplified
+3. **Economic Balance**: Resource production and consumption may need tuning
+4. **UI Responsiveness**: Map rendering can be slow with many territories
 
 ## Conclusion
 
-The Royal Succession Simulation system provides a flexible framework for modeling historically-inspired dynasties with cultural specificity. The implementation balances historical authenticity with gameplay mechanics to create engaging narratives that unfold over generations.
+The Royal Succession Multi-Agent Strategic Game provides a comprehensive framework for historically-inspired strategy gameplay. The implementation balances historical authenticity with engaging gameplay mechanics to create a rich, dynamic world where dynasties compete for power and legacy across generations.

@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+
+{% block title %}{{ territory.name }} - Economy{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>{{ territory.name }} - Economy</h1>
+    
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+            {% if territory.controller_dynasty %}
+            <li class="breadcrumb-item"><a href="{{ url_for('view_dynasty', dynasty_id=territory.controller_dynasty.id) }}">{{ territory.controller_dynasty.name }}</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('dynasty_economy', dynasty_id=territory.controller_dynasty.id) }}">Economy</a></li>
+            {% endif %}
+            <li class="breadcrumb-item active" aria-current="page">{{ territory.name }}</li>
+        </ol>
+    </nav>
+    
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">Territory Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Name:</strong> {{ territory.name }}</p>
+                            <p><strong>Terrain:</strong> {{ territory.terrain_type.value|capitalize }}</p>
+                            <p><strong>Development Level:</strong> {{ territory.development_level }}</p>
+                            <p><strong>Population:</strong> {{ territory.population }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Base Tax:</strong> {{ territory.base_tax }}</p>
+                            <p><strong>Tax Income:</strong> {{ tax_income|int }} Gold</p>
+                            <p><strong>Controller:</strong> 
+                                {% if territory.controller_dynasty %}
+                                    <a href="{{ url_for('view_dynasty', dynasty_id=territory.controller_dynasty.id) }}">{{ territory.controller_dynasty.name }}</a>
+                                {% else %}
+                                    None
+                                {% endif %}
+                            </p>
+                            <p><strong>Governor:</strong> 
+                                {% if territory.governor %}
+                                    {{ territory.governor.name }} {{ territory.governor.surname }}
+                                {% else %}
+                                    None
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                    
+                    {% if territory.controller_dynasty and territory.controller_dynasty.owner_user == current_user %}
+                    <div class="mt-3">
+                        <form action="{{ url_for('develop_territory_economy', dynasty_id=territory.controller_dynasty.id, territory_id=territory.id) }}" method="post">
+                            <button type="submit" class="btn btn-primary">Develop Territory (Level {{ territory.development_level + 1 }})</button>
+                        </form>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="card-title mb-0">Resources</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Production</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Resource</th>
+                                    <th>Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for resource_type, amount in production.items() %}
+                                <tr>
+                                    <td>{{ resource_type.value|capitalize if resource_type.value else resource_type }}</td>
+                                    <td>{{ amount|round(1) }}</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="2">No resources produced</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <h6 class="mt-3">Consumption</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Resource</th>
+                                    <th>Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for resource_type, amount in consumption.items() %}
+                                <tr>
+                                    <td>{{ resource_type.value|capitalize if resource_type.value else resource_type }}</td>
+                                    <td>{{ amount|round(1) }}</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="2">No resources consumed</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Economy Visualization -->
+    {% if economy_chart_url %}
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+            <h5 class="card-title mb-0">Economy Visualization</h5>
+        </div>
+        <div class="card-body">
+            <img src="{{ economy_chart_url }}" class="img-fluid" alt="Territory Economy">
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Buildings -->
+    <div class="card mb-4">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="card-title mb-0">Buildings</h5>
+        </div>
+        <div class="card-body">
+            {% if buildings %}
+                <div class="row">
+                    {% for building in buildings %}
+                    <div class="col-md-4 mb-3">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">{{ building.name }}</h6>
+                            </div>
+                            <div class="card-body">
+                                <p><strong>Type:</strong> {{ building.building_type.value|replace('_', ' ')|capitalize }}</p>
+                                <p><strong>Level:</strong> {{ building.level }}</p>
+                                <p><strong>Condition:</strong> 
+                                    <div class="progress">
+                                        <div class="progress-bar {% if building.condition < 0.3 %}bg-danger{% elif building.condition < 0.7 %}bg-warning{% else %}bg-success{% endif %}" 
+                                             role="progressbar" style="width: {{ (building.condition * 100)|int }}%">
+                                            {{ (building.condition * 100)|int }}%
+                                        </div>
+                                    </div>
+                                </p>
+                                <p>
+                                    <strong>Status:</strong> 
+                                    {% if building.is_under_construction %}
+                                        <span class="badge badge-info">Under Construction</span>
+                                    {% else %}
+                                        <span class="badge badge-success">Operational</span>
+                                    {% endif %}
+                                </p>
+                                
+                                {% if territory.controller_dynasty and territory.controller_dynasty.owner_user == current_user %}
+                                <div class="btn-group mt-2" role="group">
+                                    {% if not building.is_under_construction and building.level < 5 %}
+                                    <form action="{{ url_for('upgrade_building', dynasty_id=territory.controller_dynasty.id, building_id=building.id) }}" method="post">
+                                        <button type="submit" class="btn btn-sm btn-primary mr-1">Upgrade</button>
+                                    </form>
+                                    {% endif %}
+                                    
+                                    {% if not building.is_under_construction and building.condition < 0.9 %}
+                                    <form action="{{ url_for('repair_building', dynasty_id=territory.controller_dynasty.id, building_id=building.id) }}" method="post">
+                                        <button type="submit" class="btn btn-sm btn-warning">Repair</button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                {% if territory.controller_dynasty and territory.controller_dynasty.owner_user == current_user %}
+                <div class="mt-3">
+                    <button class="btn btn-success" data-toggle="modal" data-target="#constructBuildingModal">
+                        Construct New Building
+                    </button>
+                </div>
+                {% endif %}
+            {% else %}
+                <p>No buildings in this territory.</p>
+                
+                {% if territory.controller_dynasty and territory.controller_dynasty.owner_user == current_user %}
+                <button class="btn btn-success" data-toggle="modal" data-target="#constructBuildingModal">
+                    Construct New Building
+                </button>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Construct Building Modal -->
+    {% if territory.controller_dynasty and territory.controller_dynasty.owner_user == current_user %}
+    <div class="modal fade" id="constructBuildingModal" tabindex="-1" role="dialog" aria-labelledby="constructBuildingModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="constructBuildingModalLabel">Construct Building</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <form action="{{ url_for('construct_building', dynasty_id=territory.controller_dynasty.id) }}" method="post">
+                    <div class="modal-body">
+                        <input type="hidden" name="territory_id" value="{{ territory.id }}">
+                        <p>Construct a new building in {{ territory.name }}.</p>
+                        
+                        <div class="form-group">
+                            <label for="buildingType">Building Type</label>
+                            <select class="form-control" id="buildingType" name="building_type" required>
+                                <option value="FARM">Farm (50 Gold, 20 Timber)</option>
+                                <option value="MINE">Mine (100 Gold, 30 Timber, 20 Stone)</option>
+                                <option value="LUMBER_CAMP">Lumber Camp (60 Gold, 10 Timber)</option>
+                                <option value="WORKSHOP">Workshop (80 Gold, 30 Timber, 10 Stone)</option>
+                                <option value="MARKET">Market (120 Gold, 40 Timber, 30 Stone)</option>
+                                <option value="PORT">Port (200 Gold, 80 Timber, 50 Stone)</option>
+                                <option value="WAREHOUSE">Warehouse (100 Gold, 50 Timber, 20 Stone)</option>
+                                <option value="TRADE_POST">Trade Post (150 Gold, 30 Timber, 20 Stone)</option>
+                                <option value="ROADS">Roads (80 Gold, 40 Stone)</option>
+                                <option value="IRRIGATION">Irrigation (70 Gold, 20 Timber)</option>
+                                <option value="GUILD_HALL">Guild Hall (150 Gold, 40 Timber, 40 Stone)</option>
+                                <option value="BANK">Bank (200 Gold, 60 Stone)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Construct</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

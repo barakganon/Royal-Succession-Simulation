@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+
+{% block title %}Time Management - {{ dynasty.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1>Time Management - {{ dynasty.name }}</h1>
+            <p class="lead">Current Year: {{ current_year }} {% if current_season %}({{ current_season.value|title }}){% endif %}</p>
+            
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Turn Management</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Current Status</h6>
+                            <ul class="list-group">
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    Action Points
+                                    <span class="badge bg-primary rounded-pill">{{ action_points }}</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    Current Season
+                                    <span class="badge bg-info rounded-pill">{{ current_season.value|title if current_season else 'Unknown' }}</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    Scheduled Events
+                                    <span class="badge bg-warning rounded-pill">{{ scheduled_events|length }}</span>
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Advance Time</h6>
+                            <p>Process the current turn and advance to the next year.</p>
+                            <form action="{{ url_for('advance_time', dynasty_id=dynasty.id) }}" method="post">
+                                <button type="submit" class="btn btn-primary">Advance to Next Year</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Seasonal Effects</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Current Season: {{ current_season.value|title if current_season else 'Unknown' }}</h6>
+                            {% if current_season %}
+                            <h6>Effects:</h6>
+                            <ul>
+                                {% if current_season.value == 'spring' %}
+                                <li>Food Production: +20%</li>
+                                <li>Population Growth: +20%</li>
+                                <li>Movement Cost: +10% (due to rain)</li>
+                                {% elif current_season.value == 'summer' %}
+                                <li>Food Production: +50%</li>
+                                <li>Stone/Iron Production: +20%</li>
+                                <li>Movement Cost: -20% (good conditions)</li>
+                                {% elif current_season.value == 'autumn' %}
+                                <li>Food Production: +30%</li>
+                                <li>Timber Production: +20%</li>
+                                <li>Population Growth: -10%</li>
+                                {% elif current_season.value == 'winter' %}
+                                <li>Food Production: -50%</li>
+                                <li>All Resource Production: -30%</li>
+                                <li>Movement Cost: +50% (harsh conditions)</li>
+                                <li>Population Growth: -30%</li>
+                                {% endif %}
+                            </ul>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Population Growth Rates by Development Level</h6>
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Development Level</th>
+                                        <th>Base Growth Rate</th>
+                                        <th>Seasonal Rate</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for level, rate in population_growth_rates.items() %}
+                                    <tr>
+                                        <td>{{ level }}</td>
+                                        <td>{{ (rate * 100)|round(1) }}%</td>
+                                        <td>
+                                            {% if current_season %}
+                                                {% if current_season.value == 'spring' %}
+                                                    {{ (rate * 1.2 * 100)|round(1) }}%
+                                                {% elif current_season.value == 'summer' %}
+                                                    {{ (rate * 1.0 * 100)|round(1) }}%
+                                                {% elif current_season.value == 'autumn' %}
+                                                    {{ (rate * 0.9 * 100)|round(1) }}%
+                                                {% elif current_season.value == 'winter' %}
+                                                    {{ (rate * 0.7 * 100)|round(1) }}%
+                                                {% endif %}
+                                            {% else %}
+                                                {{ (rate * 100)|round(1) }}%
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    {% if seasonal_map_image_url %}
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <h6>Seasonal Map</h6>
+                            <img src="{{ seasonal_map_image_url }}" class="img-fluid" alt="Seasonal Map">
+                            <p class="text-center mt-2">
+                                <a href="{{ url_for('seasonal_map', year=current_year) }}" class="btn btn-sm btn-outline-primary">View Full Map</a>
+                            </p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0">Schedule Events</h5>
+                        </div>
+                        <div class="card-body">
+                            <form action="{{ url_for('schedule_event', dynasty_id=dynasty.id) }}" method="post">
+                                <div class="mb-3">
+                                    <label for="event_type" class="form-label">Event Type</label>
+                                    <select class="form-select" id="event_type" name="event_type" required>
+                                        <option value="DIPLOMATIC">Diplomatic</option>
+                                        <option value="MILITARY">Military</option>
+                                        <option value="ECONOMIC">Economic</option>
+                                        <option value="SCHEDULED">Custom Scheduled</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="year" class="form-label">Year</label>
+                                    <input type="number" class="form-control" id="year" name="year" min="{{ current_year + 1 }}" value="{{ current_year + 1 }}" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="priority" class="form-label">Priority</label>
+                                    <select class="form-select" id="priority" name="priority">
+                                        <option value="LOW">Low</option>
+                                        <option value="MEDIUM" selected>Medium</option>
+                                        <option value="HIGH">High</option>
+                                        <option value="CRITICAL">Critical</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="action" class="form-label">Action</label>
+                                    <input type="text" class="form-control" id="action" name="action" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="target_dynasty_id" class="form-label">Target Dynasty (optional)</label>
+                                    <select class="form-select" id="target_dynasty_id" name="target_dynasty_id">
+                                        <option value="">None</option>
+                                        {% for other_dynasty in dynasties %}
+                                            {% if other_dynasty.id != dynasty.id %}
+                                            <option value="{{ other_dynasty.id }}">{{ other_dynasty.name }}</option>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="territory_id" class="form-label">Territory (optional)</label>
+                                    <select class="form-select" id="territory_id" name="territory_id">
+                                        <option value="">None</option>
+                                        {% for territory in territories %}
+                                            <option value="{{ territory.id }}">{{ territory.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Schedule Event</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="mb-0">Scheduled Events</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if scheduled_events %}
+                                <div class="table-responsive">
+                                    <table class="table table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Year</th>
+                                                <th>Type</th>
+                                                <th>Action</th>
+                                                <th>Priority</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for event in scheduled_events %}
+                                            <tr>
+                                                <td>{{ event.year }}</td>
+                                                <td>{{ event.type }}</td>
+                                                <td>{{ event.data.action }}</td>
+                                                <td>{{ event.priority }}</td>
+                                                <td>
+                                                    <form action="{{ url_for('cancel_event', dynasty_id=dynasty.id, event_id=event.id) }}" method="post" style="display: inline;">
+                                                        <button type="submit" class="btn btn-sm btn-danger">Cancel</button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                {% if scheduled_events_image_url %}
+                                <div class="mt-3">
+                                    <h6>Scheduled Events Timeline</h6>
+                                    <img src="{{ scheduled_events_image_url }}" class="img-fluid" alt="Scheduled Events Timeline">
+                                </div>
+                                {% endif %}
+                            {% else %}
+                                <p>No scheduled events.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">Recent History</h5>
+                </div>
+                <div class="card-body">
+                    {% if timeline_events %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Year</th>
+                                        <th>Event</th>
+                                        <th>Type</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for event in timeline_events %}
+                                    <tr>
+                                        <td>{{ event.year }}</td>
+                                        <td>{{ event.event_string }}</td>
+                                        <td>{{ event.event_type }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        {% if timeline_image_url %}
+                        <div class="mt-3">
+                            <h6>Timeline Visualization</h6>
+                            <img src="{{ timeline_image_url }}" class="img-fluid" alt="Timeline">
+                            <p class="text-center mt-2">
+                                <a href="{{ url_for('timeline_view', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-outline-primary">View Full Timeline</a>
+                            </p>
+                        </div>
+                        {% endif %}
+                    {% else %}
+                        <p>No historical events recorded yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

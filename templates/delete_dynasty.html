@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Delete Dynasty{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h4>Delete Dynasty: {{ dynasty.name }}</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <h5><i class="fas fa-exclamation-triangle"></i> Warning</h5>
+                        <p>You are about to permanently delete the dynasty "{{ dynasty.name }}" and all associated data.</p>
+                        <p><strong>This action cannot be undone.</strong></p>
+                    </div>
+                    
+                    <h5>Dynasty Information:</h5>
+                    <ul>
+                        <li><strong>Name:</strong> {{ dynasty.name }}</li>
+                        <li><strong>Created:</strong> {{ dynasty.created_at.strftime('%Y-%m-%d') }}</li>
+                        <li><strong>Current Year:</strong> {{ dynasty.current_simulation_year }}</li>
+                        <li><strong>Last Played:</strong> {{ dynasty.last_played_at.strftime('%Y-%m-%d') }}</li>
+                    </ul>
+                    
+                    <h5>This will delete:</h5>
+                    <ul>
+                        <li>All dynasty members ({{ dynasty.persons.count() }} characters)</li>
+                        <li>All historical events ({{ dynasty.history_logs.count() }} entries)</li>
+                        <li>All saved visualizations</li>
+                        <li>All dynasty settings and properties</li>
+                    </ul>
+                    
+                    <form method="POST" action="{{ url_for('delete_dynasty', dynasty_id=dynasty.id) }}">
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{{ url_for('view_dynasty', dynasty_id=dynasty.id) }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash"></i> Permanently Delete Dynasty
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block title %}Treaties - {{ dynasty.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Treaties - {{ dynasty.name }}</h1>
+    
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">Treaty Network</h5>
+                </div>
+                <div class="card-body text-center">
+                    {% if treaty_image %}
+                        <img src="data:image/png;base64,{{ treaty_image }}" class="img-fluid" alt="Treaty Network">
+                    {% else %}
+                        <p>No treaty network visualization available.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">All Treaties</h5>
+                </div>
+                <div class="card-body">
+                    {% if treaties %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Dynasty</th>
+                                        <th>Treaty Type</th>
+                                        <th>Start Year</th>
+                                        <th>Duration</th>
+                                        <th>Status</th>
+                                        <th>Terms</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for treaty in treaties %}
+                                        <tr>
+                                            <td>{{ treaty.other_dynasty.name }}</td>
+                                            <td>{{ treaty.treaty_type }}</td>
+                                            <td>{{ treaty.start_year }}</td>
+                                            <td>
+                                                {% if treaty.duration %}
+                                                    {{ treaty.duration }} years
+                                                {% else %}
+                                                    Permanent
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if treaty.active %}
+                                                    <span class="badge bg-success">Active</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">Inactive</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#treatyTermsModal" 
+                                                        data-treaty-id="{{ treaty.treaty.id }}" 
+                                                        data-treaty-type="{{ treaty.treaty_type }}" 
+                                                        data-dynasty-name="{{ treaty.other_dynasty.name }}"
+                                                        data-terms="{{ treaty.terms|tojson }}">
+                                                    View Terms
+                                                </button>
+                                            </td>
+                                            <td>
+                                                {% if treaty.active %}
+                                                    <form action="{{ url_for('break_treaty', dynasty_id=dynasty.id, treaty_id=treaty.treaty.id) }}" method="post" onsubmit="return confirm('Are you sure you want to break this treaty? This will damage your reputation.');">
+                                                        <button type="submit" class="btn btn-sm btn-danger">Break Treaty</button>
+                                                    </form>
+                                                {% else %}
+                                                    <button class="btn btn-sm btn-secondary" disabled>Inactive</button>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p>No treaties found.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">Treaty Information</h5>
+                </div>
+                <div class="card-body">
+                    <h5>Treaty Types</h5>
+                    <ul>
+                        <li><strong>Non-Aggression Pact:</strong> Agreement not to attack each other for a specified period.</li>
+                        <li><strong>Defensive Alliance:</strong> Obligation to defend if attacked by a third party.</li>
+                        <li><strong>Military Alliance:</strong> Full military cooperation, including offensive wars.</li>
+                        <li><strong>Vassalage:</strong> Hierarchical relationship where the vassal provides tribute and military support.</li>
+                        <li><strong>Trade Agreement:</strong> Enables trade between territories, increasing income for both parties.</li>
+                        <li><strong>Market Access:</strong> Allows merchants in each other's markets, boosting trade income.</li>
+                        <li><strong>Resource Exchange:</strong> Regular resource transfers between dynasties.</li>
+                        <li><strong>Economic Union:</strong> Shared markets and reduced tariffs, significantly boosting trade.</li>
+                        <li><strong>Cultural Exchange:</strong> Increases mutual understanding and improves relations over time.</li>
+                        <li><strong>Royal Marriage:</strong> Creates family ties and improves relations significantly.</li>
+                    </ul>
+                    
+                    <h5 class="mt-4">Treaty Mechanics</h5>
+                    <p>Treaties provide various benefits but also come with obligations. Breaking treaties will damage your reputation and honor, making future diplomatic endeavors more difficult.</p>
+                    <p>Some treaties require a minimum relation score to be established. Improving relations through diplomatic actions can help meet these requirements.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Treaty Terms Modal -->
+<div class="modal fade" id="treatyTermsModal" tabindex="-1" aria-labelledby="treatyTermsModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="treatyTermsModalLabel">Treaty Terms</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <h5 id="treatyTypeTitle"></h5>
+                <p>Treaty with <span id="treatyDynastyName" class="fw-bold"></span></p>
+                
+                <div id="treatyTermsContent">
+                    <!-- Terms will be populated here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Treaty Terms Modal
+        var treatyTermsModal = document.getElementById('treatyTermsModal');
+        treatyTermsModal.addEventListener('show.bs.modal', function(event) {
+            var button = event.relatedTarget;
+            var treatyId = button.getAttribute('data-treaty-id');
+            var treatyType = button.getAttribute('data-treaty-type');
+            var dynastyName = button.getAttribute('data-dynasty-name');
+            var terms = JSON.parse(button.getAttribute('data-terms') || '{}');
+            
+            var treatyTypeTitle = document.getElementById('treatyTypeTitle');
+            var treatyDynastyName = document.getElementById('treatyDynastyName');
+            var treatyTermsContent = document.getElementById('treatyTermsContent');
+            
+            treatyTypeTitle.textContent = treatyType;
+            treatyDynastyName.textContent = dynastyName;
+            
+            // Clear previous content
+            treatyTermsContent.innerHTML = '';
+            
+            // Add terms content
+            if (Object.keys(terms).length > 0) {
+                var termsList = document.createElement('ul');
+                
+                for (var key in terms) {
+                    var listItem = document.createElement('li');
+                    listItem.innerHTML = '<strong>' + key.replace('_', ' ').charAt(0).toUpperCase() + key.replace('_', ' ').slice(1) + ':</strong> ' + terms[key];
+                    termsList.appendChild(listItem);
+                }
+                
+                treatyTermsContent.appendChild(termsList);
+            } else {
+                treatyTermsContent.innerHTML = '<p>No specific terms for this treaty.</p>';
+            }
+        });
+    });
+</script>
+{% endblock %}

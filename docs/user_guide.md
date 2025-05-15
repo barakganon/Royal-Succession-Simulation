@@ -1,6 +1,6 @@
-# Royal Succession Simulation User Guide
+# Royal Succession Multi-Agent Strategic Game: User Guide
 
-This guide will help you navigate the Royal Succession Simulation system and interact with your dynasties.
+This guide will help you navigate the Royal Succession Multi-Agent Strategic Game and master its various systems.
 
 ## Getting Started
 
@@ -16,7 +16,7 @@ This guide will help you navigate the Royal Succession Simulation system and int
    http://localhost:5000
    ```
 
-3. You will be directed to the home page of the Royal Succession Simulation.
+3. You will be directed to the home page of the Royal Succession game.
 
 ### Logging In
 
@@ -26,119 +26,311 @@ This guide will help you navigate the Royal Succession Simulation system and int
    - Password: `password`
 3. Click "Login" to access your dashboard.
 
-## Dashboard
+## Game Dashboard
 
-The dashboard displays all dynasties associated with your account:
+The dashboard displays all games and dynasties associated with your account:
 
-1. You'll see a list of your dynasties with basic information including:
-   - Dynasty name
+1. You'll see a list of your games with basic information including:
+   - Game name
+   - Map type
+   - Number of dynasties
    - Current year
-   - Start year
-   - Current wealth
    - Last played date
 
-2. Click on "View Dynasty" to explore a dynasty in detail.
+2. Click on "Create New Game" to start a new game, or "Load Game" to continue an existing one.
 
-## Viewing a Dynasty
+## Creating a New Game
 
-The dynasty view page provides comprehensive information about your selected dynasty:
+To create a new game:
 
-### Dynasty Overview
+1. Click "Create New Game" on the dashboard.
+2. Enter a name for your game.
+3. Select a map template:
+   - Small Continent: Compact map with fewer territories
+   - Large Continent: Expansive map with many territories
+   - Archipelago: Island-based map with naval focus
+4. Choose the number of AI dynasties (1-10).
+5. Click "Create Game" to generate the world and begin.
 
-At the top of the page, you'll find:
-- Dynasty name
-- Current year
-- Theme description
-- Current wealth
+## Game Interface
 
-### Current Monarch
+The game interface consists of several key views:
 
-This section shows details about the current ruler of your dynasty:
-- Name and title
-- Age
-- Traits
-- Reign duration
+### Main Game View
 
-### Living Nobles
+The central hub for your game with:
+- Current year and season
+- Dynasty overview (wealth, prestige, etc.)
+- Current monarch information
+- Quick access to all game systems
+- Turn management controls
 
-This section lists all living noble members of your dynasty:
-- Name
-- Age
-- Gender
-- Titles
-- Traits
+### World Map
 
-### Recent Events
+The strategic map shows:
+- Territories and their controllers (color-coded)
+- Terrain types (plains, mountains, forests, etc.)
+- Settlements and resources
+- Military units and armies
+- Current borders and contested areas
 
-A chronological list of recent events in your dynasty's history, including:
-- Births
-- Deaths
-- Marriages
-- Successions
-- World events
+Map controls allow you to:
+- Filter territories by region, province, or terrain
+- Highlight your dynasty's territories
+- Show/hide different map elements (units, resources, etc.)
+- Zoom in/out for detailed or strategic views
 
-### Family Tree
+### Dynasty Management
 
-If available, a visual representation of your dynasty's family tree will be displayed.
+The dynasty view provides:
+- Dynasty name and description
+- Current wealth, prestige, honor, and infamy
+- Current monarch details and skills
+- Living nobles and their attributes
+- Family tree visualization
+- Recent dynasty events
 
-## Advancing the Simulation
+## Game Systems
 
-To progress your dynasty through time:
+### Map and Territory System
 
-1. Click the "Advance Turn" button on the dynasty view page.
-2. This will simulate 5 years of events for your dynasty.
-3. The page will refresh with updated information.
-4. New events will appear in the Recent Events section.
-5. Character ages will increase, and new characters may be born.
+Territories are the foundation of your power:
 
-## Understanding Simulation Events
+1. **Territory Types**:
+   - Each territory has a terrain type (plains, hills, mountains, etc.)
+   - Terrain affects resource production, movement costs, and combat
 
-As you advance the simulation, various events may occur:
+2. **Territory Management**:
+   - View territory details by clicking on the map
+   - See population, development level, and resources
+   - Build improvements to increase production
+   - Construct defenses to protect against invasion
 
-### Character Life Events
+3. **Settlements**:
+   - Territories may contain settlements (villages, towns, cities, castles)
+   - Settlements provide additional tax income and manpower
+   - Upgrade settlements to increase their benefits
 
-- **Births**: New children may be born to married couples.
-- **Coming of Age**: Children will grow into adults.
-- **Marriages**: Characters may marry when they reach marriageable age.
-- **Deaths**: Characters may die from old age, disease, or other causes.
+### Military System
 
-### Dynasty Events
+Build and command armies to protect your lands and conquer new territories:
 
-- **Succession**: When a monarch dies, succession rules determine the new ruler.
-- **World Events**: Random events like wars, plagues, or festivals may affect the dynasty.
-- **Wealth Changes**: The dynasty's wealth may increase or decrease based on events.
+1. **Unit Recruitment**:
+   - Recruit military units from your territories
+   - Unit types include:
+     - Infantry: Levy Spearmen, Professional Swordsmen, Elite Guards
+     - Ranged: Archers, Crossbowmen
+     - Cavalry: Light Cavalry, Heavy Cavalry, Knights
+     - Siege: Battering Rams, Siege Towers, Catapults, Trebuchets
+     - Naval: Transport Ships, War Galleys, Heavy Warships
 
-### Culture-Specific Events
+2. **Army Management**:
+   - Create armies by combining units
+   - Assign commanders from your dynasty members
+   - Commander skills affect army performance
+   - Maintain armies with gold and food
 
-Different cultural themes have their own specific events:
+3. **Military Movement**:
+   - Move armies between territories
+   - Movement speed depends on terrain and season
+   - Units require supply lines to maintain effectiveness
 
-- **Medieval European**: Tournaments, plagues, crusades
-- **Norse**: Raids, Thing assemblies, harsh winters
-- **Byzantine**: Court intrigues, religious conflicts, trade agreements
+4. **Combat System**:
+   - **Battles**: When armies meet in the field
+     - Combat factors include unit types, numbers, terrain, commander skills
+     - Battle phases: skirmish, main engagement, pursuit
+     - Casualties reduce unit strength
+   
+   - **Sieges**: When attacking settlements or fortifications
+     - Siege progress depends on attacker strength and defender fortifications
+     - Sieges take time to complete
+     - Defenders can attempt to break sieges with relief forces
 
-## Creating Your Own Dynasty
+### Diplomacy System
 
-To create a new dynasty:
+Manage relations with other dynasties:
 
-1. From the dashboard, click "Create New Dynasty".
-2. Choose a name for your dynasty.
-3. Select a predefined theme or provide a custom story.
-4. Set the starting year and succession rules.
-5. Click "Create Dynasty" to begin your own saga.
+1. **Diplomatic Relations**:
+   - Each dynasty has a relation score with every other dynasty
+   - Scores range from -100 (hostile) to +100 (allied)
+   - View relations in the diplomacy screen
 
-## Advanced Features
+2. **Diplomatic Actions**:
+   - Send Envoy: Improve relations
+   - Arrange Marriage: Create dynastic ties
+   - Form Alliance: Military or defensive pact
+   - Declare Rivalry: Formalize hostility
+   - Declare War: Begin military conflict
+   - Negotiate Peace: End ongoing wars
 
-### Viewing Historical Records
+3. **Treaties**:
+   - Non-Aggression Pact: Agree not to attack each other
+   - Defensive Alliance: Come to each other's aid if attacked
+   - Military Alliance: Join each other's offensive wars
+   - Trade Agreement: Increase economic benefits
+   - Vassalage: Establish overlord/subject relationship
 
-To see the complete history of your dynasty:
-1. On the dynasty view page, scroll to the Recent Events section.
-2. Click "View Full History" to see all recorded events.
+4. **Reputation Mechanics**:
+   - Prestige: Increases with victories and achievements
+   - Honor: Affected by keeping or breaking agreements
+   - Infamy: Increases with aggressive actions
 
-### Checking Character Relationships
+### Economy System
 
-To understand family connections:
-1. Click on any character's name in the Living Nobles section.
-2. This will show their parents, spouse, and children.
+Develop your economy to fund your ambitions:
+
+1. **Resources**:
+   - **Basic Resources**:
+     - Food: Required for population and armies
+     - Timber: Used for buildings and ships
+     - Stone: Used for fortifications
+     - Iron: Required for military equipment
+     - Gold: Universal currency
+   
+   - **Luxury Resources**:
+     - Spices: Increase happiness and trade value
+     - Wine: Improve court prestige
+     - Silk: Enhance diplomatic relations
+     - Jewelry: Significant wealth store
+
+2. **Production and Consumption**:
+   - Territories produce resources based on terrain
+   - Population consumes food
+   - Military units require maintenance
+   - Buildings require resources to construct
+
+3. **Trade System**:
+   - Establish trade routes between territories
+   - Trade agreements with other dynasties
+   - Market prices fluctuate based on supply and demand
+
+4. **Building Construction**:
+   - Economic buildings (farms, mines, markets)
+   - Military buildings (barracks, walls, towers)
+   - Administrative buildings (town halls, courts)
+   - Cultural buildings (temples, universities)
+
+### Time System
+
+The game progresses through turns with seasonal changes:
+
+1. **Turn Structure**:
+   - Each turn represents one season
+   - Four seasons per year (Spring, Summer, Autumn, Winter)
+   - Each season has different effects on production and movement
+
+2. **Game Phases**:
+   - Planning Phase: Review your situation
+   - Diplomatic Phase: Conduct diplomatic actions
+   - Military Phase: Move armies and conduct battles
+   - Economic Phase: Manage resources and construction
+   - Character Phase: Handle dynasty members
+   - Resolution Phase: Process events and end turn
+
+3. **Events**:
+   - Random events based on season, location, and dynasty
+   - Character events (births, deaths, marriages)
+   - Natural events (harvests, storms, plagues)
+   - Political events (rebellions, coups, festivals)
+
+## Playing the Game
+
+### Turn-by-Turn Gameplay
+
+1. **Start of Turn**:
+   - Review your current situation
+   - Check notifications for important events
+   - Plan your strategy for the turn
+
+2. **Diplomatic Actions**:
+   - Review your relations with other dynasties
+   - Send envoys or arrange marriages to improve relations
+   - Form alliances with potential friends
+   - Declare wars if necessary
+
+3. **Military Operations**:
+   - Recruit new units if needed
+   - Organize your armies
+   - Move armies to strategic positions
+   - Conduct battles or sieges
+
+4. **Economic Management**:
+   - Collect taxes and resources
+   - Build improvements in your territories
+   - Establish or modify trade routes
+   - Manage your treasury
+
+5. **Dynasty Management**:
+   - Arrange marriages for dynasty members
+   - Assign roles to characters based on skills
+   - Handle succession planning
+
+6. **End Turn**:
+   - Click "Process Turn" to advance to the next season
+   - Review the results of your actions
+   - Respond to any events that occurred
+
+### Victory Conditions
+
+The game can be won through various paths:
+
+1. **Conquest Victory**: Control a majority of the world's territories
+2. **Diplomatic Victory**: Form alliances with a majority of dynasties
+3. **Economic Victory**: Accumulate vast wealth and develop your territories
+4. **Legacy Victory**: Maintain your dynasty for a set number of generations
+
+## Advanced Strategies
+
+### Military Strategies
+
+1. **Defensive Posture**:
+   - Focus on fortifying your borders
+   - Maintain defensive alliances
+   - Build walls and castles in border territories
+
+2. **Expansionist Approach**:
+   - Build large armies quickly
+   - Target weaker neighbors first
+   - Use diplomatic isolation before attacking
+
+3. **Naval Dominance**:
+   - Focus on coastal territories
+   - Build a strong fleet
+   - Control key trade routes
+
+### Diplomatic Strategies
+
+1. **Alliance Network**:
+   - Form a web of alliances for protection
+   - Maintain high honor to be a reliable ally
+   - Mediate conflicts between allies
+
+2. **Divide and Conquer**:
+   - Foster rivalries between potential threats
+   - Support weaker dynasties against stronger ones
+   - Break enemy alliances through diplomatic actions
+
+3. **Marriage Politics**:
+   - Arrange strategic marriages with powerful dynasties
+   - Use family ties to improve relations
+   - Claim territories through inheritance
+
+### Economic Strategies
+
+1. **Trade Empire**:
+   - Focus on controlling resource-rich territories
+   - Establish extensive trade networks
+   - Build markets and ports
+
+2. **Development Focus**:
+   - Invest heavily in territory improvements
+   - Increase population and production
+   - Build specialized economic buildings
+
+3. **Resource Monopoly**:
+   - Control territories with rare resources
+   - Create scarcity to drive up prices
+   - Use economic leverage for diplomatic advantage
 
 ## Troubleshooting
 
@@ -149,19 +341,19 @@ If you cannot log in with the test user:
 2. Check that the database has been properly initialized.
 3. Try restarting the application with `python main_flask_app.py`.
 
-### Simulation Not Advancing
+### Game Not Loading
 
-If clicking "Advance Turn" doesn't work:
+If a game fails to load:
 1. Check for error messages in the Flask console.
-2. Ensure the database is writable.
-3. Refresh the page and try again.
+2. Ensure the database is not corrupted.
+3. Try creating a new game if the issue persists.
 
-### Missing Family Tree Visualization
+### Map Visualization Issues
 
-If the family tree doesn't appear:
-1. Check if the visualization directory exists (`static/visualizations`).
-2. Ensure the application has write permissions to this directory.
-3. Try advancing the turn to trigger visualization generation.
+If the map doesn't display correctly:
+1. Check your browser's JavaScript console for errors.
+2. Try a different browser if issues persist.
+3. Ensure all static files are properly loaded.
 
 ## Command Line Tools
 
@@ -174,13 +366,20 @@ To run a standalone simulation without the web interface:
 python run_local_simulation.py
 ```
 
+### Check Dynasty Status
+
+To check the status of a specific dynasty:
+```
+python check_dynasty.py --dynasty_id=1
+```
+
 ## Next Steps
 
-After exploring your first dynasty, consider:
+After mastering the basics, consider:
 
-1. Creating additional dynasties with different cultural themes.
-2. Contributing to the project by adding new features or cultural themes.
-3. Exploring the code to understand how the simulation works.
-4. Creating custom themes for specific historical periods or fictional settings.
+1. Creating games with different map templates and settings.
+2. Trying different victory strategies.
+3. Contributing to the project by adding new features or cultural themes.
+4. Creating custom scenarios or historical settings.
 
-Enjoy your journey through the ages with the Royal Succession Simulation!
+Enjoy your conquest of the world with the Royal Succession Multi-Agent Strategic Game!

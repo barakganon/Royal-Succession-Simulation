@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+
+{% block title %}World Economy{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>World Economy</h1>
+    
+    <!-- Market Prices -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="card-title mb-0">Global Market Prices</h5>
+        </div>
+        <div class="card-body">
+            {% if market_chart_url %}
+                <img src="{{ market_chart_url }}" class="img-fluid" alt="Market Prices">
+            {% else %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Resource</th>
+                                <th>Base Value</th>
+                                <th>Current Value</th>
+                                <th>Trend</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for resource in resources %}
+                            <tr>
+                                <td>{{ resource.name }}</td>
+                                <td>{{ resource.base_value }} Gold</td>
+                                <td>{{ resource.current_value }} Gold</td>
+                                <td>
+                                    {% if resource.current_value > resource.base_value %}
+                                        <span class="text-success"><i class="fas fa-arrow-up"></i> {{ ((resource.current_value / resource.base_value - 1) * 100)|int }}%</span>
+                                    {% elif resource.current_value < resource.base_value %}
+                                        <span class="text-danger"><i class="fas fa-arrow-down"></i> {{ ((1 - resource.current_value / resource.base_value) * 100)|int }}%</span>
+                                    {% else %}
+                                        <span class="text-secondary"><i class="fas fa-equals"></i> 0%</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4">No resource data available</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Trade Network -->
+    <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+            <h5 class="card-title mb-0">Global Trade Network</h5>
+        </div>
+        <div class="card-body">
+            {% if trade_network_url %}
+                <img src="{{ trade_network_url }}" class="img-fluid" alt="Global Trade Network">
+            {% else %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Source Dynasty</th>
+                                <th>Target Dynasty</th>
+                                <th>Resource</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for route in trade_routes %}
+                            <tr>
+                                <td>{{ route.source_dynasty.name }}</td>
+                                <td>{{ route.target_dynasty.name }}</td>
+                                <td>{{ route.resource_type.value }}</td>
+                                <td>{{ route.resource_amount }}</td>
+                                <td>
+                                    {% if route.is_active %}
+                                        <span class="badge badge-success">Active</span>
+                                    {% else %}
+                                        <span class="badge badge-danger">Inactive</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5">No trade routes established</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Dynasties Economic Overview -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">Dynasty Economic Rankings</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Dynasty</th>
+                                    <th>Treasury</th>
+                                    <th>Territories</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for dynasty in dynasties|sort(attribute='current_wealth', reverse=True) %}
+                                <tr>
+                                    <td>{{ loop.index }}</td>
+                                    <td>{{ dynasty.name }}</td>
+                                    <td>{{ dynasty.current_wealth|int }} Gold</td>
+                                    <td>{{ dynasty.controlled_territories.count() }}</td>
+                                    <td>
+                                        {% if dynasty.owner_user == current_user %}
+                                            <a href="{{ url_for('dynasty_economy', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-primary">View Economy</a>
+                                        {% else %}
+                                            <a href="{{ url_for('view_dynasty', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-secondary">View Dynasty</a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="5">No dynasties found</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Economic Events -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="card-title mb-0">Recent Economic Events</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        {% for event in economic_events %}
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ event.event_string }}</h6>
+                                <small>Year {{ event.year }}</small>
+                            </div>
+                            <small>{{ event.dynasty_context.name }}</small>
+                        </div>
+                        {% else %}
+                        <div class="list-group-item">
+                            <p class="mb-1">No recent economic events</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Resource Distribution Map -->
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="card-title mb-0">Resource Distribution</h5>
+        </div>
+        <div class="card-body">
+            <p>Resource distribution across the world:</p>
+            
+            <div class="row">
+                {% for resource_type in resources|map(attribute='resource_type')|unique %}
+                <div class="col-md-3 mb-3">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">{{ resource_type.value|capitalize }}</h6>
+                        </div>
+                        <div class="card-body">
+                            <p>Top producing territories:</p>
+                            <ol>
+                                {% for territory_resource in territory_resources|selectattr('resource.resource_type', 'eq', resource_type)|sort(attribute='base_production', reverse=True)|slice(0, 3) %}
+                                <li>{{ territory_resource.territory.name }} ({{ territory_resource.base_production|round(1) }})</li>
+                                {% else %}
+                                <li>No data available</li>
+                                {% endfor %}
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

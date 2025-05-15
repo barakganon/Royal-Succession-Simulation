@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+
+{% block title %}Siege Details{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="mt-4 mb-3">Siege Details</h1>
+    
+    <div class="row">
+        <!-- Siege Information -->
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Siege Information</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Territory:</strong> <a href="{{ url_for('territory_details', territory_id=siege.territory_id) }}">{{ siege.territory.name }}</a></p>
+                    <p><strong>Start Year:</strong> {{ siege.start_year }}</p>
+                    {% if siege.end_year %}
+                    <p><strong>End Year:</strong> {{ siege.end_year }}</p>
+                    <p><strong>Duration:</strong> {{ siege.end_year - siege.start_year }} years</p>
+                    {% endif %}
+                    <p><strong>Attacker:</strong> <a href="{{ url_for('view_dynasty', dynasty_id=siege.attacker_dynasty_id) }}">{{ attacker_dynasty.name }}</a></p>
+                    <p><strong>Defender:</strong> <a href="{{ url_for('view_dynasty', dynasty_id=siege.defender_dynasty_id) }}">{{ defender_dynasty.name }}</a></p>
+                    
+                    <p><strong>Status:</strong> 
+                        {% if siege.is_active %}
+                        <span class="text-primary">Active</span>
+                        {% elif siege.successful %}
+                        <span class="text-success">Successful</span>
+                        {% else %}
+                        <span class="text-danger">Failed</span>
+                        {% endif %}
+                    </p>
+                    
+                    <p><strong>Progress:</strong> {{ (siege.progress * 100)|int }}%</p>
+                    
+                    {% if siege.war_id %}
+                    <p><strong>War:</strong> 
+                        {% if siege.war.attacker_dynasty_id == attacker_dynasty.id %}
+                        War against {{ defender_dynasty.name }}
+                        {% else %}
+                        War against {{ attacker_dynasty.name }}
+                        {% endif %}
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Besieging Army</h5>
+                </div>
+                <div class="card-body">
+                    {% if siege.attacker_army %}
+                    <p><strong>Name:</strong> <a href="{{ url_for('army_details', army_id=siege.attacker_army_id) }}">{{ siege.attacker_army.name }}</a></p>
+                    <p><strong>Commander:</strong> 
+                        {% if siege.attacker_army.commander_id %}
+                        {{ siege.attacker_army.commander.name }} {{ siege.attacker_army.commander.surname }}
+                        {% else %}
+                        <span class="text-muted">No commander</span>
+                        {% endif %}
+                    </p>
+                    
+                    <h6 class="mt-3">Siege Equipment</h6>
+                    {% set siege_units = [] %}
+                    {% for unit in siege.attacker_army.units %}
+                        {% if unit.unit_type.value in ['battering_ram', 'siege_tower', 'catapult', 'trebuchet'] %}
+                            {% set siege_units = siege_units + [unit] %}
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if siege_units %}
+                    <ul class="list-group">
+                        {% for unit in siege_units %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ unit.unit_type.value.replace('_', ' ').title() }}
+                            <span class="badge bg-primary rounded-pill">{{ unit.size }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted">No siege equipment</p>
+                    {% endif %}
+                    {% else %}
+                    <p><span class="text-muted">Army information not available</span></p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Territory Defenses</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Fortification Level:</strong> {{ siege.territory.fortification_level }}</p>
+                    <p><strong>Garrison Size:</strong> 
+                        {% set garrison_size = 0 %}
+                        {% for unit in siege.territory.units_present %}
+                            {% if unit.dynasty_id == siege.defender_dynasty_id %}
+                                {% set garrison_size = garrison_size + unit.size %}
+                            {% endif %}
+                        {% endfor %}
+                        {{ garrison_size }}
+                    </p>
+                    
+                    <h6 class="mt-3">Defensive Buildings</h6>
+                    {% set defensive_buildings = [] %}
+                    {% for building in siege.territory.buildings %}
+                        {% if building.building_type.value in ['fortress', 'walls', 'tower', 'barracks'] %}
+                            {% set defensive_buildings = defensive_buildings + [building] %}
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if defensive_buildings %}
+                    <ul class="list-group">
+                        {% for building in defensive_buildings %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ building.name }}
+                            <span class="badge bg-secondary rounded-pill">Level {{ building.level }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted">No defensive buildings</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Siege Visualization -->
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Siege Progress</h5>
+                </div>
+                <div class="card-body">
+                    {% if siege_progress %}
+                    <div class="text-center">
+                        <img src="data:image/png;base64,{{ siege_progress }}" class="img-fluid" alt="Siege Progress">
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning">
+                        <p>Siege visualization not available.</p>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="progress mt-4">
+                        <div class="progress-bar bg-danger" 
+                             role="progressbar" 
+                             style="width: {{ siege.progress * 100 }}%;" 
+                             aria-valuenow="{{ siege.progress * 100 }}" 
+                             aria-valuemin="0" 
+                             aria-valuemax="100">
+                            {{ (siege.progress * 100)|int }}%
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Siege Timeline</h5>
+                </div>
+                <div class="card-body">
+                    <div class="timeline">
+                        <div class="timeline-item">
+                            <div class="timeline-marker"></div>
+                            <div class="timeline-content">
+                                <h6>{{ siege.start_year }}</h6>
+                                <p>Siege of {{ siege.territory.name }} begins. {{ attacker_dynasty.name }} forces surround the settlement.</p>
+                            </div>
+                        </div>
+                        
+                        {% if siege.end_year %}
+                        <div class="timeline-item">
+                            <div class="timeline-marker"></div>
+                            <div class="timeline-content">
+                                <h6>{{ siege.end_year }}</h6>
+                                {% if siege.successful %}
+                                <p>Siege successful. {{ attacker_dynasty.name }} captures {{ siege.territory.name }} from {{ defender_dynasty.name }}.</p>
+                                {% else %}
+                                <p>Siege fails. {{ attacker_dynasty.name }} forces withdraw from {{ siege.territory.name }}.</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if siege.is_active %}
+                        <div class="timeline-item">
+                            <div class="timeline-marker"></div>
+                            <div class="timeline-content">
+                                <h6>Current Status</h6>
+                                <p>Siege ongoing. Progress: {{ (siege.progress * 100)|int }}%</p>
+                                
+                                {% if siege.attacker_dynasty_id == attacker_dynasty.id and attacker_dynasty.owner_user == current_user %}
+                                <form action="{{ url_for('update_siege', dynasty_id=attacker_dynasty.id, siege_id=siege.id) }}" method="get">
+                                    <button type="submit" class="btn btn-primary">Update Siege Progress</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-12">
+            <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                <a href="{{ url_for('military_view', dynasty_id=attacker_dynasty.id if attacker_dynasty.owner_user == current_user else defender_dynasty.id) }}" class="btn btn-primary">Back to Military View</a>
+                <a href="{{ url_for('territory_details', territory_id=siege.territory_id) }}" class="btn btn-secondary">View Territory</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Timeline styling */
+.timeline {
+    position: relative;
+    padding: 20px 0;
+}
+
+.timeline:before {
+    content: '';
+    position: absolute;
+    height: 100%;
+    width: 4px;
+    background: #ddd;
+    left: 50px;
+    top: 0;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 30px;
+}
+
+.timeline-marker {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid #ddd;
+    background: #fff;
+    margin-top: 10px;
+    left: 44px;
+}
+
+.timeline-content {
+    margin-left: 70px;
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 4px;
+}
+
+.timeline-content h6 {
+    margin-top: 0;
+    color: #495057;
+}
+</style>
+{% endblock %}

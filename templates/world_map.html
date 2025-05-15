@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+
+{% block title %}World Map{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="mt-4 mb-3">World Map</h1>
+    
+    <div class="row">
+        <!-- Map Controls -->
+        <div class="col-md-3">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Map Controls</h5>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('world_map') }}" method="get">
+                        <div class="form-group mb-3">
+                            <label for="show_terrain">Display Options:</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="show_terrain" id="show_terrain" checked>
+                                <label class="form-check-label" for="show_terrain">Show Terrain</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="show_settlements" id="show_settlements" checked>
+                                <label class="form-check-label" for="show_settlements">Show Settlements</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="show_resources" id="show_resources">
+                                <label class="form-check-label" for="show_resources">Show Resources</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="show_units" id="show_units" checked>
+                                <label class="form-check-label" for="show_units">Show Military Units</label>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="highlight_dynasty">Highlight Dynasty:</label>
+                            <select class="form-select" name="highlight_dynasty" id="highlight_dynasty">
+                                <option value="">None</option>
+                                {% for dynasty in user_dynasties %}
+                                <option value="{{ dynasty.id }}">{{ dynasty.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Update Map</button>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Filter Territories</h5>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('world_map') }}" method="get">
+                        <div class="form-group mb-3">
+                            <label for="region">Region:</label>
+                            <select class="form-select" name="region" id="region">
+                                <option value="">All Regions</option>
+                                {% for region in regions %}
+                                <option value="{{ region.id }}">{{ region.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="province">Province:</label>
+                            <select class="form-select" name="province" id="province">
+                                <option value="">All Provinces</option>
+                                {% for province in provinces %}
+                                <option value="{{ province.id }}">{{ province.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="terrain">Terrain Type:</label>
+                            <select class="form-select" name="terrain" id="terrain">
+                                <option value="">All Terrain Types</option>
+                                <option value="plains">Plains</option>
+                                <option value="hills">Hills</option>
+                                <option value="mountains">Mountains</option>
+                                <option value="forest">Forest</option>
+                                <option value="desert">Desert</option>
+                                <option value="tundra">Tundra</option>
+                                <option value="coastal">Coastal</option>
+                                <option value="river">River</option>
+                                <option value="lake">Lake</option>
+                                <option value="swamp">Swamp</option>
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Filter</button>
+                    </form>
+                </div>
+            </div>
+            
+            {% if current_user.username == 'admin' %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Admin Controls</h5>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('generate_map') }}" method="post">
+                        <div class="form-group mb-3">
+                            <label for="template_name">Map Template:</label>
+                            <select class="form-select" name="template_name" id="template_name">
+                                <option value="default">Default</option>
+                                <option value="small_continent">Small Continent</option>
+                                <option value="large_continent">Large Continent</option>
+                                <option value="archipelago">Archipelago</option>
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-danger">Generate New Map</button>
+                        <div class="form-text text-danger">Warning: This will delete the existing map!</div>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Map Display -->
+        <div class="col-md-9">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">World Map</h5>
+                </div>
+                <div class="card-body">
+                    {% if map_image %}
+                    <div class="text-center">
+                        <img src="data:image/png;base64,{{ map_image }}" class="img-fluid" alt="World Map">
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning">
+                        <p>No map data available. Please generate a map first.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Territories</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Terrain</th>
+                                    <th>Controller</th>
+                                    <th>Development</th>
+                                    <th>Population</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for territory in territories %}
+                                <tr>
+                                    <td>{{ territory.name }}</td>
+                                    <td>{{ territory.terrain_type.value }}</td>
+                                    <td>
+                                        {% if territory.controller_dynasty_id %}
+                                        {% for dynasty in user_dynasties %}
+                                        {% if dynasty.id == territory.controller_dynasty_id %}
+                                        {{ dynasty.name }}
+                                        {% endif %}
+                                        {% endfor %}
+                                        {% else %}
+                                        Uncontrolled
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ territory.development_level }}</td>
+                                    <td>{{ territory.population }}</td>
+                                    <td>
+                                        <a href="{{ url_for('territory_details', territory_id=territory.id) }}" class="btn btn-sm btn-primary">View</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Dynamic province filtering based on selected region
+    document.getElementById('region').addEventListener('change', function() {
+        const regionId = this.value;
+        const provinceSelect = document.getElementById('province');
+        
+        // Reset province selection
+        provinceSelect.innerHTML = '<option value="">All Provinces</option>';
+        
+        if (regionId) {
+            // Filter provinces by region
+            {% for province in provinces %}
+            if ('{{ province.region_id }}' === regionId) {
+                const option = document.createElement('option');
+                option.value = '{{ province.id }}';
+                option.textContent = '{{ province.name }}';
+                provinceSelect.appendChild(option);
+            }
+            {% endfor %}
+        } else {
+            // Show all provinces
+            {% for province in provinces %}
+            const option = document.createElement('option');
+            option.value = '{{ province.id }}';
+            option.textContent = '{{ province.name }}';
+            provinceSelect.appendChild(option);
+            {% endfor %}
+        }
+    });
+</script>
+{% endblock %}

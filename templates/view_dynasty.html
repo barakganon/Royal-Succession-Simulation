@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+ç{% extends "base.html" %}
 
 {% block title %}{{ dynasty.name }} - Dynasty Saga{% endblock %}
 
@@ -10,8 +10,14 @@
             <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary mr-2">
                 <i class="fas fa-arrow-left"></i> Back to Dashboard
             </a>
-            <a href="{{ url_for('advance_turn', dynasty_id=dynasty.id) }}" class="btn btn-success">
+            <a href="{{ url_for('advance_turn', dynasty_id=dynasty.id) }}" class="btn btn-success mr-2">
                 <i class="fas fa-forward"></i> Advance Turn
+            </a>
+            <a href="{{ url_for('dynasty_economy', dynasty_id=dynasty.id) }}" class="btn btn-primary mr-2">
+                <i class="fas fa-chart-line"></i> Economy
+            </a>
+            <a href="{{ url_for('delete_dynasty', dynasty_id=dynasty.id) }}" class="btn btn-outline-danger">
+                <i class="fas fa-trash"></i> Delete Dynasty
             </a>
         </div>
     </div>
@@ -103,7 +109,13 @@
                         <div class="timeline">
                             {% for event in recent_events %}
                                 <div class="timeline-item">
-                                    <div class="timeline-year">Year {{ event.year }}</div>
+                                    <div class="timeline-year">
+                                        {% if event.year %}
+                                            Year {{ event.year }}
+                                        {% else %}
+                                            System Event
+                                        {% endif %}
+                                    </div>
                                     <div class="timeline-content">
                                         <p>{{ event.event_string }}</p>
                                     </div>

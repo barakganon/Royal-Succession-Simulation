@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+
+{% block title %}{{ dynasty.name }} - Economy{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>{{ dynasty.name }} - Economy</h1>
+    <p class="lead">Year: {{ dynasty.current_simulation_year }}</p>
+    
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">Treasury</h5>
+                </div>
+                <div class="card-body">
+                    <h2 class="display-4">{{ economy_data.current_treasury|int }} <small>Gold</small></h2>
+                    <p class="text-{% if economy_data.treasury_change >= 0 %}success{% else %}danger{% endif %}">
+                        <i class="fas fa-{% if economy_data.treasury_change >= 0 %}arrow-up{% else %}arrow-down{% endif %}"></i>
+                        {{ economy_data.treasury_change|int }} Gold per year
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="card-title mb-0">Income</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <span>Tax Income:</span>
+                        <span>{{ economy_data.tax_income|int }} Gold</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Trade Income:</span>
+                        <span>{{ economy_data.trade_income|int }} Gold</span>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between font-weight-bold">
+                        <span>Total Income:</span>
+                        <span>{{ economy_data.total_income|int }} Gold</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="card-title mb-0">Expenses</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <span>Military Maintenance:</span>
+                        <span>{{ economy_data.total_consumption.get(ResourceType.GOLD, 0)|int }} Gold</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Building Maintenance:</span>
+                        <span>{{ (economy_data.total_consumption.get(ResourceType.GOLD, 0) * 0.3)|int }} Gold</span>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between font-weight-bold">
+                        <span>Total Expenses:</span>
+                        <span>{{ economy_data.total_consumption.get(ResourceType.GOLD, 0)|int }} Gold</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Resource Production and Consumption Chart -->
+    {% if production_chart_url %}
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+            <h5 class="card-title mb-0">Resource Production and Consumption</h5>
+        </div>
+        <div class="card-body">
+            <img src="{{ production_chart_url }}" class="img-fluid" alt="Resource Production and Consumption">
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="row">
+        <!-- Territories -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="card-title mb-0">Territories</h5>
+                </div>
+                <div class="card-body">
+                    {% if economy_data.territories %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Territory</th>
+                                        <th>Development</th>
+                                        <th>Population</th>
+                                        <th>Tax Income</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for territory in economy_data.territories %}
+                                    <tr>
+                                        <td><a href="{{ url_for('territory_details', territory_id=territory.id) }}">{{ territory.name }}</a></td>
+                                        <td>{{ territory.development_level }}</td>
+                                        <td>{{ territory.population }}</td>
+                                        <td>{{ territory.tax_income|int }} Gold</td>
+                                        <td>
+                                            <div class="btn-group">
+                                                <button type="button" class="btn btn-sm btn-primary dropdown-toggle" data-toggle="dropdown">
+                                                    Actions
+                                                </button>
+                                                <div class="dropdown-menu">
+                                                    <a class="dropdown-item" href="{{ url_for('territory_economy', territory_id=territory.id) }}">View Economy</a>
+                                                    <button class="dropdown-item" data-toggle="modal" data-target="#constructBuildingModal" 
+                                                            data-territory-id="{{ territory.id }}" data-territory-name="{{ territory.name }}">
+                                                        Construct Building
+                                                    </button>
+                                                    <form action="{{ url_for('develop_territory_economy', dynasty_id=dynasty.id, territory_id=territory.id) }}" method="post">
+                                                        <button type="submit" class="dropdown-item">Develop Territory</button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p>No territories controlled by this dynasty.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Trade Routes -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="card-title mb-0">Trade Routes</h5>
+                </div>
+                <div class="card-body">
+                    {% if economy_data.trade_routes %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Partner</th>
+                                        <th>Resource</th>
+                                        <th>Amount</th>
+                                        <th>Profit</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for route in economy_data.trade_routes %}
+                                    <tr>
+                                        <td>{{ route.type|capitalize }}</td>
+                                        <td>{{ route.partner }}</td>
+                                        <td>{{ route.resource }}</td>
+                                        <td>{{ route.amount }}</td>
+                                        <td>{{ route.profit|int }} Gold</td>
+                                        <td>
+                                            <form action="{{ url_for('cancel_trade', dynasty_id=dynasty.id, trade_route_id=route.id) }}" method="post">
+                                                <button type="submit" class="btn btn-sm btn-danger">Cancel</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                            
+                            <button class="btn btn-success mt-3" data-toggle="modal" data-target="#establishTradeModal">
+                                Establish New Trade Route
+                            </button>
+                        </div>
+                    {% else %}
+                        <p>No active trade routes.</p>
+                        <button class="btn btn-success" data-toggle="modal" data-target="#establishTradeModal">
+                            Establish New Trade Route
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Trade Network Visualization -->
+            {% if trade_chart_url %}
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">Trade Network</h5>
+                </div>
+                <div class="card-body">
+                    <img src="{{ trade_chart_url }}" class="img-fluid" alt="Trade Network">
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Economic Trends Chart -->
+    {% if trends_chart_url %}
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+            <h5 class="card-title mb-0">Economic Trends</h5>
+        </div>
+        <div class="card-body">
+            <img src="{{ trends_chart_url }}" class="img-fluid" alt="Economic Trends">
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Construct Building Modal -->
+    <div class="modal fade" id="constructBuildingModal" tabindex="-1" role="dialog" aria-labelledby="constructBuildingModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="constructBuildingModalLabel">Construct Building</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <form action="{{ url_for('construct_building', dynasty_id=dynasty.id) }}" method="post">
+                    <div class="modal-body">
+                        <input type="hidden" name="territory_id" id="territoryId">
+                        <p>Construct a new building in <span id="territoryName"></span>.</p>
+                        
+                        <div class="form-group">
+                            <label for="buildingType">Building Type</label>
+                            <select class="form-control" id="buildingType" name="building_type" required>
+                                <option value="FARM">Farm (50 Gold, 20 Timber)</option>
+                                <option value="MINE">Mine (100 Gold, 30 Timber, 20 Stone)</option>
+                                <option value="LUMBER_CAMP">Lumber Camp (60 Gold, 10 Timber)</option>
+                                <option value="WORKSHOP">Workshop (80 Gold, 30 Timber, 10 Stone)</option>
+                                <option value="MARKET">Market (120 Gold, 40 Timber, 30 Stone)</option>
+                                <option value="PORT">Port (200 Gold, 80 Timber, 50 Stone)</option>
+                                <option value="WAREHOUSE">Warehouse (100 Gold, 50 Timber, 20 Stone)</option>
+                                <option value="TRADE_POST">Trade Post (150 Gold, 30 Timber, 20 Stone)</option>
+                                <option value="ROADS">Roads (80 Gold, 40 Stone)</option>
+                                <option value="IRRIGATION">Irrigation (70 Gold, 20 Timber)</option>
+                                <option value="GUILD_HALL">Guild Hall (150 Gold, 40 Timber, 40 Stone)</option>
+                                <option value="BANK">Bank (200 Gold, 60 Stone)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Construct</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Establish Trade Modal -->
+    <div class="modal fade" id="establishTradeModal" tabindex="-1" role="dialog" aria-labelledby="establishTradeModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="establishTradeModalLabel">Establish Trade Route</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <form action="{{ url_for('establish_trade', dynasty_id=dynasty.id) }}" method="post">
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="targetDynasty">Trade Partner</label>
+                            <select class="form-control" id="targetDynasty" name="target_dynasty_id" required>
+                                {% for other_dynasty in dynasties %}
+                                    {% if other_dynasty.id != dynasty.id %}
+                                        <option value="{{ other_dynasty.id }}">{{ other_dynasty.name }}</option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="resourceType">Resource</label>
+                            <select class="form-control" id="resourceType" name="resource_type" required>
+                                <option value="FOOD">Food</option>
+                                <option value="TIMBER">Timber</option>
+                                <option value="STONE">Stone</option>
+                                <option value="IRON">Iron</option>
+                                <option value="GOLD">Gold</option>
+                                <option value="SPICES">Spices</option>
+                                <option value="WINE">Wine</option>
+                                <option value="SILK">Silk</option>
+                                <option value="JEWELRY">Jewelry</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="amount">Amount per Year</label>
+                            <input type="number" class="form-control" id="amount" name="amount" min="1" max="100" value="10" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Establish Trade Route</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Set territory ID and name in construct building modal
+    $('#constructBuildingModal').on('show.bs.modal', function (event) {
+        var button = $(event.relatedTarget);
+        var territoryId = button.data('territory-id');
+        var territoryName = button.data('territory-name');
+        
+        var modal = $(this);
+        modal.find('#territoryId').val(territoryId);
+        modal.find('#territoryName').text(territoryName);
+    });
+</script>
+{% endblock %}
