@@ -64,7 +64,7 @@ class DynastyDB(db.Model):
     
     # Capital territory - main seat of power
     capital_territory_id = db.Column(db.Integer, db.ForeignKey('territory.id'), nullable=True)
-    capital = db.relationship('Territory', foreign_keys=[capital_territory_id], backref='capital_of')
+    capital = db.relationship('Territory', foreign_keys=[capital_territory_id])
 
     # Relationships to related simulation data for this dynasty
     # 'dynamic' allows for querying, e.g., dynasty.persons.filter_by(...).all()
@@ -156,15 +156,18 @@ class PersonDB(db.Model):
     espionage_skill = db.Column(db.Integer, default=0)   # Skill for covert operations (0-20)
 
     # New relationships for multi-agent game
-    commanded_units = db.relationship('MilitaryUnit', backref='commander',
-                                     foreign_keys='MilitaryUnit.commander_id',
-                                     lazy='dynamic')
-    commanded_armies = db.relationship('Army', backref='commander',
-                                      foreign_keys='Army.commander_id',
+    commanded_units = db.relationship('MilitaryUnit',
+                                      foreign_keys='MilitaryUnit.commander_id',
                                       lazy='dynamic')
-    governed_territories = db.relationship('Territory', backref='governor',
-                                          foreign_keys='Territory.governor_id',
-                                          lazy='dynamic')
+    commanded_armies = db.relationship('Army',
+                                       foreign_keys='Army.commander_id',
+                                       lazy='dynamic')
+    # Fix backref conflict by using a different name
+    governed_territories = db.relationship('Territory',
+                                           foreign_keys='Territory.governor_id',
+                                           backref=db.backref('governor_person', uselist=False),
+                                           lazy='dynamic',
+                                           overlaps="governor")
 
     # If you want a direct relationship for founder on DynastyDB
     # founded_dynasty_rel = db.relationship('DynastyDB', foreign_keys=[DynastyDB.founder_person_db_id], backref='founder_character', uselist=False)
@@ -226,10 +229,11 @@ class HistoryLogEntryDB(db.Model):
     treaty_id = db.Column(db.Integer, db.ForeignKey('treaty.id'), nullable=True)
     
     # Relationships for multi-agent game
-    territory = db.relationship('Territory', backref='history_logs')
-    war = db.relationship('War', backref='history_logs')
-    battle = db.relationship('Battle', backref='history_logs')
-    treaty = db.relationship('Treaty', backref='history_logs')
+    # Use different relationship names to avoid conflicts with backrefs
+    territory_rel = db.relationship('Territory', foreign_keys=[territory_id], backref=db.backref('history_entries_rel', lazy='dynamic'))
+    war_rel = db.relationship('War', foreign_keys=[war_id], backref=db.backref('history_entries_rel', lazy='dynamic'))
+    battle_rel = db.relationship('Battle', foreign_keys=[battle_id], backref=db.backref('history_entries_rel', lazy='dynamic'))
+    treaty_rel = db.relationship('Treaty', foreign_keys=[treaty_id], backref=db.backref('history_entries_rel', lazy='dynamic'))
 
     # Timestamp for when the log entry was created in the database
     recorded_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
@@ -330,26 +334,39 @@ class Territory(db.Model):
     fortification_level = db.Column(db.Integer, default=0)  # 0-5, affects siege difficulty
     
     # Relationships
-    history_entries = db.relationship('HistoryLogEntryDB', backref='territory')
-    governor = db.relationship('PersonDB', foreign_keys=[governor_id], backref='governed_territories')
+    # Modified to avoid conflict with HistoryLogEntryDB.territory_rel
+    history_entries = db.relationship('HistoryLogEntryDB',
+                                     foreign_keys='HistoryLogEntryDB.territory_id',
+                                     overlaps="territory_rel,history_entries_rel")
+    governor = db.relationship('PersonDB', foreign_keys=[governor_id], overlaps="governor_person,governed_territories")
     buildings = db.relationship('Building', backref='territory', lazy='dynamic',
                                cascade="all, delete-orphan")
     resources = db.relationship('TerritoryResource', backref='territory', lazy='dynamic',
                                cascade="all, delete-orphan")
     settlements = db.relationship('Settlement', backref='territory', lazy='dynamic',
                                  cascade="all, delete-orphan")
-    units_present = db.relationship('MilitaryUnit', backref='current_territory',
-                                   foreign_keys='MilitaryUnit.territory_id',
-                                   lazy='dynamic')
-    armies_present = db.relationship('Army', backref='current_territory',
-                                    foreign_keys='Army.territory_id',
+    units_present = db.relationship('MilitaryUnit',
+                                    foreign_keys='MilitaryUnit.territory_id',
                                     lazy='dynamic')
-    battles = db.relationship('Battle', backref='territory', lazy='dynamic')
-    sieges = db.relationship('Siege', backref='territory', lazy='dynamic')
+    armies_present = db.relationship('Army',
+                                     foreign_keys='Army.territory_id',
+                                     lazy='dynamic')
+    battles = db.relationship('Battle',
+                             backref=db.backref('battle_territory', uselist=False),
+                             lazy='dynamic',
+                             foreign_keys='Battle.territory_id',
+                             overlaps="battle_rel,history_entries_rel")
+    
+    sieges = db.relationship('Siege',
+                            backref=db.backref('siege_territory', uselist=False),
+                            lazy='dynamic',
+                            foreign_keys='Siege.territory_id')
+    
     wars_over_territory = db.relationship('War',
                                          foreign_keys='War.target_territory_id',
-                                         backref='target_territory',
-                                         lazy='dynamic')
+                                         backref=db.backref('target_territory_ref', uselist=False),
+                                         lazy='dynamic',
+                                         overlaps="war_rel,history_entries_rel")
     
     # Metadata
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
@@ -439,7 +456,7 @@ class TerritoryResource(db.Model):
     current_depletion = db.Column(db.Float, default=0.0)  # Current depletion level (0.0-1.0)
     
     # Relationships
-    resource = db.relationship('Resource')
+    resource = db.relationship('Resource', backref='territory_resources')
     
     # Metadata
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
@@ -603,7 +620,7 @@ class MilitaryUnit(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     last_updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
     
-    def calculate_strength(self, terrain=None) -> float:
+    def calculate_strength(self, terrain_type=None) -> float:
         """Calculate combat strength considering all factors."""
         base_strength = self.size * self.quality * (1.0 + self.experience)
         
@@ -656,7 +673,7 @@ class Army(db.Model):
     is_sieging = db.Column(db.Boolean, default=False)
     
     # Relationships
-    units = db.relationship('MilitaryUnit', backref='army', lazy='dynamic')
+    units = db.relationship('MilitaryUnit', lazy='dynamic')
     
     # Metadata
     created_year = db.Column(db.Integer, nullable=False)
@@ -683,7 +700,7 @@ class DiplomaticRelation(db.Model):
     relation_score = db.Column(db.Integer, default=0)  # -100 to 100
     
     # Relationships
-    treaties = db.relationship('Treaty', backref='diplomatic_relation', lazy='dynamic',
+    treaties = db.relationship('Treaty', lazy='dynamic',
                               cascade="all, delete-orphan")
     
     # Metadata
@@ -738,7 +755,7 @@ class Treaty(db.Model):
     terms_json = db.Column(db.Text, default='{}')  # JSON string of terms
     
     # Relationships
-    history_entries = db.relationship('HistoryLogEntryDB', backref='treaty')
+    history_entries = db.relationship('HistoryLogEntryDB')
     
     # Metadata
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
@@ -799,10 +816,10 @@ class War(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     
     # Relationships
-    battles = db.relationship('Battle', backref='war', lazy='dynamic',
+    battles = db.relationship('Battle', lazy='dynamic',
                              cascade="all, delete-orphan")
-    history_entries = db.relationship('HistoryLogEntryDB', backref='war')
-    target_territory = db.relationship('Territory', backref='wars_over_territory')
+    history_entries = db.relationship('HistoryLogEntryDB')
+    target_territory = db.relationship('Territory')
     
     # Metadata
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
@@ -861,13 +878,13 @@ class Battle(db.Model):
     details_json = db.Column(db.Text, default='{}')  # JSON string of battle details
     
     # Relationships
-    territory = db.relationship('Territory', backref='battles')
-    attacker = db.relationship('DynastyDB', foreign_keys=[attacker_dynasty_id], backref='battles_as_attacker')
-    defender = db.relationship('DynastyDB', foreign_keys=[defender_dynasty_id], backref='battles_as_defender')
-    winner = db.relationship('DynastyDB', foreign_keys=[winner_dynasty_id], backref='battles_won')
+    territory = db.relationship('Territory')
+    attacker = db.relationship('DynastyDB', foreign_keys=[attacker_dynasty_id])
+    defender = db.relationship('DynastyDB', foreign_keys=[defender_dynasty_id])
+    winner = db.relationship('DynastyDB', foreign_keys=[winner_dynasty_id])
     attacker_army = db.relationship('Army', foreign_keys=[attacker_army_id])
     defender_army = db.relationship('Army', foreign_keys=[defender_army_id])
-    history_entries = db.relationship('HistoryLogEntryDB', backref='battle')
+    history_entries = db.relationship('HistoryLogEntryDB')
     
     # Metadata
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
@@ -906,11 +923,11 @@ class Siege(db.Model):
     successful = db.Column(db.Boolean, default=False)
     
     # Relationships
-    war = db.relationship('War', backref='sieges')
-    territory = db.relationship('Territory', backref='sieges')
-    attacker = db.relationship('DynastyDB', foreign_keys=[attacker_dynasty_id], backref='sieges_as_attacker')
-    defender = db.relationship('DynastyDB', foreign_keys=[defender_dynasty_id], backref='sieges_as_defender')
-    attacker_army = db.relationship('Army', foreign_keys=[attacker_army_id], backref='sieges')
+    war = db.relationship('War')
+    territory = db.relationship('Territory')
+    attacker = db.relationship('DynastyDB', foreign_keys=[attacker_dynasty_id])
+    defender = db.relationship('DynastyDB', foreign_keys=[defender_dynasty_id])
+    attacker_army = db.relationship('Army', foreign_keys=[attacker_army_id])
     
     # Metadata
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)

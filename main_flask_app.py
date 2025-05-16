@@ -2841,15 +2841,15 @@ def process_world_events(dynasty: DynastyDB, current_year: int, theme_config: di
 
 def generate_family_tree_visualization(dynasty: DynastyDB, theme_config: dict):
     """Generate a family tree visualization for the dynasty."""
-    from visualization.plotter import visualize_family_tree_snapshot
-    from models.family_tree import FamilyTree
-    from models.person import Person
-    
-    # Create a directory for visualizations
-    visualizations_dir = os.path.join('static', 'visualizations')
-    os.makedirs(visualizations_dir, exist_ok=True)
-    
     try:
+        from visualization.plotter import visualize_family_tree_snapshot
+        from models.family_tree import FamilyTree
+        from models.person import Person
+        
+        # Create a directory for visualizations
+        visualizations_dir = os.path.join('static', 'visualizations')
+        os.makedirs(visualizations_dir, exist_ok=True)
+        
         # Create a FamilyTree object from the database
         family_tree = FamilyTree(dynasty.name, theme_config)
         family_tree.current_year = dynasty.current_simulation_year
@@ -2935,6 +2935,45 @@ def initialize_test_user():
         return test_user
 
 
+def start_flask_app_with_port_fallback(initial_port=8091, max_attempts=10):
+    """
+    Attempts to start the Flask application, falling back to alternative ports if the initial port is in use.
+    
+    Args:
+        initial_port: The port to try first
+        max_attempts: Maximum number of alternative ports to try
+    
+    Returns:
+        True if the app started successfully, False otherwise
+    """
+    import socket
+    from werkzeug.serving import make_server
+
+    # Try the initial port and then alternatives
+    for port_offset in range(max_attempts):
+        current_port = initial_port + port_offset
+        
+        try:
+            # Check if port is available before trying to start Flask
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(('127.0.0.1', current_port))
+                # If we get here, the port is available
+                s.close()
+                
+            logger.info(f"Starting Flask application on port {current_port}...")
+            app.run(debug=True, use_reloader=False, host='0.0.0.0', port=current_port)
+            return True
+            
+        except socket.error:
+            logger.warning(f"Port {current_port} is already in use, trying next port...")
+        except Exception as e:
+            logger.error(f"Error starting Flask on port {current_port}: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+            
+    logger.critical(f"Failed to start Flask app after trying {max_attempts} different ports")
+    return False
+
 if __name__ == '__main__':
     try:
         # Initialize database with integrity checks and migrations
@@ -2958,10 +2997,11 @@ if __name__ == '__main__':
         load_cultural_themes()  # From utils.theme_manager
         logger.info("Cultural themes loaded.")
 
-        # Start the Flask application
-        logger.info("Starting Flask application...")
-        app.run(debug=True,
-                use_reloader=False)  # debug=True for development, use_reloader=False often helps with PyCharm debugger
+        # Start the Flask application with port fallback
+        if not start_flask_app_with_port_fallback(initial_port=8091, max_attempts=10):
+            logger.critical("Could not start Flask application on any available port")
+            sys.exit(1)
+            
     except Exception as e:
         logger.critical(f"Fatal error starting application: {str(e)}")
         import traceback

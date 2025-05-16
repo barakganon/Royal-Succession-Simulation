@@ -39,7 +39,7 @@ def generate_name(gender: str, theme_config: dict) -> str:
     return random.choice(name_list)
 
 
-def generate_narrative_flair(category: str, theme_config: dict, subject_name: str = "",
+def generate_narrative_flair(category: str = None, theme_config: dict = None, subject_name: str = "",
                              object_name: str = "", year: int = None, details: dict = None) -> str:
     """
     Generates a flavorful sentence for historical events, using LLM if available.

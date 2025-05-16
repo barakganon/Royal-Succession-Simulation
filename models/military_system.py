@@ -49,7 +49,6 @@ class MilitarySystem:
             session: SQLAlchemy database session
         """
         logger.info("Initializing MilitarySystem")
-        """
         self.session = session
         self.movement_system = MovementSystem(session)
         
@@ -938,4 +937,3 @@ class MilitarySystem:
         # Siege continues
         self.session.commit()
         return True, f"Siege of {territory.name} continues. Progress: {siege.progress:.1%}", siege
-        return True, f"Battle resolved. {winner_name} was victorious.", battle

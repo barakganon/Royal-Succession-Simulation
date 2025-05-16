@@ -7,6 +7,7 @@ Handles database setup, table creation, and schema migrations.
 import os
 import logging
 import datetime
+import stat
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -65,8 +66,25 @@ class DatabaseInitializer:
                 # Check if database file exists for SQLite
                 if self.app.config['SQLALCHEMY_DATABASE_URI'].startswith('sqlite:///'):
                     db_path = self.app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+                    
+                    # Ensure database directory exists
+                    db_dir = os.path.dirname(db_path)
+                    if db_dir and not os.path.exists(db_dir):
+                        os.makedirs(db_dir, exist_ok=True)
+                        self.logger.info(f"Created database directory: {db_dir}")
+                    
+                    # Check if database file exists
                     if not os.path.exists(db_path):
                         self.logger.info(f"Database file {db_path} does not exist. Creating new database.")
+                    else:
+                        # Ensure database file has proper permissions
+                        try:
+                            current_mode = os.stat(db_path).st_mode
+                            if not (current_mode & stat.S_IWUSR):
+                                os.chmod(db_path, current_mode | stat.S_IRUSR | stat.S_IWUSR)
+                                self.logger.info(f"Set read/write permissions on database file: {db_path}")
+                        except Exception as perm_error:
+                            self.logger.warning(f"Could not set permissions on database file: {str(perm_error)}")
                 
                 # Create tables if they don't exist
                 self._create_tables_if_not_exist()
@@ -412,8 +430,62 @@ class DatabaseInitializer:
             int: Current database schema version
         """
         try:
-            # Check if the version table exists
+            # Check if the person_db table has the required skill columns
             inspector = inspect(db.engine)
+            
+            # Check person_db table first (most critical for current issue)
+            if 'person_db' in inspector.get_table_names():
+                person_columns = [col['name'] for col in inspector.get_columns('person_db')]
+                required_skill_columns = ['diplomatic_skill', 'military_skill', 'stewardship_skill', 'espionage_skill']
+                
+                # Force migration if ANY required column is missing
+                missing_columns = [col for col in required_skill_columns if col not in person_columns]
+                if missing_columns:
+                    self.logger.info(f"Columns {missing_columns} missing from person_db table. Forcing migration.")
+                    # Reset the version in the db_version table to 0
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text("UPDATE db_version SET version = 0"))
+                            conn.commit()
+                    except Exception as e:
+                        self.logger.error(f"Error resetting db_version: {e}")
+                    return 0
+            
+            # Also check dynasty table
+            dynasty_columns = [col['name'] for col in inspector.get_columns('dynasty')]
+            
+            # If any of the required columns are missing, force a migration by returning 0
+            required_columns = ['prestige', 'infamy', 'honor', 'piety', 'capital_territory_id', 'last_updated_at']
+            for col in required_columns:
+                if col not in dynasty_columns:
+                    self.logger.info(f"Column '{col}' missing from dynasty table. Forcing migration.")
+                    # Reset the version in the db_version table to 0
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text("UPDATE db_version SET version = 0"))
+                            conn.commit()
+                    except:
+                        pass
+                    return 0
+            
+            # Check history_log_entry table for required columns
+            if 'history_log_entry' in inspector.get_table_names():
+                history_columns = [col['name'] for col in inspector.get_columns('history_log_entry')]
+                required_history_columns = ['territory_id', 'war_id', 'battle_id', 'treaty_id']
+                
+                for col in required_history_columns:
+                    if col not in history_columns:
+                        self.logger.info(f"Column '{col}' missing from history_log_entry table. Forcing migration.")
+                        # Reset the version in the db_version table to 0
+                        try:
+                            with db.engine.connect() as conn:
+                                conn.execute(text("UPDATE db_version SET version = 0"))
+                                conn.commit()
+                        except:
+                            pass
+                        return 0
+            
+            # Check if the version table exists
             if 'db_version' not in inspector.get_table_names():
                 # Create version table
                 with db.engine.connect() as conn:
@@ -453,16 +525,101 @@ class DatabaseInitializer:
         try:
             self.logger.info("Performing migration from v0 to v1")
             
-            # Example migration: Add a new column to a table
-            # Check if the column already exists
+            # Check which columns already exist in the dynasty table
             inspector = inspect(db.engine)
             dynasty_columns = [col['name'] for col in inspector.get_columns('dynasty')]
             
-            if 'piety' not in dynasty_columns:
-                self.logger.info("Adding 'piety' column to dynasty table")
-                with db.engine.connect() as conn:
+            # Add missing columns to the dynasty table
+            with db.engine.connect() as conn:
+                # Add prestige column if it doesn't exist
+                if 'prestige' not in dynasty_columns:
+                    self.logger.info("Adding 'prestige' column to dynasty table")
+                    conn.execute(text("ALTER TABLE dynasty ADD COLUMN prestige INTEGER DEFAULT 0"))
+                
+                # Add infamy column if it doesn't exist
+                if 'infamy' not in dynasty_columns:
+                    self.logger.info("Adding 'infamy' column to dynasty table")
+                    conn.execute(text("ALTER TABLE dynasty ADD COLUMN infamy INTEGER DEFAULT 0"))
+                
+                # Add honor column if it doesn't exist
+                if 'honor' not in dynasty_columns:
+                    self.logger.info("Adding 'honor' column to dynasty table")
+                    conn.execute(text("ALTER TABLE dynasty ADD COLUMN honor INTEGER DEFAULT 50"))
+                
+                # Add piety column if it doesn't exist
+                if 'piety' not in dynasty_columns:
+                    self.logger.info("Adding 'piety' column to dynasty table")
                     conn.execute(text("ALTER TABLE dynasty ADD COLUMN piety INTEGER DEFAULT 50"))
+                
+                # Add capital_territory_id column if it doesn't exist
+                if 'capital_territory_id' not in dynasty_columns:
+                    self.logger.info("Adding 'capital_territory_id' column to dynasty table")
+                    conn.execute(text("ALTER TABLE dynasty ADD COLUMN capital_territory_id INTEGER"))
+                
+                # Add last_updated_at column if it doesn't exist
+                if 'last_updated_at' not in dynasty_columns:
+                    self.logger.info("Adding 'last_updated_at' column to dynasty table")
+                    # Use a constant string value for the default instead of CURRENT_TIMESTAMP
+                    current_time = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+                    conn.execute(text(f"ALTER TABLE dynasty ADD COLUMN last_updated_at TIMESTAMP DEFAULT '{current_time}'"))
+                
+                # Check which columns already exist in the person_db table
+                person_columns = [col['name'] for col in inspector.get_columns('person_db')]
+                
+                # Define required skill columns
+                required_skill_columns = ['diplomatic_skill', 'military_skill', 'stewardship_skill', 'espionage_skill']
+                
+                # Add missing skill columns to the person_db table
+                if 'diplomatic_skill' not in person_columns:
+                    self.logger.info("Adding 'diplomatic_skill' column to person_db table")
+                    conn.execute(text("ALTER TABLE person_db ADD COLUMN diplomatic_skill INTEGER DEFAULT 0"))
                     conn.commit()
+                
+                if 'military_skill' not in person_columns:
+                    self.logger.info("Adding 'military_skill' column to person_db table")
+                    conn.execute(text("ALTER TABLE person_db ADD COLUMN military_skill INTEGER DEFAULT 0"))
+                    conn.commit()
+                
+                if 'stewardship_skill' not in person_columns:
+                    self.logger.info("Adding 'stewardship_skill' column to person_db table")
+                    conn.execute(text("ALTER TABLE person_db ADD COLUMN stewardship_skill INTEGER DEFAULT 0"))
+                    conn.commit()
+                
+                if 'espionage_skill' not in person_columns:
+                    self.logger.info("Adding 'espionage_skill' column to person_db table")
+                    conn.execute(text("ALTER TABLE person_db ADD COLUMN espionage_skill INTEGER DEFAULT 0"))
+                    conn.commit()
+                
+                # Verify all columns were added successfully
+                person_columns_after = [col['name'] for col in inspector.get_columns('person_db')]
+                missing_after = [col for col in required_skill_columns if col not in person_columns_after]
+                if missing_after:
+                    self.logger.error(f"Failed to add columns {missing_after} to person_db table")
+                    raise Exception(f"Migration failed: could not add columns {missing_after}")
+                else:
+                    self.logger.info("All required skill columns added successfully to person_db table")
+                
+                # Check which columns already exist in the history_log_entry table
+                history_columns = [col['name'] for col in inspector.get_columns('history_log_entry')]
+                
+                # Add missing columns to the history_log_entry table
+                if 'territory_id' not in history_columns:
+                    self.logger.info("Adding 'territory_id' column to history_log_entry table")
+                    conn.execute(text("ALTER TABLE history_log_entry ADD COLUMN territory_id INTEGER"))
+                
+                if 'war_id' not in history_columns:
+                    self.logger.info("Adding 'war_id' column to history_log_entry table")
+                    conn.execute(text("ALTER TABLE history_log_entry ADD COLUMN war_id INTEGER"))
+                
+                if 'battle_id' not in history_columns:
+                    self.logger.info("Adding 'battle_id' column to history_log_entry table")
+                    conn.execute(text("ALTER TABLE history_log_entry ADD COLUMN battle_id INTEGER"))
+                
+                if 'treaty_id' not in history_columns:
+                    self.logger.info("Adding 'treaty_id' column to history_log_entry table")
+                    conn.execute(text("ALTER TABLE history_log_entry ADD COLUMN treaty_id INTEGER"))
+                
+                conn.commit()
             
             self.logger.info("Migration from v0 to v1 completed")
             

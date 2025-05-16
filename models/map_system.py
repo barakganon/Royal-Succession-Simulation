@@ -526,6 +526,9 @@ class MapGenerator:
                 "tundra": 0.0,
                 "swamp": 0.3
             })
+            
+        return weights
+        
     def _distribute_resources(self, territories: List[Territory]) -> None:
         """
         Distribute resources across territories based on terrain types.
@@ -539,6 +542,13 @@ class MapGenerator:
         # If no resources exist, create them
         if not resources:
             resources = self._create_default_resources()
+            
+        # Get existing territory-resource mappings to avoid duplicates
+        existing_territory_resources = {}
+        for tr in self.session.query(TerritoryResource).all():
+            if tr.territory_id not in existing_territory_resources:
+                existing_territory_resources[tr.territory_id] = set()
+            existing_territory_resources[tr.territory_id].add(tr.resource_id)
         
         # Resource distribution by terrain type
         terrain_resource_affinities = {
@@ -624,14 +634,22 @@ class MapGenerator:
                 # Base production based on affinity
                 base_production = random.uniform(0.5, 1.5) * affinities.get(resource_type, 0.5)
                 
-                territory_resource = TerritoryResource(
-                    territory_id=territory.id,
-                    resource_id=resource.id,
-                    base_production=base_production,
-                    quality=random.uniform(0.8, 1.2),
-                    depletion_rate=random.uniform(0.01, 0.05) if resource_type != ResourceType.FOOD else 0.0
-                )
-                self.session.add(territory_resource)
+                # Check if this territory already has this resource
+                territory_resources = existing_territory_resources.get(territory.id, set())
+                if resource.id not in territory_resources:
+                    territory_resource = TerritoryResource(
+                        territory_id=territory.id,
+                        resource_id=resource.id,
+                        base_production=base_production,
+                        quality=random.uniform(0.8, 1.2),
+                        depletion_rate=random.uniform(0.01, 0.05) if resource_type != ResourceType.FOOD else 0.0
+                    )
+                    self.session.add(territory_resource)
+                    
+                    # Update our tracking of existing resources
+                    if territory.id not in existing_territory_resources:
+                        existing_territory_resources[territory.id] = set()
+                    existing_territory_resources[territory.id].add(resource.id)
             
             # Small chance for luxury resource
             if random.random() < 0.15:  # 15% chance
@@ -654,14 +672,22 @@ class MapGenerator:
                         # Lower base production for luxury resources
                         base_production = random.uniform(0.2, 0.6) * affinities.get(resource_type, 0.3)
                         
-                        territory_resource = TerritoryResource(
-                            territory_id=territory.id,
-                            resource_id=resource.id,
-                            base_production=base_production,
-                            quality=random.uniform(0.9, 1.5),  # Higher quality for luxury
-                            depletion_rate=random.uniform(0.02, 0.08)  # Luxury resources deplete faster
-                        )
-                        self.session.add(territory_resource)
+                        # Check if this territory already has this resource
+                        territory_resources = existing_territory_resources.get(territory.id, set())
+                        if resource.id not in territory_resources:
+                            territory_resource = TerritoryResource(
+                                territory_id=territory.id,
+                                resource_id=resource.id,
+                                base_production=base_production,
+                                quality=random.uniform(0.9, 1.5),  # Higher quality for luxury
+                                depletion_rate=random.uniform(0.02, 0.08)  # Luxury resources deplete faster
+                            )
+                            self.session.add(territory_resource)
+                            
+                            # Update our tracking of existing resources
+                            if territory.id not in existing_territory_resources:
+                                existing_territory_resources[territory.id] = set()
+                            existing_territory_resources[territory.id].add(resource.id)
     
     def _create_default_resources(self) -> List[Resource]:
         """

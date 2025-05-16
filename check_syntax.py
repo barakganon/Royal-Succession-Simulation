@@ -1,4 +1,5 @@
 import ast
+import sys
 
 def check_syntax(filename):
     try:
@@ -9,4 +10,8 @@ def check_syntax(filename):
     except SyntaxError as e:
         print(f"Syntax error in {filename}: {e}")
 
-check_syntax('main_flask_app.py')
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        check_syntax(sys.argv[1])
+    else:
+        check_syntax('main_flask_app.py')

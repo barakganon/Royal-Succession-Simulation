@@ -31,6 +31,67 @@ import matplotlib.pyplot as plt
 # Set up logger
 logger = setup_logger('royal_succession.simulation_engine')
 
+class SimulationEngine:
+    """
+    A class that encapsulates the simulation engine functionality.
+    This class provides an interface for running royal succession simulations.
+    """
+    
+    def __init__(self):
+        """Initialize the SimulationEngine with default settings."""
+        self.verbose_logging = True
+        self.visualize_tree_interval_years = 50
+        self.use_llm_flair = True
+        self.verbose_event_logging = True
+        self.verbose_trait_logging = True
+        self.llm_model_instance = None
+        self.google_api_key_is_set = False
+        
+    def configure(self, verbose_log=True, viz_interval=50, use_llm_flair=True,
+                 event_log=True, trait_log=True, llm_model_obj=None, api_key_present_bool=False):
+        """Configure the simulation engine settings."""
+        self.verbose_logging = verbose_log
+        self.visualize_tree_interval_years = viz_interval
+        self.use_llm_flair = use_llm_flair
+        self.verbose_event_logging = event_log
+        self.verbose_trait_logging = trait_log
+        self.llm_model_instance = llm_model_obj
+        self.google_api_key_is_set = api_key_present_bool
+        
+        # Configure global settings for the simulation
+        configure_simulation_globals(
+            verbose_log=verbose_log,
+            viz_interval=viz_interval,
+            use_llm_flair=use_llm_flair,
+            event_log=event_log,
+            trait_log=trait_log,
+            llm_model_obj=llm_model_obj,
+            api_key_present_bool=api_key_present_bool
+        )
+        
+    def run(self, theme_name_or_user_story=None, sim_years_override=None,
+            start_year_override=None, succession_rule_override=None, is_user_story=False):
+        """
+        Run a royal succession simulation.
+        
+        Args:
+            theme_name_or_user_story: The theme name or user story to use for the simulation
+            sim_years_override: Override for the number of years to simulate
+            start_year_override: Override for the starting year
+            succession_rule_override: Override for the succession rule
+            is_user_story: Whether the theme_name_or_user_story is a user story
+            
+        Returns:
+            A tuple containing the family tree and history log
+        """
+        return run_simulation(
+            theme_name_or_user_story=theme_name_or_user_story,
+            sim_years_override=sim_years_override,
+            start_year_override=start_year_override,
+            succession_rule_override=succession_rule_override,
+            is_user_story=is_user_story
+        )
+
 # --- Define BASE Constants (Master defaults for the simulation engine) ---
 BASE_START_YEAR = 1000;
 BASE_MAX_SIMULATION_YEARS = 200  # Default length of a run
@@ -100,47 +161,46 @@ def run_simulation(theme_name_or_user_story: str = None,
     start_time = time.time()
     
     # Wrap the entire function in a try-except block to catch any unhandled exceptions
-    try:
-        # --- 1. Theme Loading and Configuration ---
-        logger.info("Starting simulation with theme loading")
-        theme_load_start = time.time()
-        
-        current_run_theme_config: dict | None = None
-        dynasty_id_for_filenames: str = "DefaultDynasty"  # Fallback for naming output files
+    # --- 1. Theme Loading and Configuration ---
+    logger.info("Starting simulation with theme loading")
+    theme_load_start = time.time()
+    
+    current_run_theme_config: dict | None = None
+    dynasty_id_for_filenames: str = "DefaultDynasty"  # Fallback for naming output files
 
-        if is_user_story and theme_name_or_user_story:
-            logger.info("Attempting to generate custom theme from user story")
-            # generate_theme_from_story_llm is imported from utils.theme_manager
-            # It needs LLM_MODEL_INSTANCE and GOOGLE_API_KEY_IS_SET to be configured via configure_simulation_globals
-            try:
-                custom_theme_dict = generate_theme_from_story_llm(theme_name_or_user_story)
-                if custom_theme_dict:
-                    current_run_theme_config = custom_theme_dict
-                    # Try to get a dynastic name from the generated theme for file naming
-                    surnames_list_custom = current_run_theme_config.get("surnames_dynastic")
-                    if surnames_list_custom and isinstance(surnames_list_custom, list) and surnames_list_custom:
-                        dynasty_id_for_filenames = surnames_list_custom[0].replace(" ", "_")  # Use first for file ID
-                    else:
-                        dynasty_id_for_filenames = "CustomStoryDynasty"  # Fallback
-                    logger.info(f"Successfully generated custom theme: {current_run_theme_config.get('description', 'N/A')}")
-                else:  # LLM theme generation failed
-                    logger.warning("Failed to generate theme from user story. Falling back to a random predefined theme.")
-                    # get_random_theme is imported from utils.theme_manager
-                    theme_name_or_user_story, current_run_theme_config = get_random_theme()
-                    is_user_story = False  # Update flag as we are no longer using the user's story directly
-                    if current_run_theme_config and "description" not in current_run_theme_config:  # Error theme from get_random_theme
-                        logger.error(f"CRITICAL FALLBACK ERROR: Could not load a random theme ('{theme_name_or_user_story}'). Aborting.")
-                        return None, None
-                    logger.info(f"Using fallback predefined theme: {theme_name_or_user_story}")
-            except Exception as theme_error:
-                logger.error(f"Error generating theme from story: {str(theme_error)}")
-                logger.error(traceback.format_exc())
-                # Fallback to random theme
+    if is_user_story and theme_name_or_user_story:
+        logger.info("Attempting to generate custom theme from user story")
+        # generate_theme_from_story_llm is imported from utils.theme_manager
+        # It needs LLM_MODEL_INSTANCE and GOOGLE_API_KEY_IS_SET to be configured via configure_simulation_globals
+        try:
+            custom_theme_dict = generate_theme_from_story_llm(theme_name_or_user_story)
+            if custom_theme_dict:
+                current_run_theme_config = custom_theme_dict
+                # Try to get a dynastic name from the generated theme for file naming
+                surnames_list_custom = current_run_theme_config.get("surnames_dynastic")
+                if surnames_list_custom and isinstance(surnames_list_custom, list) and surnames_list_custom:
+                    dynasty_id_for_filenames = surnames_list_custom[0].replace(" ", "_")  # Use first for file ID
+                else:
+                    dynasty_id_for_filenames = "CustomStoryDynasty"  # Fallback
+                logger.info(f"Successfully generated custom theme: {current_run_theme_config.get('description', 'N/A')}")
+            else:  # LLM theme generation failed
+                logger.warning("Failed to generate theme from user story. Falling back to a random predefined theme.")
+                # get_random_theme is imported from utils.theme_manager
                 theme_name_or_user_story, current_run_theme_config = get_random_theme()
-                is_user_story = False
-                logger.info(f"Using emergency fallback theme: {theme_name_or_user_story}")
+                is_user_story = False  # Update flag as we are no longer using the user's story directly
+                if current_run_theme_config and "description" not in current_run_theme_config:  # Error theme from get_random_theme
+                    logger.error(f"CRITICAL FALLBACK ERROR: Could not load a random theme ('{theme_name_or_user_story}'). Aborting.")
+                    return None, None
+                logger.info(f"Using fallback predefined theme: {theme_name_or_user_story}")
+        except Exception as theme_error:
+            logger.error(f"Error generating theme from story: {str(theme_error)}")
+            logger.error(traceback.format_exc())
+            # Fallback to random theme
+            theme_name_or_user_story, current_run_theme_config = get_random_theme()
+            is_user_story = False
+            logger.info(f"Using emergency fallback theme: {theme_name_or_user_story}")
 
-        if not is_user_story:  # Handles predefined themes OR if custom story generation failed and fell back
+    else:  # Handles predefined themes OR if custom story generation failed and fell back
             try:
                 chosen_theme_key = theme_name_or_user_story
                 if not chosen_theme_key:  # If None was passed and not a story
@@ -175,13 +235,13 @@ def run_simulation(theme_name_or_user_story: str = None,
                 dynasty_id_for_filenames = "EmergencyDynasty"
                 logger.info("Created emergency fallback theme")
 
-        if not current_run_theme_config:  # If still no theme after all logic
-            logger.critical("FATAL: Could not load or generate any theme configuration. Aborting simulation.")
-            return None, None
-            
-        theme_load_time = time.time() - theme_load_start
-        log_performance("Theme loading", theme_load_time)
-        # --- End Theme Loading ---
+    if not current_run_theme_config:  # If still no theme after all logic
+        logger.critical("FATAL: Could not load or generate any theme configuration. Aborting simulation.")
+        return None, None
+        
+    theme_load_time = time.time() - theme_load_start
+    log_performance("Theme loading", theme_load_time)
+    # --- End Theme Loading ---
 
 
     # --- 2. Simulation Initialization ---
@@ -372,12 +432,6 @@ def run_simulation(theme_name_or_user_story: str = None,
     
     logger.info(f"Simulation completed for House of {family.dynasty_name}")
     return family, history_log
-    
-    except Exception as e:
-        logger.critical(f"Unhandled exception in run_simulation: {str(e)}")
-        logger.critical(traceback.format_exc())
-        return None, None
-
 
 # --- Helper Functions for run_simulation ---
 
