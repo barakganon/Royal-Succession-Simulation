@@ -993,6 +993,19 @@ def dynasty_territories(dynasty_id):
     border_system = BorderSystem(db.session)
     border_territories = border_system.get_border_territories(dynasty_id)
     
+    # Get contested territories (territories at borders with potential conflicts)
+    contested_territories = []
+    try:
+        # Get territories that are at the border and have neighboring territories controlled by other dynasties
+        for territory in border_territories:
+            neighbors = border_system.get_neighboring_territories(territory.id)
+            for neighbor in neighbors:
+                if neighbor.controller_dynasty_id and neighbor.controller_dynasty_id != dynasty_id:
+                    contested_territories.append(territory)
+                    break
+    except Exception as e:
+        print(f"Error determining contested territories: {e}")
+    
     # Create map renderer
     map_renderer = MapRenderer(db.session)
     
@@ -1013,7 +1026,8 @@ def dynasty_territories(dynasty_id):
                           dynasty=dynasty,
                           territories=territories,
                           border_territories=border_territories,
-                          contested_territories=contested_territories)
+                          contested_territories=contested_territories,
+                          dynasty_map=dynasty_map)
 
 # Military routes
 @app.route('/dynasty/<int:dynasty_id>/military')
@@ -1345,7 +1359,8 @@ def update_siege(dynasty_id, siege_id):
         if siege:
             return redirect(url_for('siege_details', siege_id=siege.id))
     else:
-        return False, "Not enough gold for military maintenance. Troops' morale has decreased.", costs
+        flash("Siege update failed: " + message, "danger")
+        return redirect(url_for('military_view', dynasty_id=dynasty_id))
 
 # Diplomacy routes
 @app.route('/dynasty/<int:dynasty_id>/diplomacy')

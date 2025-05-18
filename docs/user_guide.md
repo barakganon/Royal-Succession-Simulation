@@ -1,6 +1,20 @@
 # Royal Succession Multi-Agent Strategic Game: User Guide
 
-This guide will help you navigate the Royal Succession Multi-Agent Strategic Game and master its various systems.
+This comprehensive guide will help you navigate the Royal Succession Multi-Agent Strategic Game and master its various systems. It covers all aspects of gameplay from basic controls to advanced strategies.
+
+## Table of Contents
+
+1. [Getting Started](#getting-started)
+2. [Game Dashboard](#game-dashboard)
+3. [Creating a New Game](#creating-a-new-game)
+4. [Game Interface](#game-interface)
+5. [Game Systems](#game-systems)
+6. [Playing the Game](#playing-the-game)
+7. [Advanced Strategies](#advanced-strategies)
+8. [Troubleshooting](#troubleshooting)
+9. [Command Line Tools](#command-line-tools)
+10. [Upcoming Features](#upcoming-features)
+11. [Next Steps](#next-steps)
 
 ## Getting Started
 
@@ -373,13 +387,57 @@ To check the status of a specific dynasty:
 python check_dynasty.py --dynasty_id=1
 ```
 
+## Upcoming Features
+
+The Royal Succession Multi-Agent Strategic Game is actively being developed, with many exciting features planned for future updates:
+
+### Religion and Culture System
+- Different religions with unique bonuses and restrictions
+- Cultural identities with traditions and innovations
+- Religious buildings and cultural landmarks
+- Religious conflicts and conversion mechanics
+
+### Enhanced Character System
+- More detailed character traits and personalities
+- Character education and development paths
+- Character ambitions and personal goals
+- Stress and mental health mechanics
+- Character secrets and blackmail
+
+### Laws and Government Types
+- Different government types (feudal, republic, theocracy)
+- Council positions with powerful vassals and advisors
+- Law system for succession, gender rights, and vassal obligations
+- Parliamentary/council voting mechanics
+- Revolution and civil war mechanics
+
+### Technology and Development
+- Technology progression system with historical advancements
+- Regional technology spread and innovation
+- Specialized development paths
+- Invention events and famous scholars
+
+### Multiplayer Enhancements
+- Improved synchronization for multiplayer games
+- Chat and diplomacy channels
+- Alliance and team mechanics
+- Spectator mode for watching games
+
+### Visual Improvements
+- Enhanced map visualization with more detail
+- Character portraits that age and change with traits
+- Dynamic music that responds to game situations
+- Improved battle and siege visualizations
+
 ## Next Steps
 
 After mastering the basics, consider:
 
-1. Creating games with different map templates and settings.
-2. Trying different victory strategies.
-3. Contributing to the project by adding new features or cultural themes.
-4. Creating custom scenarios or historical settings.
+1. Creating games with different map templates and settings
+2. Trying different victory strategies
+3. Contributing to the project by adding new features or cultural themes
+4. Creating custom scenarios or historical settings
+5. Joining the community to discuss strategies and share stories
+6. Exploring the command-line tools for advanced simulation options
 
-Enjoy your conquest of the world with the Royal Succession Multi-Agent Strategic Game!
+Enjoy your conquest of the world with the Royal Succession Multi-Agent Strategic Game! Your dynasty's legacy awaits!

@@ -628,7 +628,7 @@ class MilitaryUnit(db.Model):
         strength = base_strength * self.morale
         
         # Apply terrain modifier if provided
-        if terrain and isinstance(terrain, TerrainType):
+        if terrain_type and isinstance(terrain_type, TerrainType):
             # Different unit types have different terrain advantages
             terrain_modifiers = {
                 UnitType.LEVY_SPEARMEN: {'HILLS': 1.1, 'MOUNTAINS': 0.8},
@@ -638,8 +638,8 @@ class MilitaryUnit(db.Model):
                 # Add more as needed
             }
             
-            if self.unit_type in terrain_modifiers and terrain.name in terrain_modifiers[self.unit_type]:
-                strength *= terrain_modifiers[self.unit_type][terrain.name]
+            if self.unit_type in terrain_modifiers and terrain_type.name in terrain_modifiers[self.unit_type]:
+                strength *= terrain_modifiers[self.unit_type][terrain_type.name]
         
         # Apply commander bonus if available
         if self.commander_id:

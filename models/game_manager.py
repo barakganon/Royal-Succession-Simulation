@@ -9,6 +9,10 @@ loading, and saving.
 import datetime
 import random
 from typing import List, Dict, Tuple, Optional, Any
+import logging
+
+# Import custom logging configuration
+from utils.logging_config import setup_logger
 
 from sqlalchemy.orm import Session
 
@@ -38,6 +42,9 @@ class GameManager:
             session: SQLAlchemy database session
         """
         self.session = session
+        
+        # Initialize logger
+        self.logger = setup_logger('royal_succession.game_manager', level='info')
         
         # Initialize all subsystems
         self.map_system = {
@@ -85,17 +92,17 @@ class GameManager:
             # Validate map template
             valid_templates = ["small_continent", "large_continent", "archipelago", "default"]
             if map_template not in valid_templates:
-                logging.warning(f"Invalid map template '{map_template}'. Falling back to 'small_continent'.")
+                self.logger.warning(f"Invalid map template '{map_template}'. Falling back to 'small_continent'.")
                 map_template = "small_continent"
             
             # Generate map with error handling
             try:
                 map_data = self.map_system['generator'].generate_predefined_map(map_template)
                 if not map_data or not map_data.get('territories'):
-                    logging.error(f"Map generation failed for template '{map_template}'. Trying fallback template.")
+                    self.logger.error(f"Map generation failed for template '{map_template}'. Trying fallback template.")
                     map_data = self.map_system['generator'].generate_predefined_map("default")
             except Exception as map_error:
-                logging.error(f"Error generating map with template '{map_template}': {str(map_error)}")
+                self.logger.error(f"Error generating map with template '{map_template}': {str(map_error)}")
                 # Fallback to default map generation
                 map_data = self.map_system['generator'].generate_procedural_map()
             
@@ -148,7 +155,7 @@ class GameManager:
             
             # Ensure there are enough territories for all dynasties
             if len(territories) < len(all_dynasties):
-                logging.error(f"Not enough territories ({len(territories)}) for all dynasties ({len(all_dynasties)}). Generating additional territories.")
+                self.logger.error(f"Not enough territories ({len(territories)}) for all dynasties ({len(all_dynasties)}). Generating additional territories.")
                 # Generate additional territories if needed
                 additional_territories_needed = len(all_dynasties) - len(territories)
                 try:
@@ -175,7 +182,7 @@ class GameManager:
                     else:
                         return False, "Failed to create game: Not enough territories and no provinces available", None
                 except Exception as territory_error:
-                    logging.error(f"Error creating additional territories: {str(territory_error)}")
+                    self.logger.error(f"Error creating additional territories: {str(territory_error)}")
                     return False, f"Failed to create game: Territory generation error: {str(territory_error)}", None
             
             # Distribute territories evenly among dynasties with minimum guarantee
@@ -183,7 +190,7 @@ class GameManager:
             remaining_territories = len(territories) - (min_territories_per_dynasty * len(all_dynasties))
             
             if remaining_territories < 0:
-                logging.error("Critical error: Not enough territories even after generation attempt")
+                self.logger.error("Critical error: Not enough territories even after generation attempt")
                 return False, "Failed to create game: Critical territory shortage", None
                 
             # First pass: assign minimum territories
@@ -223,7 +230,7 @@ class GameManager:
                             territory.id, dynasty.id, is_capital
                         )
                     except Exception as assign_error:
-                        logging.error(f"Error assigning territory {territory.id} to dynasty {dynasty.id}: {str(assign_error)}")
+                        self.logger.error(f"Error assigning territory {territory.id} to dynasty {dynasty.id}: {str(assign_error)}")
                         # Continue with other assignments even if one fails
             
             # Initialize founder and spouse for each dynasty
