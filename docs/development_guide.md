@@ -81,12 +81,30 @@ Royal-Succession-Simulation/
 ├── instance/                 # Instance-specific data
 │   ├── __init__.py
 │   └── dynastysim.db         # SQLite database
-├── tests/                    # Test directory (future)
+├── tests/                    # Comprehensive testing framework
+│   ├── __init__.py
+│   ├── conftest.py           # Common test fixtures and configuration
+│   ├── unit/                 # Unit tests for individual components
+│   │   ├── __init__.py
+│   │   ├── test_db_models.py # Database model tests
+│   │   ├── test_game_manager.py # Game manager tests
+│   │   └── test_simulation_engine.py # Simulation engine tests
+│   ├── integration/          # Integration tests for component interactions
+│   │   ├── __init__.py
+│   │   └── test_flask_app.py # Flask application tests
+│   └── functional/           # Functional tests for complete workflows
+│       ├── __init__.py
+│       └── test_game_flow.py # Game flow tests
+├── pytest.ini                # Pytest configuration
+├── requirements-test.txt     # Testing dependencies
+├── run_tests.sh              # Test runner script
 └── docs/                     # Documentation
     ├── user_guide.md         # User documentation
     ├── technical_implementation.md # Technical documentation
     ├── development_guide.md  # This file
     ├── enhancement_plan.md   # Planned enhancements
+    ├── development_tasks.md  # Development tasks and priorities
+    ├── security_considerations.md # Security guidelines
     ├── royal_succession_multi_agent_game_design.md # Game design
     └── technical_analysis_for_multi_agent_extension.md # Technical analysis
 ```
@@ -748,42 +766,116 @@ def my_visualization():
 
 ## Testing
 
-### Unit Testing
+### Comprehensive Testing Framework
 
-Unit tests are located in the project root and test individual components:
+The project uses pytest for a comprehensive testing framework. Tests are organized in the `tests` directory with the following structure:
 
-- `test_basic.py`: Basic functionality tests
-- `test_flask.py`: Flask route tests
-- `test_game_manager.py`: Game manager tests
-- `test_imports.py`: Import validation tests
-
-To run tests:
-
-```bash
-python -m unittest discover
+```
+tests/
+├── __init__.py
+├── conftest.py           # Common test fixtures and configuration
+├── unit/                 # Unit tests for individual components
+│   ├── __init__.py
+│   ├── test_db_models.py # Database model tests
+│   ├── test_game_manager.py # Game manager tests
+│   └── test_simulation_engine.py # Simulation engine tests
+├── integration/          # Integration tests for component interactions
+│   ├── __init__.py
+│   └── test_flask_app.py # Flask application tests
+└── functional/           # Functional tests for complete workflows
+    ├── __init__.py
+    └── test_game_flow.py # Game flow tests
 ```
 
-### Writing New Tests
+#### Running Tests
 
-When adding new features, create corresponding tests:
+The project includes a test runner script that can run different types of tests:
+
+```bash
+# Run all tests
+./run_tests.sh
+
+# Run specific test types
+./run_tests.sh unit        # Run unit tests only
+./run_tests.sh integration # Run integration tests only
+./run_tests.sh functional  # Run functional tests only
+
+# Run tests for specific components
+./run_tests.sh model       # Run database model tests
+./run_tests.sh game_manager # Run game manager tests
+./run_tests.sh simulation  # Run simulation engine tests
+./run_tests.sh web         # Run web interface tests
+
+# Run tests with coverage report
+./run_tests.sh coverage
+```
+
+#### Test Categories
+
+The testing framework includes several categories of tests:
+
+1. **Unit Tests**: Test individual components in isolation
+   - Database models
+   - Game manager
+   - Simulation engine
+   - Individual systems (map, military, diplomacy, economy)
+
+2. **Integration Tests**: Test interactions between components
+   - Flask application with database
+   - Game manager with systems
+   - Systems with each other
+
+3. **Functional Tests**: Test complete workflows
+   - Game creation and turn processing
+   - Dynasty interactions
+   - User interface flows
+
+#### Writing New Tests
+
+When adding new features, create corresponding tests using pytest:
 
 ```python
-import unittest
+import pytest
 from models.my_module import MyClass
 
-class TestMyClass(unittest.TestCase):
-    def setUp(self):
+@pytest.mark.unit  # Mark the test category
+class TestMyClass:
+    @pytest.fixture
+    def my_instance(self):
         # Setup code
-        self.my_instance = MyClass()
-        
-    def test_my_method(self):
+        instance = MyClass()
+        yield instance
+        # Cleanup code (if needed)
+    
+    def test_my_method(self, my_instance):
         # Test code
-        result = self.my_instance.my_method(param1, param2)
-        self.assertEqual(result, expected_result)
-        
-    def tearDown(self):
-        # Cleanup code
-        pass
+        result = my_instance.my_method(param1, param2)
+        assert result == expected_result
+```
+
+#### Test Fixtures
+
+Common test fixtures are defined in `tests/conftest.py`:
+
+- `app`: Flask application for testing
+- `db`: Database for testing
+- `session`: Database session for testing
+- `game_manager`: Game manager instance for testing
+
+Use these fixtures in your tests to avoid duplicating setup code:
+
+```python
+def test_create_dynasty(self, game_manager, session):
+    # Test creating a dynasty using the game_manager fixture
+    success, message, dynasty_id = game_manager.create_dynasty(
+        user_id=1,
+        name="Test Dynasty",
+        theme="medieval_europe",
+        start_year=1400
+    )
+    
+    assert success is True
+    assert dynasty_id is not None
 ```
 
 ## Troubleshooting

@@ -452,34 +452,53 @@ def delete_dynasty(dynasty_id):
         dynasty_name = dynasty.name  # Store for flash message
         
         try:
-            # Fix for circular dependency: manually break relationships before deletion
-            # 1. Get all persons in this dynasty
-            persons = PersonDB.query.filter_by(dynasty_id=dynasty.id).all()
+            logger.info(f"Deleting dynasty {dynasty_name} (ID: {dynasty_id})")
             
-            # 2. Break circular references between persons
-            for person in persons:
-                # Clear relationship references
-                person.spouse_sim_id = None
-                person.mother_sim_id = None
-                person.father_sim_id = None
+            # Delete related entities that might not be covered by cascade
+            # This ensures clean deletion and prevents orphaned records
             
-            # 3. Commit these changes first
-            db.session.commit()
+            # 1. Delete diplomatic relations
+            logger.debug(f"Deleting diplomatic relations for dynasty {dynasty_id}")
+            DiplomaticRelation.query.filter(
+                (DiplomaticRelation.dynasty1_id == dynasty_id) |
+                (DiplomaticRelation.dynasty2_id == dynasty_id)
+            ).delete(synchronize_session=False)
             
-            # 4. Delete history logs
-            HistoryLogEntryDB.query.filter_by(dynasty_id=dynasty.id).delete()
+            # 2. Delete wars
+            logger.debug(f"Deleting wars for dynasty {dynasty_id}")
+            War.query.filter(
+                (War.attacker_dynasty_id == dynasty_id) |
+                (War.defender_dynasty_id == dynasty_id)
+            ).delete(synchronize_session=False)
             
-            # 5. Delete persons
-            PersonDB.query.filter_by(dynasty_id=dynasty.id).delete()
+            # 3. Delete trade routes
+            logger.debug(f"Deleting trade routes for dynasty {dynasty_id}")
+            try:
+                TradeRoute.query.filter(
+                    (TradeRoute.exporter_dynasty_id == dynasty_id) |
+                    (TradeRoute.importer_dynasty_id == dynasty_id)
+                ).delete(synchronize_session=False)
+            except Exception as trade_error:
+                logger.warning(f"Error deleting trade routes: {str(trade_error)}")
             
-            # 6. Finally delete the dynasty
+            # 4. Release controlled territories
+            logger.debug(f"Releasing territories controlled by dynasty {dynasty_id}")
+            Territory.query.filter_by(controller_dynasty_id=dynasty_id).update(
+                {"controller_dynasty_id": None}, synchronize_session=False
+            )
+            
+            # 5. Delete the dynasty - this will cascade to persons and history logs
+            # thanks to the cascade="all, delete-orphan" setting in the relationships
+            logger.info(f"Deleting dynasty {dynasty_id} from database")
             db.session.delete(dynasty)
             db.session.commit()
             
             flash(f'Dynasty "{dynasty_name}" has been permanently deleted.', 'success')
+            logger.info(f"Dynasty {dynasty_name} successfully deleted")
             return redirect(url_for('dashboard'))
         except Exception as e:
             db.session.rollback()
+            logger.error(f"Error deleting dynasty {dynasty_id}: {str(e)}", exc_info=True)
             flash(f'Error deleting dynasty: {str(e)}', 'danger')
             return redirect(url_for('view_dynasty', dynasty_id=dynasty_id))
     

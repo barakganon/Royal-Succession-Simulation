@@ -45,6 +45,7 @@ class GameManager:
         
         # Initialize logger
         self.logger = setup_logger('royal_succession.game_manager', level='info')
+        self.logger.info("Initializing Game Manager")
         
         # Initialize all subsystems
         self.map_system = {
@@ -62,11 +63,45 @@ class GameManager:
         # Active player sessions
         self.active_sessions = {}
         
-        # AI player controllers
-        self.ai_controllers = {}
+        # AI player controllers - initialize with different personality types
+        self.ai_controllers = {
+            'aggressive': {
+                'military_focus': 0.7,
+                'diplomacy_focus': 0.2,
+                'economy_focus': 0.1,
+                'risk_tolerance': 0.8
+            },
+            'diplomatic': {
+                'military_focus': 0.3,
+                'diplomacy_focus': 0.6,
+                'economy_focus': 0.1,
+                'risk_tolerance': 0.3
+            },
+            'economic': {
+                'military_focus': 0.2,
+                'diplomacy_focus': 0.3,
+                'economy_focus': 0.5,
+                'risk_tolerance': 0.4
+            },
+            'balanced': {
+                'military_focus': 0.33,
+                'diplomacy_focus': 0.33,
+                'economy_focus': 0.34,
+                'risk_tolerance': 0.5
+            }
+        }
         
-        # Game state cache
-        self.game_state_cache = {}
+        # Dynasty to AI controller mapping
+        self.dynasty_ai_mapping = {}
+        
+        # Game state cache with TTL and invalidation tracking
+        self.game_state_cache = {
+            'data': {},
+            'ttl': 60,  # Cache time-to-live in seconds
+            'invalidation_keys': {}  # Track keys that should invalidate cache
+        }
+        
+        self.logger.info("Game Manager initialized successfully")
         
     def create_new_game(self, user_id: int, game_name: str, map_template: str = "small_continent",
                         starting_dynasties: int = 4, ai_dynasties: int = 3) -> Tuple[bool, str, Optional[int]]:
@@ -264,8 +299,10 @@ class GameManager:
         try:
             dynasty = self.session.query(DynastyDB).get(dynasty_id)
             if not dynasty:
-                logging.error(f"Dynasty with ID {dynasty_id} not found during founder initialization")
+                self.logger.error(f"Dynasty with ID {dynasty_id} not found during founder initialization")
                 return
+            
+            self.logger.info(f"Initializing founder for dynasty {dynasty.name} (ID: {dynasty_id})")
             
             # Create founder with error handling
             try:
@@ -294,8 +331,9 @@ class GameManager:
                 )
                 self.session.add(founder)
                 self.session.flush()  # Get ID
+                self.logger.info(f"Created founder {founder_name} for dynasty {dynasty.name}")
             except Exception as founder_error:
-                logging.error(f"Error creating dynasty founder: {str(founder_error)}")
+                self.logger.error(f"Error creating dynasty founder: {str(founder_error)}")
                 # Create a basic founder as fallback
                 founder = PersonDB(
                     dynasty_id=dynasty_id,
@@ -312,6 +350,7 @@ class GameManager:
                 )
                 self.session.add(founder)
                 self.session.flush()  # Get ID
+                self.logger.warning(f"Created emergency founder for dynasty {dynasty.name}")
             
             # Create spouse with error handling
             spouse = None
@@ -350,8 +389,9 @@ class GameManager:
                     # Link as spouses
                     founder.spouse_sim_id = spouse.id
                     spouse.spouse_sim_id = founder.id
+                    self.logger.info(f"Created spouse {spouse_name} for founder {founder.name}")
                 except Exception as spouse_error:
-                    logging.error(f"Error creating spouse for dynasty founder: {str(spouse_error)}")
+                    self.logger.error(f"Error creating spouse for dynasty founder: {str(spouse_error)}")
                     # Continue without spouse if there's an error
             
             # Create history log entry
@@ -364,12 +404,17 @@ class GameManager:
                     person1_sim_id=founder.id
                 )
                 self.session.add(log_entry)
+                self.logger.info(f"Created founding history entry for dynasty {dynasty.name}")
             except Exception as log_error:
-                logging.error(f"Error creating dynasty founding log entry: {str(log_error)}")
+                self.logger.error(f"Error creating dynasty founding log entry: {str(log_error)}")
                 # Continue without log entry if there's an error
                 
+            # Assign an AI personality if this is an AI dynasty
+            if dynasty.is_ai_controlled:
+                self._assign_ai_personality(dynasty_id)
+                
         except Exception as e:
-            logging.error(f"Unhandled error in _initialize_dynasty_founder: {str(e)}")
+            self.logger.error(f"Unhandled error in _initialize_dynasty_founder: {str(e)}")
             # We don't re-raise the exception to allow the game creation to continue
     
     def _generate_character_name(self, dynasty_name: str, role: str) -> str:
@@ -422,8 +467,31 @@ class GameManager:
                 return f"{prefix} {base_name}"
                 
         except Exception as e:
-            logging.error(f"Error in name generation: {str(e)}")
+            self.logger.error(f"Error in name generation: {str(e)}")
             return f"{role.capitalize()} of {dynasty_name}"  # Fallback name
+    
+    def _assign_ai_personality(self, dynasty_id: int) -> None:
+        """
+        Assign an AI personality to a dynasty.
+        
+        Args:
+            dynasty_id: ID of the AI dynasty
+        """
+        try:
+            # Get available personality types
+            personality_types = list(self.ai_controllers.keys())
+            
+            # Assign a random personality
+            personality = random.choice(personality_types)
+            
+            # Store the mapping
+            self.dynasty_ai_mapping[dynasty_id] = personality
+            
+            self.logger.info(f"Assigned {personality} AI personality to dynasty {dynasty_id}")
+        except Exception as e:
+            self.logger.error(f"Error assigning AI personality: {str(e)}")
+            # Fallback to balanced personality
+            self.dynasty_ai_mapping[dynasty_id] = 'balanced'
     
     def load_game(self, dynasty_id: int) -> Dict[str, Any]:
         """
@@ -435,9 +503,28 @@ class GameManager:
         Returns:
             Dictionary with game state information
         """
+        self.logger.info(f"Loading game state for dynasty ID {dynasty_id}")
+        
+        # Check if we have a valid cached state
+        if dynasty_id in self.game_state_cache['data']:
+            cache_entry = self.game_state_cache['data'][dynasty_id]
+            cache_age = (datetime.datetime.now() - cache_entry['last_updated']).total_seconds()
+            
+            # If cache is still valid, return it
+            if cache_age < self.game_state_cache['ttl']:
+                self.logger.info(f"Using cached game state for dynasty {dynasty_id} (age: {cache_age:.1f}s)")
+                return cache_entry['state']
+            else:
+                self.logger.debug(f"Cache expired for dynasty {dynasty_id} (age: {cache_age:.1f}s)")
+        
+        # Cache miss or expired, load from database
         dynasty = self.session.query(DynastyDB).get(dynasty_id)
         if not dynasty:
-            return {'error': f"Dynasty with ID {dynasty_id} not found"}
+            error_msg = f"Dynasty with ID {dynasty_id} not found"
+            self.logger.error(error_msg)
+            return {'error': error_msg}
+        
+        self.logger.debug(f"Building game state for dynasty {dynasty.name}")
         
         # Get basic dynasty information
         game_state = {
@@ -579,11 +666,21 @@ class GameManager:
             'action_points': self.time_system.calculate_action_points(dynasty_id)
         }
         
-        # Update cache
-        self.game_state_cache[dynasty_id] = {
+        # Store in cache
+        self.logger.debug(f"Caching game state for dynasty {dynasty_id}")
+        self.game_state_cache['data'][dynasty_id] = {
             'last_updated': datetime.datetime.now(),
+            'state': game_state,
             'current_year': dynasty.current_simulation_year,
             'current_phase': GamePhase.PLANNING
+        }
+        
+        # Set invalidation keys
+        self.game_state_cache['invalidation_keys'][dynasty_id] = {
+            'territories': [t.id for t in territories],
+            'units': [u.id for u in units],
+            'armies': [a.id for a in armies],
+            'wars': [w['id'] for w in wars]
         }
         
         return game_state
@@ -625,16 +722,23 @@ class GameManager:
         Returns:
             Tuple of (success, message, turn_results)
         """
+        self.logger.info(f"Processing turn for dynasty ID {dynasty_id}")
+        
         try:
             # Get dynasty
             dynasty = self.session.query(DynastyDB).get(dynasty_id)
             if not dynasty:
-                return False, f"Dynasty with ID {dynasty_id} not found", {}
+                error_msg = f"Dynasty with ID {dynasty_id} not found"
+                self.logger.error(error_msg)
+                return False, error_msg, {}
+            
+            self.logger.info(f"Processing turn for dynasty {dynasty.name}, year {dynasty.current_simulation_year}")
             
             # Process turn using time system
             success, message = self.time_system.process_turn(dynasty_id)
             
             if not success:
+                self.logger.error(f"Time system failed to process turn: {message}")
                 return False, message, {}
             
             # Get turn results
@@ -649,22 +753,32 @@ class GameManager:
                 year=dynasty.current_simulation_year
             ).order_by(HistoryLogEntryDB.id.desc()).limit(10).all()
             
+            self.logger.debug(f"Found {len(recent_events)} events for dynasty {dynasty.name} in year {dynasty.current_simulation_year}")
+            
             turn_results['events'] = [{
                 'year': event.year,
                 'description': event.event_string,
                 'type': event.event_type
             } for event in recent_events]
             
-            # Update game state cache
-            self.game_state_cache[dynasty_id] = {
-                'last_updated': datetime.datetime.now(),
-                'current_year': dynasty.current_simulation_year,
-                'current_phase': GamePhase.PLANNING
-            }
+            # Invalidate cache for this dynasty
+            if dynasty_id in self.game_state_cache['data']:
+                self.logger.debug(f"Invalidating cache for dynasty {dynasty_id}")
+                del self.game_state_cache['data'][dynasty_id]
+                
+                # Also invalidate any related dynasties (those with diplomatic relations, wars, etc.)
+                if dynasty_id in self.game_state_cache['invalidation_keys']:
+                    related_dynasties = self._get_related_dynasties(dynasty_id)
+                    for related_id in related_dynasties:
+                        if related_id in self.game_state_cache['data']:
+                            self.logger.debug(f"Invalidating cache for related dynasty {related_id}")
+                            del self.game_state_cache['data'][related_id]
             
+            self.logger.info(f"Turn processed successfully for dynasty {dynasty.name}, new year: {dynasty.current_simulation_year}")
             return True, "Turn processed successfully", turn_results
         except Exception as e:
             self.session.rollback()
+            self.logger.error(f"Error processing turn: {str(e)}", exc_info=True)
             return False, f"Error processing turn: {str(e)}", {}
     
     def process_ai_turns(self, user_id: int) -> Tuple[bool, str]:
@@ -677,89 +791,403 @@ class GameManager:
         Returns:
             Tuple of (success, message)
         """
+        self.logger.info(f"Processing AI turns for user ID {user_id}")
+        
         try:
             # Get all AI dynasties for this user
             ai_dynasties = self.session.query(DynastyDB).filter_by(
                 user_id=user_id, is_ai_controlled=True
             ).all()
             
-            for dynasty in ai_dynasties:
-                # Generate AI decisions
-                self._generate_ai_decisions(dynasty.id)
-                
-                # Process turn
-                self.time_system.process_turn(dynasty.id)
+            self.logger.info(f"Found {len(ai_dynasties)} AI dynasties for user {user_id}")
             
-            return True, f"Processed turns for {len(ai_dynasties)} AI dynasties"
+            success_count = 0
+            error_count = 0
+            
+            for dynasty in ai_dynasties:
+                try:
+                    self.logger.info(f"Processing AI turn for dynasty {dynasty.name} (ID: {dynasty.id})")
+                    
+                    # Ensure dynasty has an AI personality assigned
+                    if dynasty.id not in self.dynasty_ai_mapping:
+                        self._assign_ai_personality(dynasty.id)
+                    
+                    # Generate AI decisions
+                    self._generate_ai_decisions(dynasty.id)
+                    
+                    # Process turn
+                    turn_success, turn_message = self.time_system.process_turn(dynasty.id)
+                    
+                    if turn_success:
+                        success_count += 1
+                        self.logger.info(f"Successfully processed turn for AI dynasty {dynasty.name}")
+                        
+                        # Invalidate cache for this dynasty
+                        if dynasty.id in self.game_state_cache['data']:
+                            del self.game_state_cache['data'][dynasty.id]
+                    else:
+                        error_count += 1
+                        self.logger.error(f"Failed to process turn for AI dynasty {dynasty.name}: {turn_message}")
+                        
+                except Exception as dynasty_error:
+                    error_count += 1
+                    self.logger.error(f"Error processing AI turn for dynasty {dynasty.name}: {str(dynasty_error)}")
+                    # Continue with other dynasties even if one fails
+            
+            if error_count == 0:
+                return True, f"Successfully processed turns for {success_count} AI dynasties"
+            else:
+                return True, f"Processed turns for {success_count} AI dynasties with {error_count} errors"
+                
         except Exception as e:
             self.session.rollback()
+            self.logger.error(f"Error processing AI turns: {str(e)}", exc_info=True)
             return False, f"Error processing AI turns: {str(e)}"
+    
+    def _get_related_dynasties(self, dynasty_id: int) -> List[int]:
+        """
+        Get a list of dynasty IDs that are related to the given dynasty.
+        Related dynasties include those with diplomatic relations, wars, etc.
+        
+        Args:
+            dynasty_id: ID of the dynasty
+            
+        Returns:
+            List of related dynasty IDs
+        """
+        related_ids = set()
+        
+        try:
+            # Get dynasties with diplomatic relations
+            relations = self.session.query(DiplomaticRelation).filter(
+                (DiplomaticRelation.dynasty1_id == dynasty_id) |
+                (DiplomaticRelation.dynasty2_id == dynasty_id)
+            ).all()
+            
+            for relation in relations:
+                if relation.dynasty1_id == dynasty_id:
+                    related_ids.add(relation.dynasty2_id)
+                else:
+                    related_ids.add(relation.dynasty1_id)
+            
+            # Get dynasties involved in wars
+            wars = self.session.query(War).filter(
+                (War.attacker_dynasty_id == dynasty_id) |
+                (War.defender_dynasty_id == dynasty_id)
+            ).all()
+            
+            for war in wars:
+                if war.attacker_dynasty_id == dynasty_id:
+                    related_ids.add(war.defender_dynasty_id)
+                else:
+                    related_ids.add(war.attacker_dynasty_id)
+            
+            # Get dynasties with trade routes (if applicable)
+            try:
+                trade_routes = self.session.query(TradeRoute).filter(
+                    (TradeRoute.exporter_dynasty_id == dynasty_id) |
+                    (TradeRoute.importer_dynasty_id == dynasty_id)
+                ).all()
+                
+                for route in trade_routes:
+                    if route.exporter_dynasty_id == dynasty_id:
+                        related_ids.add(route.importer_dynasty_id)
+                    else:
+                        related_ids.add(route.exporter_dynasty_id)
+            except Exception as e:
+                self.logger.warning(f"Error getting trade routes: {str(e)}")
+            
+            self.logger.debug(f"Found {len(related_ids)} related dynasties for dynasty {dynasty_id}")
+            
+        except Exception as e:
+            self.logger.error(f"Error finding related dynasties: {str(e)}")
+        
+        # Remove the original dynasty ID if it somehow got included
+        if dynasty_id in related_ids:
+            related_ids.remove(dynasty_id)
+            
+        return list(related_ids)
     
     def _generate_ai_decisions(self, dynasty_id: int) -> None:
         """
-        Generate decisions for an AI-controlled dynasty.
+        Generate decisions for an AI-controlled dynasty based on its personality.
         
         Args:
             dynasty_id: ID of the AI dynasty
         """
-        dynasty = self.session.query(DynastyDB).get(dynasty_id)
-        if not dynasty or not dynasty.is_ai_controlled:
-            return
-        
-        # Simple AI decision making
-        # 1. Military: Recruit units if wealth allows
-        if dynasty.current_wealth > 100:
-            # Find a territory to recruit in
-            territory = self.session.query(Territory).filter_by(
-                controller_dynasty_id=dynasty_id
-            ).first()
+        try:
+            dynasty = self.session.query(DynastyDB).get(dynasty_id)
+            if not dynasty or not dynasty.is_ai_controlled:
+                return
             
-            if territory:
-                # Recruit a random unit type
-                unit_type = random.choice([
-                    UnitType.LEVY_SPEARMEN,
-                    UnitType.ARCHERS,
-                    UnitType.LIGHT_CAVALRY
-                ])
+            self.logger.info(f"Generating AI decisions for dynasty {dynasty.name} (ID: {dynasty_id})")
+            
+            # Get AI personality
+            personality = self.dynasty_ai_mapping.get(dynasty_id, 'balanced')
+            if not personality:
+                # If no personality assigned yet, assign one
+                self._assign_ai_personality(dynasty_id)
+                personality = self.dynasty_ai_mapping.get(dynasty_id, 'balanced')
                 
-                # Random size between 100-500
-                size = random.randint(100, 500)
+            personality_traits = self.ai_controllers.get(personality, self.ai_controllers['balanced'])
+            
+            # Extract focus values
+            military_focus = personality_traits['military_focus']
+            diplomacy_focus = personality_traits['diplomacy_focus']
+            economy_focus = personality_traits['economy_focus']
+            risk_tolerance = personality_traits['risk_tolerance']
+            
+            self.logger.debug(f"AI personality: {personality}, Military: {military_focus}, Diplomacy: {diplomacy_focus}, Economy: {economy_focus}, Risk: {risk_tolerance}")
+            
+            # Calculate action probabilities based on focus values
+            military_prob = military_focus * 1.5  # Scale to make it more likely to take action
+            diplomacy_prob = diplomacy_focus * 1.5
+            economy_prob = economy_focus * 1.5
+            
+            # 1. Military decisions
+            if random.random() < military_prob:
+                self._make_military_decision(dynasty_id, risk_tolerance)
+            
+            # 2. Diplomacy decisions
+            if random.random() < diplomacy_prob:
+                self._make_diplomacy_decision(dynasty_id, risk_tolerance)
+            
+            # 3. Economy decisions
+            if random.random() < economy_prob:
+                self._make_economy_decision(dynasty_id, risk_tolerance)
                 
-                self.military_system.recruit_unit(
+        except Exception as e:
+            self.logger.error(f"Error generating AI decisions: {str(e)}")
+    
+    def _make_military_decision(self, dynasty_id: int, risk_tolerance: float) -> None:
+        """
+        Make a military decision for an AI dynasty based on risk tolerance.
+        
+        Args:
+            dynasty_id: ID of the AI dynasty
+            risk_tolerance: Risk tolerance factor (0-1)
+        """
+        try:
+            dynasty = self.session.query(DynastyDB).get(dynasty_id)
+            if not dynasty:
+                return
+                
+            self.logger.debug(f"Making military decision for dynasty {dynasty.name}")
+            
+            # Get controlled territories
+            territories = self.session.query(Territory).filter_by(
+                controller_dynasty_id=dynasty_id
+            ).all()
+            
+            if not territories:
+                return
+                
+            # Determine wealth threshold based on risk tolerance
+            # Higher risk tolerance = willing to spend more of their wealth
+            wealth_threshold = max(50, 100 * (1 - risk_tolerance))
+            
+            if dynasty.current_wealth > wealth_threshold:
+                # Choose a territory - prefer capital or high development
+                if random.random() < 0.7:  # 70% chance to choose strategically
+                    # Try to find capital first
+                    capital = next((t for t in territories if t.is_capital), None)
+                    if capital:
+                        territory = capital
+                    else:
+                        # Sort by development level and pick one of the top territories
+                        sorted_territories = sorted(territories, key=lambda t: t.development_level, reverse=True)
+                        territory = sorted_territories[0] if sorted_territories else random.choice(territories)
+                else:
+                    territory = random.choice(territories)
+                
+                # Determine unit type based on risk tolerance
+                if risk_tolerance > 0.7:
+                    # High risk: prefer offensive units
+                    unit_types = [UnitType.LIGHT_CAVALRY, UnitType.HEAVY_CAVALRY, UnitType.KNIGHTS]
+                    weights = [0.4, 0.4, 0.2]  # Weighted choice
+                elif risk_tolerance > 0.4:
+                    # Medium risk: balanced units
+                    unit_types = [UnitType.LEVY_SPEARMEN, UnitType.ARCHERS, UnitType.LIGHT_CAVALRY]
+                    weights = [0.3, 0.4, 0.3]
+                else:
+                    # Low risk: prefer defensive units
+                    unit_types = [UnitType.LEVY_SPEARMEN, UnitType.ARCHERS]
+                    weights = [0.6, 0.4]
+                
+                unit_type = random.choices(unit_types, weights=weights, k=1)[0]
+                
+                # Size based on wealth and risk tolerance
+                base_size = 100
+                wealth_factor = min(5, dynasty.current_wealth / 100)
+                size = int(base_size * wealth_factor * (0.5 + risk_tolerance))
+                
+                # Cap size based on wealth
+                max_size = dynasty.current_wealth // 2
+                size = min(size, max_size, 1000)
+                
+                # Recruit unit
+                unit_id = self.military_system.recruit_unit(
                     dynasty_id=dynasty_id,
                     unit_type=unit_type,
                     size=size,
                     territory_id=territory.id
                 )
+                
+                if unit_id:
+                    self.logger.info(f"AI dynasty {dynasty.name} recruited {size} {unit_type.value} in {territory.name}")
+        except Exception as e:
+            self.logger.error(f"Error making military decision: {str(e)}")
+    
+    def _make_diplomacy_decision(self, dynasty_id: int, risk_tolerance: float) -> None:
+        """
+        Make a diplomacy decision for an AI dynasty based on risk tolerance.
         
-        # 2. Diplomacy: Improve relations with random dynasty
-        other_dynasties = self.session.query(DynastyDB).filter(
-            DynastyDB.id != dynasty_id
-        ).all()
-        
-        if other_dynasties:
-            target_dynasty = random.choice(other_dynasties)
+        Args:
+            dynasty_id: ID of the AI dynasty
+            risk_tolerance: Risk tolerance factor (0-1)
+        """
+        try:
+            # Get other dynasties
+            other_dynasties = self.session.query(DynastyDB).filter(
+                DynastyDB.id != dynasty_id
+            ).all()
             
-            # Perform a random diplomatic action
-            action_type = random.choice([
-                "send_envoy",
-                "gift",
-                "cultural_exchange"
-            ])
+            if not other_dynasties:
+                return
+                
+            dynasty = self.session.query(DynastyDB).get(dynasty_id)
+            if not dynasty:
+                return
+                
+            self.logger.debug(f"Making diplomacy decision for dynasty {dynasty.name}")
             
-            self.diplomacy_system.perform_diplomatic_action(
+            # Choose target dynasty - not completely random
+            # Higher chance to target dynasties with existing relations
+            related_ids = self._get_related_dynasties(dynasty_id)
+            
+            if related_ids and random.random() < 0.7:  # 70% chance to focus on existing relations
+                target_dynasty_id = random.choice(related_ids)
+                target_dynasty = self.session.query(DynastyDB).get(target_dynasty_id)
+            else:
+                target_dynasty = random.choice(other_dynasties)
+            
+            # Get current relation
+            relation_status, relation_score = self.diplomacy_system.get_relation_status(
+                dynasty_id, target_dynasty.id
+            )
+            
+            # Determine action based on relation and risk tolerance
+            if relation_score < -50:
+                # Very negative relations
+                if risk_tolerance > 0.7 and random.random() < 0.3:
+                    # High risk: consider war
+                    action_type = "declare_war"
+                else:
+                    # Try to improve slightly
+                    action_type = "send_envoy"
+            elif relation_score < 0:
+                # Negative relations
+                action_type = random.choice(["send_envoy", "gift"])
+            elif relation_score < 50:
+                # Neutral relations
+                action_type = random.choice(["send_envoy", "gift", "cultural_exchange"])
+            else:
+                # Positive relations
+                if risk_tolerance < 0.3:
+                    # Low risk: consolidate friendship
+                    action_type = random.choice(["gift", "cultural_exchange", "propose_alliance"])
+                else:
+                    # Higher risk: more varied actions
+                    action_type = random.choice(["send_envoy", "gift", "cultural_exchange", "propose_alliance", "request_military_access"])
+            
+            # Execute action
+            success, message = self.diplomacy_system.perform_diplomatic_action(
                 actor_dynasty_id=dynasty_id,
                 target_dynasty_id=target_dynasty.id,
                 action_type=action_type
             )
+            
+            if success:
+                self.logger.info(f"AI dynasty {dynasty.name} performed {action_type} towards dynasty {target_dynasty.name}")
+            else:
+                self.logger.warning(f"AI dynasty {dynasty.name} failed to perform {action_type}: {message}")
+        except Exception as e:
+            self.logger.error(f"Error making diplomacy decision: {str(e)}")
+    
+    def _make_economy_decision(self, dynasty_id: int, risk_tolerance: float) -> None:
+        """
+        Make an economy decision for an AI dynasty based on risk tolerance.
         
-        # 3. Economy: Develop a random territory
-        territory = self.session.query(Territory).filter_by(
-            controller_dynasty_id=dynasty_id
-        ).order_by(Territory.development_level).first()
-        
-        if territory and territory.development_level < 10 and dynasty.current_wealth > 50:
-            self.economy_system.develop_territory(territory.id)
+        Args:
+            dynasty_id: ID of the AI dynasty
+            risk_tolerance: Risk tolerance factor (0-1)
+        """
+        try:
+            dynasty = self.session.query(DynastyDB).get(dynasty_id)
+            if not dynasty:
+                return
+                
+            self.logger.debug(f"Making economy decision for dynasty {dynasty.name}")
+            
+            # Get territories
+            territories = self.session.query(Territory).filter_by(
+                controller_dynasty_id=dynasty_id
+            ).all()
+            
+            if not territories:
+                return
+            
+            # Determine wealth threshold based on risk tolerance
+            # Lower risk tolerance = save more money
+            wealth_threshold = 50 * (1 + (1 - risk_tolerance))
+            
+            if dynasty.current_wealth > wealth_threshold:
+                # Decide between developing territory or constructing building
+                if random.random() < 0.6:  # 60% chance to develop territory
+                    # Choose territory to develop - prefer least developed
+                    sorted_territories = sorted(territories, key=lambda t: t.development_level)
+                    territory = sorted_territories[0] if sorted_territories else random.choice(territories)
+                    
+                    if territory.development_level < 10:  # Max development level
+                        success, message = self.economy_system.develop_territory(territory.id)
+                        if success:
+                            self.logger.info(f"AI dynasty {dynasty.name} developed territory {territory.name}")
+                        else:
+                            self.logger.warning(f"AI dynasty {dynasty.name} failed to develop territory: {message}")
+                else:
+                    # Construct building
+                    # Choose territory - prefer capital or high development
+                    capital = next((t for t in territories if t.is_capital), None)
+                    if capital:
+                        territory = capital
+                    else:
+                        # Sort by development level and pick one of the top territories
+                        sorted_territories = sorted(territories, key=lambda t: t.development_level, reverse=True)
+                        territory = sorted_territories[0] if sorted_territories else random.choice(territories)
+                    
+                    # Choose building type based on risk tolerance
+                    if risk_tolerance > 0.7:
+                        # High risk: military buildings
+                        building_types = [BuildingType.BARRACKS, BuildingType.WALLS, BuildingType.WATCHTOWER]
+                    elif risk_tolerance > 0.4:
+                        # Medium risk: balanced buildings
+                        building_types = [BuildingType.MARKET, BuildingType.FARM, BuildingType.MINE, BuildingType.BARRACKS]
+                    else:
+                        # Low risk: economic buildings
+                        building_types = [BuildingType.MARKET, BuildingType.FARM, BuildingType.MINE, BuildingType.WORKSHOP]
+                    
+                    building_type = random.choice(building_types)
+                    
+                    try:
+                        success, message = self.economy_system.construct_building(territory.id, building_type)
+                        if success:
+                            self.logger.info(f"AI dynasty {dynasty.name} constructed {building_type.value} in {territory.name}")
+                        else:
+                            self.logger.warning(f"AI dynasty {dynasty.name} failed to construct building: {message}")
+                    except Exception as building_error:
+                        self.logger.error(f"Error constructing building: {str(building_error)}")
+        except Exception as e:
+            self.logger.error(f"Error making economy decision: {str(e)}")
     
     def register_player_session(self, user_id: int, dynasty_id: int) -> str:
         """
@@ -844,33 +1272,72 @@ class GameManager:
         Returns:
             Dictionary with synchronized game state
         """
-        if session_token not in self.active_sessions:
-            return {'error': 'Invalid session token'}
-        
-        # Update last activity
-        self.active_sessions[session_token]['last_activity'] = datetime.datetime.now()
-        
-        # Get session info
-        session = self.active_sessions[session_token]
-        dynasty_id = session['dynasty_id']
-        
-        # Get basic synchronization data
-        sync_data = {
-            'active_players': self.get_active_players(),
-            'current_time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        }
-        
-        # Check if game state needs to be refreshed
-        if dynasty_id in self.game_state_cache:
-            cache_entry = self.game_state_cache[dynasty_id]
-            if (datetime.datetime.now() - cache_entry['last_updated']).total_seconds() < 60:
-                # Use cached data if less than 60 seconds old
-                sync_data['game_state_fresh'] = False
-                return sync_data
-        
-        # Load fresh game state
-        game_state = self.load_game(dynasty_id)
-        sync_data['game_state'] = game_state
-        sync_data['game_state_fresh'] = True
-        
-        return sync_data
+        try:
+            if session_token not in self.active_sessions:
+                self.logger.warning(f"Invalid session token: {session_token}")
+                return {'error': 'Invalid session token'}
+            
+            # Update last activity
+            self.active_sessions[session_token]['last_activity'] = datetime.datetime.now()
+            
+            # Get session info
+            session = self.active_sessions[session_token]
+            dynasty_id = session['dynasty_id']
+            user_id = session['user_id']
+            
+            self.logger.info(f"Synchronizing multiplayer state for user {user_id}, dynasty {dynasty_id}")
+            
+            # Get basic synchronization data
+            sync_data = {
+                'active_players': self.get_active_players(),
+                'current_time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
+            
+            # Check if game state needs to be refreshed
+            cache_valid = False
+            if 'data' in self.game_state_cache and dynasty_id in self.game_state_cache['data']:
+                cache_entry = self.game_state_cache['data'][dynasty_id]
+                cache_age = (datetime.datetime.now() - cache_entry['last_updated']).total_seconds()
+                
+                # Check if cache is still valid
+                if cache_age < self.game_state_cache['ttl']:
+                    self.logger.debug(f"Using cached game state for dynasty {dynasty_id} (age: {cache_age:.1f}s)")
+                    sync_data['game_state'] = cache_entry['state']
+                    sync_data['game_state_fresh'] = False
+                    cache_valid = True
+                else:
+                    self.logger.debug(f"Cache expired for dynasty {dynasty_id} (age: {cache_age:.1f}s)")
+            
+            # Load fresh game state if cache is invalid
+            if not cache_valid:
+                self.logger.debug(f"Loading fresh game state for dynasty {dynasty_id}")
+                game_state = self.load_game(dynasty_id)
+                sync_data['game_state'] = game_state
+                sync_data['game_state_fresh'] = True
+            
+            # Add additional synchronization data
+            dynasty = self.session.query(DynastyDB).get(dynasty_id)
+            if dynasty:
+                sync_data['dynasty_year'] = dynasty.current_simulation_year
+                
+                # Get notifications
+                recent_events = self.session.query(HistoryLogEntryDB).filter_by(
+                    dynasty_id=dynasty_id
+                ).order_by(HistoryLogEntryDB.id.desc()).limit(5).all()
+                
+                sync_data['notifications'] = [{
+                    'id': event.id,
+                    'year': event.year,
+                    'message': event.event_string,
+                    'type': event.event_type,
+                    'is_read': event.is_read
+                } for event in recent_events]
+            
+            return sync_data
+            
+        except Exception as e:
+            self.logger.error(f"Error synchronizing multiplayer: {str(e)}", exc_info=True)
+            return {
+                'error': f"Error synchronizing: {str(e)}",
+                'current_time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
