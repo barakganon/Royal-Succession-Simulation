@@ -321,6 +321,11 @@ class MapRenderer:
             
             ax.set_xlim(min_x - padding_x, max_x + padding_x)
             ax.set_ylim(min_y - padding_y, max_y + padding_y)
+        else:
+            # Default limits if no territories
+            ax.set_xlim(-100, 100)
+            ax.set_ylim(-100, 100)
+            ax.text(0, 0, "No territories available", fontsize=14, ha='center', va='center')
         
         # Set title
         ax.set_title('World Map')

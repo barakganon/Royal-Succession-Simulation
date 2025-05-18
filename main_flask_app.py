@@ -26,7 +26,8 @@ logger = logging.getLogger("royal_succession.flask")
 # Import database models (adjust path if your structure differs slightly)
 from models.db_models import (
     db, User, DynastyDB, PersonDB, HistoryLogEntryDB, Territory, Region, Province,
-    MilitaryUnit, UnitType, Army, Battle, Siege, War, DiplomaticRelation, Treaty, TreatyType
+    MilitaryUnit, UnitType, Army, Battle, Siege, War, DiplomaticRelation, Treaty, TreatyType, TradeRoute, Resource,
+    BuildingType, ResourceType, Building, WarGoal
 )
 from models.map_system import MapGenerator, TerritoryManager, MovementSystem, BorderSystem
 from models.military_system import MilitarySystem
@@ -892,21 +893,27 @@ def world_map():
     # Render map
     map_image = None
     try:
-        # Determine if we should highlight a specific dynasty
-        highlight_dynasty = None
-        if len(user_dynasties) == 1:
-            highlight_dynasty = user_dynasties[0].id
-        
-        # Render the map
-        map_image = map_renderer.render_world_map(
-            show_terrain=True,
-            show_territories=True,
-            show_settlements=True,
-            show_units=True,
-            highlight_dynasty_id=highlight_dynasty
-        )
+        # Check if there are territories to render
+        if territories:
+            # Determine if we should highlight a specific dynasty
+            highlight_dynasty = None
+            if len(user_dynasties) == 1:
+                highlight_dynasty = user_dynasties[0].id
+            
+            # Render the map
+            map_image = map_renderer.render_world_map(
+                show_terrain=True,
+                show_territories=True,
+                show_settlements=True,
+                show_units=True,
+                highlight_dynasty_id=highlight_dynasty
+            )
+        else:
+            print("No territories found in the database. Map cannot be rendered.")
     except Exception as e:
         print(f"Error rendering map: {e}")
+        import traceback
+        traceback.print_exc()
     
     # Get regions and provinces for filtering
     regions = Region.query.all()
@@ -2448,9 +2455,18 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
         generate_family_tree_visualization(dynasty, theme_config)
     except Exception as e:
         print(f"Error generating family tree: {e}")
+        import traceback
+        traceback.print_exc()
     
-    db.session.commit()
-    return True, f"Advanced {years_to_advance} years from {start_year} to {end_year}."
+    try:
+        db.session.commit()
+        return True, f"Advanced {years_to_advance} years from {start_year} to {end_year}."
+    except Exception as commit_error:
+        db.session.rollback()
+        print(f"Error committing changes: {commit_error}")
+        import traceback
+        traceback.print_exc()
+        return False, f"Error advancing turn: {commit_error}"
 
 
 def process_death_check(person: PersonDB, current_year: int, theme_config: dict):
@@ -2860,22 +2876,27 @@ def generate_family_tree_visualization(dynasty: DynastyDB, theme_config: dict):
         # First pass: Create Person objects
         person_objects = {}
         for db_person in persons:
+            # Create Person object with required parameters
             person = Person(
-                id=db_person.id,
                 name=db_person.name,
-                surname=db_person.surname,
                 gender=db_person.gender,
                 birth_year=db_person.birth_year,
-                death_year=db_person.death_year,
+                theme_config=theme_config,
                 is_noble=db_person.is_noble
             )
+            
+            # Set additional attributes
+            person.surname = db_person.surname
+            person.death_year = db_person.death_year
             person.is_monarch = db_person.is_monarch
             person.reign_start_year = db_person.reign_start_year
             person.reign_end_year = db_person.reign_end_year
             person.titles = db_person.get_titles()
             person.traits = db_person.get_traits()
             
+            # Store the Person object with the database ID as the key
             person_objects[db_person.id] = person
+            # Use the database ID as the key in the family tree members dictionary
             family_tree.members[db_person.id] = person
             
             if db_person.is_monarch and db_person.death_year is None:

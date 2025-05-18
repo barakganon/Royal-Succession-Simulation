@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from models.db_models import (
     db, Region, Province, Territory, TerrainType, Settlement,
     Resource, ResourceType, TerritoryResource, Building, BuildingType,
-    MilitaryUnit, Army
+    MilitaryUnit, Army, UnitType, War
 )
 
 class MapGenerator:

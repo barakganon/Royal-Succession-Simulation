@@ -4,17 +4,14 @@ Military system for the multi-agent strategic game.
 Handles unit recruitment, army management, battles, and sieges.
 """
 
-import random
-import math
-import datetime
 import logging
-import traceback
-from typing import List, Dict, Tuple, Optional, Union, Any
+import random
+from typing import List, Dict, Tuple, Optional, Any
+
 from sqlalchemy.orm import Session
+
 from models.db_models import (
-    db, DynastyDB, PersonDB, Territory, TerrainType, Settlement,
-    MilitaryUnit, UnitType, Army, Battle, Siege, War, WarGoal,
-    HistoryLogEntryDB
+    DynastyDB, PersonDB, Territory, MilitaryUnit, UnitType, Army, Battle, Siege, War, HistoryLogEntryDB
 )
 from models.map_system import MovementSystem
 

@@ -1,7 +1,7 @@
 # models/family_tree.py
 import random
 import networkx as nx  # type: ignore
-from collections import defaultdict
+from collections import defaultdict, deque
 
 # Assuming Person class is in models.person and History in models.history
 from .person import Person

@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from models.db_models import (
     db, DynastyDB, PersonDB, Territory, TerrainType, Settlement,
     Resource, ResourceType, TerritoryResource, Building, BuildingType,
-    TradeRoute, Region, Province
+    TradeRoute, Region, Province, War, MilitaryUnit, DiplomaticRelation, Treaty, TreatyType
 )
 from models.map_system import TerritoryManager
 

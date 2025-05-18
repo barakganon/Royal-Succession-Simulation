@@ -6,22 +6,22 @@ handles multiplayer synchronization, coordinates AI players, and manages game cr
 loading, and saving.
 """
 
-import random
-import json
 import datetime
-from typing import List, Dict, Tuple, Optional, Union, Any, Set
+import random
+from typing import List, Dict, Tuple, Optional, Any
+
 from sqlalchemy.orm import Session
 
 from models.db_models import (
-    db, User, DynastyDB, PersonDB, Territory, TerrainType, Settlement,
-    MilitaryUnit, UnitType, Army, Battle, Siege, War, DiplomaticRelation, Treaty, TreatyType,
-    HistoryLogEntryDB, Region, Province
+    User, DynastyDB, PersonDB, Territory, MilitaryUnit, UnitType, Army, War, DiplomaticRelation, HistoryLogEntryDB,
+    Province
 )
-from models.map_system import MapGenerator, TerritoryManager, MovementSystem, BorderSystem
-from models.military_system import MilitarySystem
 from models.diplomacy_system import DiplomacySystem
 from models.economy_system import EconomySystem
-from models.time_system import TimeSystem, Season, EventType, EventPriority, GamePhase
+from models.map_system import MapGenerator, TerritoryManager, MovementSystem, BorderSystem
+from models.military_system import MilitarySystem
+from models.time_system import TimeSystem, GamePhase
+
 
 class GameManager:
     """

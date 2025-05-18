@@ -14,11 +14,16 @@
                     <h5 class="card-title mb-0">Treasury</h5>
                 </div>
                 <div class="card-body">
-                    <h2 class="display-4">{{ economy_data.current_treasury|int }} <small>Gold</small></h2>
-                    <p class="text-{% if economy_data.treasury_change >= 0 %}success{% else %}danger{% endif %}">
-                        <i class="fas fa-{% if economy_data.treasury_change >= 0 %}arrow-up{% else %}arrow-down{% endif %}"></i>
-                        {{ economy_data.treasury_change|int }} Gold per year
-                    </p>
+                    {% if economy_data %}
+                        <h2 class="display-4">{{ economy_data.current_treasury|int }} <small>Gold</small></h2>
+                        <p class="text-{% if economy_data.treasury_change >= 0 %}success{% else %}danger{% endif %}">
+                            <i class="fas fa-{% if economy_data.treasury_change >= 0 %}arrow-up{% else %}arrow-down{% endif %}"></i>
+                            {{ economy_data.treasury_change|int }} Gold per year
+                        </p>
+                    {% else %}
+                        <h2 class="display-4">0 <small>Gold</small></h2>
+                        <p class="text-muted">Economy data not available</p>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -29,19 +34,35 @@
                     <h5 class="card-title mb-0">Income</h5>
                 </div>
                 <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <span>Tax Income:</span>
-                        <span>{{ economy_data.tax_income|int }} Gold</span>
-                    </div>
-                    <div class="d-flex justify-content-between">
-                        <span>Trade Income:</span>
-                        <span>{{ economy_data.trade_income|int }} Gold</span>
-                    </div>
-                    <hr>
-                    <div class="d-flex justify-content-between font-weight-bold">
-                        <span>Total Income:</span>
-                        <span>{{ economy_data.total_income|int }} Gold</span>
-                    </div>
+                    {% if economy_data %}
+                        <div class="d-flex justify-content-between">
+                            <span>Tax Income:</span>
+                            <span>{{ economy_data.tax_income|int }} Gold</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Trade Income:</span>
+                            <span>{{ economy_data.trade_income|int }} Gold</span>
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-between font-weight-bold">
+                            <span>Total Income:</span>
+                            <span>{{ economy_data.total_income|int }} Gold</span>
+                        </div>
+                    {% else %}
+                        <div class="d-flex justify-content-between">
+                            <span>Tax Income:</span>
+                            <span>0 Gold</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Trade Income:</span>
+                            <span>0 Gold</span>
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-between font-weight-bold">
+                            <span>Total Income:</span>
+                            <span>0 Gold</span>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -52,19 +73,35 @@
                     <h5 class="card-title mb-0">Expenses</h5>
                 </div>
                 <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <span>Military Maintenance:</span>
-                        <span>{{ economy_data.total_consumption.get(ResourceType.GOLD, 0)|int }} Gold</span>
-                    </div>
-                    <div class="d-flex justify-content-between">
-                        <span>Building Maintenance:</span>
-                        <span>{{ (economy_data.total_consumption.get(ResourceType.GOLD, 0) * 0.3)|int }} Gold</span>
-                    </div>
-                    <hr>
-                    <div class="d-flex justify-content-between font-weight-bold">
-                        <span>Total Expenses:</span>
-                        <span>{{ economy_data.total_consumption.get(ResourceType.GOLD, 0)|int }} Gold</span>
-                    </div>
+                    {% if economy_data %}
+                        <div class="d-flex justify-content-between">
+                            <span>Military Maintenance:</span>
+                            <span>{{ economy_data.total_consumption.get(ResourceType.GOLD, 0)|int }} Gold</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Building Maintenance:</span>
+                            <span>{{ (economy_data.total_consumption.get(ResourceType.GOLD, 0) * 0.3)|int }} Gold</span>
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-between font-weight-bold">
+                            <span>Total Expenses:</span>
+                            <span>{{ economy_data.total_consumption.get(ResourceType.GOLD, 0)|int }} Gold</span>
+                        </div>
+                    {% else %}
+                        <div class="d-flex justify-content-between">
+                            <span>Military Maintenance:</span>
+                            <span>0 Gold</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Building Maintenance:</span>
+                            <span>0 Gold</span>
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-between font-weight-bold">
+                            <span>Total Expenses:</span>
+                            <span>0 Gold</span>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -90,7 +127,7 @@
                     <h5 class="card-title mb-0">Territories</h5>
                 </div>
                 <div class="card-body">
-                    {% if economy_data.territories %}
+                    {% if economy_data and economy_data.territories %}
                         <div class="table-responsive">
                             <table class="table table-striped">
                                 <thead>
@@ -145,7 +182,7 @@
                     <h5 class="card-title mb-0">Trade Routes</h5>
                 </div>
                 <div class="card-body">
-                    {% if economy_data.trade_routes %}
+                    {% if economy_data and economy_data.trade_routes %}
                         <div class="table-responsive">
                             <table class="table table-striped">
                                 <thead>
