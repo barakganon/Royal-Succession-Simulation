@@ -54,7 +54,8 @@ def get_all_theme_names() -> list[str]:
     """Returns a list of all loaded predefined theme names."""
     if not CULTURAL_THEMES_DATA:
         load_cultural_themes()
-    return list(CULTURAL_THEMES_DATA.keys())
+    # Exclude non-theme metadata keys (e.g. ai_personalities added by AI player feature)
+    return [k for k, v in CULTURAL_THEMES_DATA.items() if isinstance(v, dict)]
 
 
 def get_random_theme() -> tuple[str | None, dict | None]:
