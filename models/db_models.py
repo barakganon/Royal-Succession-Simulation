@@ -252,7 +252,7 @@ class HistoryLogEntryDB(db.Model):
     
     event_war = db.relationship('War',
                               foreign_keys=[war_id],
-                              backref=db.backref('history_events', lazy='dynamic'))
+                              back_populates='history_entries')
     
     event_battle = db.relationship('Battle',
                                  foreign_keys=[battle_id],
@@ -858,7 +858,8 @@ class War(db.Model):
     # Relationships
     battles = db.relationship('Battle', lazy='dynamic',
                              cascade="all, delete-orphan")
-    history_entries = db.relationship('HistoryLogEntryDB')
+    history_entries = db.relationship('HistoryLogEntryDB', back_populates='event_war',
+                                     foreign_keys='HistoryLogEntryDB.war_id')
     target_territory = db.relationship('Territory',
                                        foreign_keys=[target_territory_id],
                                        back_populates='territory_wars')
