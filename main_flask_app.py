@@ -1,5 +1,5 @@
 # main_flask_app.py
-from flask import Flask, render_template, redirect, url_for, flash, request
+from flask import Flask, render_template, redirect, url_for, flash, request, jsonify, session as flask_session
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, current_user, login_required
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -2533,6 +2533,91 @@ def create_dynasty_placeholder():
 @login_required
 def view_dynasty_placeholder(dynasty_id):
     return redirect(url_for('view_dynasty', dynasty_id=dynasty_id))
+
+
+# --- AI Advisor Route ---
+
+@app.route('/game/<int:dynasty_id>/advisor')
+@login_required
+def game_advisor(dynasty_id):
+    """Return JSON with 2-3 strategic suggestions from the AI advisor.
+
+    Caches the result in Flask session keyed by (dynasty_id, turn) to avoid
+    redundant LLM calls on page refresh.
+    """
+    from utils.llm_prompts import build_advisor_prompt, generate_advisor_fallback
+
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.user_id != current_user.id:
+        return jsonify({'error': 'Access denied'}), 403
+
+    # Build cache key using current simulation year as turn proxy
+    current_turn = getattr(dynasty, 'current_simulation_year', 0) or 0
+    cache_key = f'advisor_{dynasty_id}_{current_turn}'
+
+    # Check Flask session cache
+    if cache_key in flask_session:
+        return jsonify({'suggestions': flask_session[cache_key]})
+
+    # Build game state summary
+    treasury = getattr(dynasty, 'current_wealth', 0) or 0
+    year = getattr(dynasty, 'current_simulation_year', 1000) or 1000
+    season = 'Spring'  # DynastyDB has no season field; use a sensible default
+
+    active_wars = War.query.filter(
+        (War.attacker_dynasty_id == dynasty_id) | (War.defender_dynasty_id == dynasty_id),
+        War.is_active == True
+    ).count()
+
+    # Count alliances through DiplomaticRelation → Treaty join
+    alliance_types = [TreatyType.DEFENSIVE_ALLIANCE, TreatyType.MILITARY_ALLIANCE]
+    allies = (
+        Treaty.query
+        .join(DiplomaticRelation, Treaty.diplomatic_relation_id == DiplomaticRelation.id)
+        .filter(
+            (DiplomaticRelation.dynasty1_id == dynasty_id) | (DiplomaticRelation.dynasty2_id == dynasty_id),
+            Treaty.treaty_type.in_(alliance_types),
+            Treaty.active == True
+        )
+        .count()
+    )
+
+    # Find strongest neighbour by total unit strength
+    neighbours = DynastyDB.query.filter(DynastyDB.id != dynasty_id).all()
+
+    def _dynasty_strength(d):
+        return sum(
+            unit.calculate_strength()
+            for unit in d.military_units.all()
+        )
+
+    strongest = max(neighbours, key=_dynasty_strength, default=None)
+    strongest_name = strongest.name if strongest else 'unknown'
+
+    # Try LLM
+    suggestions = []
+    if FLASK_APP_LLM_MODEL is not None:
+        try:
+            prompt = build_advisor_prompt(dynasty.name, year, season, treasury, strongest_name, active_wars)
+            response = FLASK_APP_LLM_MODEL.generate_content(
+                prompt,
+                generation_config={'max_output_tokens': 200}
+            )
+            text = response.text.strip()
+            # Parse numbered list
+            lines = [l.strip() for l in text.split('\n') if l.strip()]
+            suggestions = [l.lstrip('123. ').strip() for l in lines if l and l[0].isdigit()][:3]
+        except Exception as e:
+            logger.warning(f"Advisor LLM call failed for dynasty {dynasty_id}: {e}")
+
+    if not suggestions:
+        suggestions = generate_advisor_fallback(treasury, active_wars, allies > 0)
+
+    # Cache in Flask session
+    flask_session[cache_key] = suggestions
+    flask_session.modified = True
+
+    return jsonify({'suggestions': suggestions})
 
 
 # --- Helper Functions for Dynasty Management ---
