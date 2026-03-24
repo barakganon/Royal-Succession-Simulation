@@ -2,6 +2,9 @@
 import random
 import networkx as nx  # type: ignore
 from collections import defaultdict, deque
+from utils.logging_config import setup_logger
+
+logger = setup_logger('royal_succession.family_tree')
 
 # Assuming Person class is in models.person and History in models.history
 from .person import Person
@@ -14,7 +17,7 @@ from .person import Person
 try:
     from ..utils.helpers import generate_name, generate_narrative_flair
 except ImportError:  # Fallback for simpler execution context or testing
-    print("Warning (family_tree.py): Could not import from utils.helpers. Using placeholders.")
+    logger.warning("Could not import from utils.helpers. Using placeholders.")
 
 
     def generate_name(g, tc):
@@ -74,7 +77,7 @@ class FamilyTree:
         """Adds a Person object to the family tree and logs their birth (if not a placeholder)."""
         if person_obj.id in self.members:
             if VERBOSE_LOGGING:
-                print(
+                logger.debug(
                     f"Warning (FamilyTree.add_person): Person ID {person_obj.id} ({person_obj.full_name}) already exists in tree.")
             return
 
@@ -116,7 +119,7 @@ class FamilyTree:
         person2 = self.get_person(person2_id)
 
         if not person1 or not person2:
-            if VERBOSE_LOGGING: print(
+            if VERBOSE_LOGGING: logger.debug(
                 f"Marriage Failed (Year {marriage_year}): Person ID {person1_id if not person1 else ''}{person2_id if not person2 else ''} not found.")
             return False
         if person1.gender == person2.gender:
@@ -143,7 +146,7 @@ class FamilyTree:
                 if person2.surname not in self.alliances: self.alliances[person2.surname] = {}
                 self.alliances[person1.surname][person2.surname] = marriage_year
                 self.alliances[person2.surname][person1.surname] = marriage_year
-                if VERBOSE_LOGGING: print(
+                if VERBOSE_LOGGING: logger.debug(
                     f"Alliance Tracked (Year {marriage_year}): {alliance_description}. (Current wealth: {self.dynasty_wealth})")
 
             self.history.log_event(
@@ -160,8 +163,8 @@ class FamilyTree:
             if VERBOSE_LOGGING:  # Log specific failure if trying to marry
                 p1_can = person1.can_marry(marriage_year)
                 p2_can = person2.can_marry(marriage_year)
-                print(f"Marriage Failed (Yr {marriage_year}): Eligibility issue. "
-                      f"{person1.full_name} can_marry: {p1_can}. {person2.full_name} can_marry: {p2_can}.")
+                logger.debug(f"Marriage Failed (Yr {marriage_year}): Eligibility issue. "
+                             f"{person1.full_name} can_marry: {p1_can}. {person2.full_name} can_marry: {p2_can}.")
             return False
 
     def attempt_conception(self, female_id: int, current_year: int) -> Person | None:
@@ -213,7 +216,7 @@ class FamilyTree:
             if current_year < effect_data_dict.get("end_year", current_year):  # Check if effect is still active
                 effective_mortality_modifier *= effect_data_dict.get("mortality_impact_factor", 1.0)
             else:  # Event effect has expired
-                if VERBOSE_EVENT_LOGGING: print(f"Event effect '{event_id_key}' expired in {current_year}.")
+                if VERBOSE_EVENT_LOGGING: logger.debug(f"Event effect '{event_id_key}' expired in {current_year}.")
                 del self.active_event_effects[event_id_key]
 
         # Base mortality for this person's theme, modified by active events
@@ -243,7 +246,7 @@ class FamilyTree:
         if person_died_this_year:
             # If the deceased was the current monarch, trigger succession process
             if self.current_monarch and person.id == self.current_monarch.id:
-                if VERBOSE_LOGGING: print(
+                if VERBOSE_LOGGING: logger.debug(
                     f"LEADER DEATH (detected in yearly_events): {person.full_name} (ID: {person.id}). Processing succession.")
                 self.process_succession(person.id)  # Pass ID of the monarch who just died
             return  # Person died, no further actions for them this year
@@ -260,7 +263,7 @@ class FamilyTree:
             actual_marriage_seek_chance = 0.75 if is_important_person_for_marriage else base_marriage_seek_chance
 
             if random.random() < actual_marriage_seek_chance:
-                if VERBOSE_LOGGING: print(
+                if VERBOSE_LOGGING: logger.debug(
                     f"Marriage Seek (Yr {current_year}): {person.full_name} (Age {person_age}) actively seeking marriage. Important: {is_important_person_for_marriage}")
                 self._arrange_marriage_for_person(person, current_year, is_important_person_for_marriage)
 
@@ -345,7 +348,7 @@ class FamilyTree:
         if self.marry_people(person_seeking_marriage.id, new_spouse.id, current_year,
                              is_arranged_external_marriage=True):
             if VERBOSE_LOGGING:
-                print(
+                logger.debug(
                     f"Marriage Arranged (Yr {current_year}): {person_seeking_marriage.full_name} successfully married newly introduced noble "
                     f"{new_spouse.full_name} from House {new_spouse.surname} (Alliance Potentially Formed).")
         else:
@@ -354,7 +357,7 @@ class FamilyTree:
             if VERBOSE_LOGGING:
                 psm_can_marry_now = person_seeking_marriage.can_marry(current_year)
                 new_spouse_can_marry_now = new_spouse.can_marry(current_year)
-                print(
+                logger.debug(
                     f"Marriage Arrangement FAILED (Yr {current_year}): {person_seeking_marriage.full_name} (can_marry:{psm_can_marry_now}) "
                     f"with newly created {new_spouse.full_name} (can_marry:{new_spouse_can_marry_now}). Check eligibility logic if this happens often.")
 
@@ -425,9 +428,9 @@ class FamilyTree:
                 self.graph.add_edge(spouse_character.id, mother_placeholder.id, type="child_of_mother")
 
         if VERBOSE_LOGGING:
-            print(f"Placeholder parents created for {spouse_character.full_name}: "
-                  f"Father {father_placeholder.full_name} (B:{father_birth_year}-D:{father_death_year}), "
-                  f"Mother {mother_placeholder.full_name} (B:{mother_birth_year}-D:{mother_death_year})")
+            logger.debug(f"Placeholder parents created for {spouse_character.full_name}: "
+                         f"Father {father_placeholder.full_name} (B:{father_birth_year}-D:{father_death_year}), "
+                         f"Mother {mother_placeholder.full_name} (B:{mother_birth_year}-D:{mother_death_year})")
 
     # --- Succession Logic ---
     # (Ensure _get_eligible_heirs_of_person, _find_heir_recursively, find_next_monarch,
@@ -446,7 +449,7 @@ class FamilyTree:
         elif rule == "ELECTIVE_NOBLE_COUNCIL":
             # For elective, we might sort by a 'prestige' or 'influence' score, then age.
             # Placeholder: sort by age for now, actual election logic would be complex.
-            if VERBOSE_LOGGING: print(
+            if VERBOSE_LOGGING: logger.debug(
                 f"Year {self.current_year}: Elective succession for heirs of {person.full_name} (using age as fallback sort).")
             eligible_children.sort(key=lambda p: (
                 -sum(1 for tr in ["Valiant", "Learned", "Just", "Diplomatic", "Ambitious"] if tr in p.traits),
@@ -513,7 +516,7 @@ class FamilyTree:
 
         # Handle Elective Monarchy separately
         if self.succession_rule == "ELECTIVE_NOBLE_COUNCIL":
-            if VERBOSE_LOGGING: print(
+            if VERBOSE_LOGGING: logger.debug(
                 f"Year {self.current_year}: Elective Council convenes for House {self.dynasty_name}.")
             # Identify candidates: living, adult nobles of the dynasty (or wider pool if defined by theme)
             candidates = [
@@ -545,8 +548,8 @@ class FamilyTree:
             candidates.sort(key=elective_candidate_score, reverse=True)  # Highest score first
 
             if VERBOSE_LOGGING and candidates:
-                print(f"  Elective Candidates (Top 3 scores):")
-                for cand in candidates[:3]: print(f"    - {cand.full_name}, Score: {elective_candidate_score(cand)}")
+                logger.debug(f"  Elective Candidates (Top 3 scores):")
+                for cand in candidates[:3]: logger.debug(f"    - {cand.full_name}, Score: {elective_candidate_score(cand)}")
             return candidates[0] if candidates else None
 
         # For primogeniture-based succession:
@@ -622,7 +625,7 @@ class FamilyTree:
         """Handles finding and crowning a new monarch."""
         old_monarch = self.get_person(deceased_monarch_id)
         if not old_monarch:
-            if VERBOSE_LOGGING: print(
+            if VERBOSE_LOGGING: logger.debug(
                 f"Succession Error (Yr {self.current_year}): Deceased monarch ID {deceased_monarch_id} not found.")
             return False
 
@@ -728,7 +731,7 @@ class FamilyTree:
     def prune_distant_relatives(self, max_distance: int) -> list[dict]:
         """Identifies and removes individuals too distantly related to the current monarch."""
         if not self.current_monarch or self.current_monarch.id not in self.members:
-            if VERBOSE_LOGGING: print(f"Year {self.current_year}: Pruning skipped - no valid current monarch.")
+            if VERBOSE_LOGGING: logger.debug(f"Year {self.current_year}: Pruning skipped - no valid current monarch.")
             return []
 
         center_person_id = self.current_monarch.id
@@ -738,7 +741,7 @@ class FamilyTree:
 
         # It's possible the monarch is isolated or the graph is empty if something went wrong.
         if not blood_relatives_graph.has_node(center_person_id) and VERBOSE_LOGGING:
-            print(
+            logger.debug(
                 f"Year {self.current_year}: Pruning Warning - Current monarch (ID {center_person_id}) not found in their own blood relatives graph. Pruning may be ineffective.")
 
         pruned_individuals_details_list = []
@@ -802,7 +805,7 @@ class FamilyTree:
                 else:
                     reason_for_pruning = "Peripheral (no leader and no path if graph was fragmented)."
             except Exception as e_graph:  # Catch other potential graph errors
-                if VERBOSE_LOGGING: print(
+                if VERBOSE_LOGGING: logger.debug(
                     f"Pruning graph distance calculation error for {person_object_to_check.full_name}: {e_graph}")
                 reason_for_pruning = "Graph error during distance evaluation."
 
@@ -840,4 +843,4 @@ class FamilyTree:
         return pruned_individuals_details_list
 
 
-print("models.family_tree.FamilyTree class defined with yearly processing, marriage enhancements, events, and wealth.")
+logger.debug("models.family_tree.FamilyTree class defined with yearly processing, marriage enhancements, events, and wealth.")

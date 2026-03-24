@@ -1,13 +1,16 @@
 # utils/helpers.py
 import random
 import os
+from utils.logging_config import setup_logger
+
+logger = setup_logger('royal_succession.helpers')
 
 # Import the LLM library; this assumes google.generativeai is installed
 try:
     import google.generativeai as genai
 except ImportError:
     genai = None  # type: ignore # Make type checker happy if not installed
-    print("Warning (utils/helpers.py): google-generativeai not installed. LLM features will be disabled.")
+    logger.warning("google-generativeai not installed. LLM features will be disabled.")
 
 # --- Global Configs (These are intended to be set by the main script, e.g., simulation_engine.py or run_local_simulation.py) ---
 VERBOSE_LOGGING = True  # Default, should be overridden by main script's configuration
@@ -25,7 +28,7 @@ def set_llm_globals_for_helpers(llm_model_instance, api_key_is_present: bool):
     GOOGLE_API_KEY_GLOBAL = api_key_is_present
     if VERBOSE_LOGGING:
         status_msg = f"Helpers Module: LLM Globals Set. Model Instance: {'Available' if LLM_MODEL_GLOBAL else 'None'}, API Key Configured: {GOOGLE_API_KEY_GLOBAL}"
-        print(status_msg)
+        logger.debug(status_msg)
 
 
 def generate_name(gender: str, theme_config: dict) -> str:
@@ -88,7 +91,7 @@ def generate_narrative_flair(category: str = None, theme_config: dict = None, su
             )
 
             if VERBOSE_LOGGING and category not in ["birth", "death"]:  # Reduce logging for very common events
-                print(f"DEBUG LLM Flair Prompt for {category}: {prompt_context[:200]}...")
+                logger.debug(f"DEBUG LLM Flair Prompt for {category}: {prompt_context[:200]}...")
 
             response = LLM_MODEL_GLOBAL.generate_content(prompt)
 
@@ -97,17 +100,17 @@ def generate_narrative_flair(category: str = None, theme_config: dict = None, su
                 if 15 < len(llm_text_candidate) < 350:  # Check for reasonable length
                     return llm_text_candidate
                 elif VERBOSE_LOGGING:
-                    print(
+                    logger.debug(
                         f"LLM flair for '{category}' was out of length bounds ({len(llm_text_candidate)} chars): '{llm_text_candidate[:100]}...'. Using fallback.")
             elif VERBOSE_LOGGING:
                 # Try to get more info if prompt was blocked
                 block_reason = response.prompt_feedback.block_reason if hasattr(response,
                                                                                 'prompt_feedback') else "Unknown reason"
-                print(f"LLM flair for '{category}' produced no text (Block reason: {block_reason}). Using fallback.")
+                logger.debug(f"LLM flair for '{category}' produced no text (Block reason: {block_reason}). Using fallback.")
 
         except Exception as e_llm_flair:
             if VERBOSE_LOGGING:
-                print(
+                logger.debug(
                     f"LLM Flair Generation Error for '{category}': {type(e_llm_flair).__name__} - {e_llm_flair}. Using fallback.")
     # --- End LLM Call ---
 
@@ -155,10 +158,10 @@ def generate_story_from_chronicle(chronicle_text: str, theme_config: dict, dynas
                                   start_year: int, end_year: int) -> str:
     """Generates a narrative story from the simulation chronicle using an LLM."""
     if not LLM_MODEL_GLOBAL or not GOOGLE_API_KEY_GLOBAL:
-        if VERBOSE_LOGGING: print("LLM not available for story generation from chronicle.")
+        if VERBOSE_LOGGING: logger.debug("LLM not available for story generation from chronicle.")
         return "LLM Error: LLM not available for story generation."
     if not chronicle_text.strip():
-        if VERBOSE_LOGGING: print("Chronicle text is empty, cannot generate story.")
+        if VERBOSE_LOGGING: logger.debug("Chronicle text is empty, cannot generate story.")
         return "Error: Chronicle is empty."
 
     llm_persona = theme_config.get("llm_persona_prompt",
@@ -204,7 +207,7 @@ Now, narrate the epic saga of House {dynasty_name}:
 """
 
     try:
-        if VERBOSE_LOGGING: print(f"\nGenerating narrative story for House {dynasty_name} using LLM...")
+        if VERBOSE_LOGGING: logger.debug(f"\nGenerating narrative story for House {dynasty_name} using LLM...")
 
         generation_config_story = genai.types.GenerationConfig(
             temperature=0.75,  # More creative
@@ -215,7 +218,7 @@ Now, narrate the epic saga of House {dynasty_name}:
         response = LLM_MODEL_GLOBAL.generate_content(prompt, generation_config=generation_config_story)
 
         if hasattr(response, 'text') and response.text:
-            if VERBOSE_LOGGING: print("Narrative story generated successfully by LLM.")
+            if VERBOSE_LOGGING: logger.debug("Narrative story generated successfully by LLM.")
             return response.text.strip()
         else:
             # Log more detailed feedback if available
@@ -226,16 +229,14 @@ Now, narrate the epic saga of House {dynasty_name}:
                                                                                      'finish_reason'):
                 feedback_reason = f"Candidate Finish Reason: {response.candidates[0].finish_reason}"
 
-            if VERBOSE_LOGGING: print(
+            if VERBOSE_LOGGING: logger.debug(
                 f"LLM generated an empty or invalid response for the story. Reason: {feedback_reason}. Full response: {response}")
             return f"LLM Error: Empty or invalid response for story ({feedback_reason})."
 
     except Exception as e_llm_story:
         if VERBOSE_LOGGING:
-            print(f"An error occurred during LLM story generation: {type(e_llm_story).__name__} - {e_llm_story}")
-            import traceback
-            traceback.print_exc()  # Print full traceback for debugging
+            logger.error(f"An error occurred during LLM story generation: {type(e_llm_story).__name__} - {e_llm_story}", exc_info=True)
         return f"LLM Story Generation Error: {type(e_llm_story).__name__}"
 
 
-print("utils.helpers defined with LLM integration placeholders now more complete.")
+logger.debug("utils.helpers defined with LLM integration placeholders now more complete.")

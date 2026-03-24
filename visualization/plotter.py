@@ -5,6 +5,9 @@ import networkx as nx  # type: ignore
 import random
 import os
 from collections import deque  # For BFS/DFS in node selection
+from utils.logging_config import setup_logger
+
+logger = setup_logger('royal_succession.plotter')
 
 # If type hinting FamilyTree:
 from typing import TYPE_CHECKING
@@ -26,7 +29,7 @@ def visualize_family_tree_snapshot(family_tree_obj: 'FamilyTree',  # Use forward
     display_mode options: "monarch_focus", "living_nobles", "all_living".
     """
     if not family_tree_obj.members:
-        if VERBOSE_LOGGING: print(f"Year {year}: Visualization skipped - no members in the family tree.")
+        if VERBOSE_LOGGING: logger.debug(f"Year {year}: Visualization skipped - no members in the family tree.")
         return
 
     display_graph = nx.DiGraph()
@@ -104,7 +107,7 @@ def visualize_family_tree_snapshot(family_tree_obj: 'FamilyTree',  # Use forward
                                 if person_obj_al.is_alive(year))
 
     if not nodes_to_display:  # Fallback if no nodes selected by primary logic
-        if VERBOSE_LOGGING: print(
+        if VERBOSE_LOGGING: logger.debug(
             f"Viz (Yr {year}): No nodes from '{display_mode}'. Using fallback display (first 30 living or 15 total).")
         fallback_nodes_list = [pid for pid, p_obj_fb in family_tree_obj.members.items() if p_obj_fb.is_alive(year)][:30]
         if not fallback_nodes_list: fallback_nodes_list = list(family_tree_obj.members.keys())[:15]  # Absolute fallback
@@ -134,7 +137,7 @@ def visualize_family_tree_snapshot(family_tree_obj: 'FamilyTree',  # Use forward
                                        style="dashed", penwidth=1.0, color="dimgray")
 
     if not display_graph.nodes:
-        if VERBOSE_LOGGING: print(
+        if VERBOSE_LOGGING: logger.debug(
             f"Year {year}: Visualization skipped - no nodes to construct display graph after filtering.")
         return
 
@@ -221,10 +224,10 @@ def visualize_family_tree_snapshot(family_tree_obj: 'FamilyTree',  # Use forward
         pos = nx.nx_agraph.graphviz_layout(display_graph, prog='dot',
                                            args="-Gsplines=true -Gnodesep=0.4 -Granksep=0.7 -Gratio=auto -Gconcentrate=false")
     except Exception as e_graphviz:
-        if VERBOSE_LOGGING: print(f"PyGraphviz 'dot' layout failed ({e_graphviz}). Using fallback NetworkX layout.")
+        if VERBOSE_LOGGING: logger.debug(f"PyGraphviz 'dot' layout failed ({e_graphviz}). Using fallback NetworkX layout.")
         temp_undirected_graph_for_layout = display_graph.to_undirected()  # Some layouts prefer undirected
         if not display_graph.nodes():  # Should be caught earlier, but as a safeguard
-            if VERBOSE_LOGGING: print("Visualization: No nodes to draw after all filtering."); return
+            if VERBOSE_LOGGING: logger.debug("Visualization: No nodes to draw after all filtering."); return
 
         # Try Kamada-Kawai for connected components, otherwise spring
         if nx.number_connected_components(
@@ -232,7 +235,7 @@ def visualize_family_tree_snapshot(family_tree_obj: 'FamilyTree',  # Use forward
             try:
                 pos = nx.kamada_kawai_layout(display_graph)  # Use original directed graph for layout if possible
             except Exception as e_kk:  # Kamada-Kawai can also fail
-                if VERBOSE_LOGGING: print(f"Kamada-Kawai layout failed ({e_kk}). Using spring layout.")
+                if VERBOSE_LOGGING: logger.debug(f"Kamada-Kawai layout failed ({e_kk}). Using spring layout.")
                 pos = nx.spring_layout(display_graph, k=1.5 / max(1, (len(display_graph.nodes()) ** 0.5)),
                                        iterations=50, seed=year)  # Seed for consistency
         else:  # Disconnected or very small graph, spring_layout is more robust
@@ -288,11 +291,11 @@ def visualize_family_tree_snapshot(family_tree_obj: 'FamilyTree',  # Use forward
 
     try:
         plt.savefig(filename_path, dpi=150, bbox_inches='tight')  # Higher DPI for better quality
-        if VERBOSE_LOGGING: print(f"Family tree visualization saved to {filename_path}")
+        if VERBOSE_LOGGING: logger.debug(f"Family tree visualization saved to {filename_path}")
     except Exception as e_save_fig:
-        print(f"Error saving visualization to {filename_path}: {e_save_fig}")
+        logger.debug(f"Error saving visualization to {filename_path}: {e_save_fig}")
     plt.show()  # Display in notebook if running interactively
     plt.close(fig)  # Important to close the figure to free memory
 
 
-print("visualization.plotter module defined with legend and improvements.")
+logger.debug("visualization.plotter module defined with legend and improvements.")

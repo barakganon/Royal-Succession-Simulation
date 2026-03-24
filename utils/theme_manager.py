@@ -3,6 +3,9 @@ import json
 import os
 import random
 import re
+from utils.logging_config import setup_logger
+
+logger = setup_logger('royal_succession.theme_manager')
 
 # Import LLM model and API key status from helpers (or a central config)
 # This creates a slight interdependency, ensure helpers.py defines these globals
@@ -26,16 +29,16 @@ def load_cultural_themes(filepath: str = DEFAULT_THEMES_FILE) -> dict:
     if CULTURAL_THEMES_DATA and filepath == DEFAULT_THEMES_FILE and os.path.exists(filepath):
         return CULTURAL_THEMES_DATA
     try:
-        if VERBOSE_LOGGING: print(f"Attempting to load themes from: {filepath}")
+        if VERBOSE_LOGGING: logger.debug(f"Attempting to load themes from: {filepath}")
         with open(filepath, 'r', encoding='utf-8') as f:
             CULTURAL_THEMES_DATA = json.load(f)
-        if VERBOSE_LOGGING: print(
+        if VERBOSE_LOGGING: logger.debug(
             f"Cultural themes loaded successfully from: {filepath}. Found {len(CULTURAL_THEMES_DATA)} themes.")
     except FileNotFoundError:
-        print(f"ERROR (theme_manager): Themes file not found at {filepath}. No predefined themes will be available.")
+        logger.error(f"Themes file not found at {filepath}. No predefined themes will be available.")
         CULTURAL_THEMES_DATA = {}
     except json.JSONDecodeError as e:
-        print(f"ERROR (theme_manager): Could not decode JSON from {filepath}: {e}. Themes might be corrupted.")
+        logger.error(f"Could not decode JSON from {filepath}: {e}. Themes might be corrupted.")
         CULTURAL_THEMES_DATA = {}
     return CULTURAL_THEMES_DATA
 
@@ -88,7 +91,7 @@ def generate_theme_from_story_llm(story_text: str) -> dict | None:
     Uses an LLM to generate a cultural theme configuration based on user's story text.
     """
     if not LLM_MODEL_GLOBAL or not GOOGLE_API_KEY_GLOBAL:
-        if VERBOSE_LOGGING: print("LLM not available for theme generation from story (theme_manager).")
+        if VERBOSE_LOGGING: logger.debug("LLM not available for theme generation from story (theme_manager).")
         return None  # Cannot generate theme without LLM
 
     # Using the detailed prompt from CELL 0 of the previous full code response
@@ -144,7 +147,7 @@ For lists like names or titles, provide a good variety (around the number specif
 For events, ensure the 'narrative' uses placeholders like {{dynasty_name}} and {{location_flavor}} where appropriate.
 """
     try:
-        if VERBOSE_LOGGING: print(f"\nLLM Theme Gen (theme_manager): Sending prompt for story '{story_text[:70]}...'")
+        if VERBOSE_LOGGING: logger.debug(f"\nLLM Theme Gen (theme_manager): Sending prompt for story '{story_text[:70]}...'")
 
         # Ensure genai is available if we reach here with LLM_MODEL_GLOBAL set
         if not genai: raise ImportError("google.generativeai not available for LLM call.")
@@ -160,13 +163,13 @@ For events, ensure the 'narrative' uses placeholders like {{dynasty_name}} and {
         # Attempt to extract JSON from the response (LLMs sometimes add surrounding text)
         json_match = re.search(r"\{.*\}", raw_response_text, re.DOTALL)
         if not json_match:
-            print(
-                f"Error (theme_manager): LLM did not return a recognizable JSON object structure in its response. Response text:\n{raw_response_text}")
+            logger.error(
+                f"LLM did not return a recognizable JSON object structure in its response. Response text:\n{raw_response_text}")
             return None
 
         cleaned_json_str = json_match.group(0)
 
-        if VERBOSE_LOGGING: print(
+        if VERBOSE_LOGGING: logger.debug(
             f"LLM Theme Gen (theme_manager): Cleaned JSON Text (first 500 chars):\n{cleaned_json_str[:500]}...")
 
         custom_theme_dict = json.loads(cleaned_json_str)
@@ -206,13 +209,13 @@ For events, ensure the 'narrative' uses placeholders like {{dynasty_name}} and {
                 valid_type = True
 
             if not valid_type:
-                if VERBOSE_LOGGING: print(
+                if VERBOSE_LOGGING: logger.debug(
                     f"LLM Theme Validation: Key '{key}' invalid or missing (value: '{current_value}'). Using default: '{default_val}'")
                 custom_theme_dict[key] = default_val
 
         for factor_key_name in float_factor_keys:
             if not isinstance(custom_theme_dict.get(factor_key_name), (int, float)):
-                if VERBOSE_LOGGING: print(
+                if VERBOSE_LOGGING: logger.debug(
                     f"LLM Theme Validation: Factor '{factor_key_name}' invalid. Using default: 1.0")
                 custom_theme_dict[factor_key_name] = 1.0
             else:
@@ -231,27 +234,26 @@ For events, ensure the 'narrative' uses placeholders like {{dynasty_name}} and {
                     event_dict_item["chance_per_year"] = float(event_dict_item.get("chance_per_year", 0.01))
                     valid_event_list.append(event_dict_item)
                 elif VERBOSE_LOGGING:
-                    print(
+                    logger.debug(
                         f"Warning (theme_manager): LLM generated event definition at index {i} is malformed: {event_dict_item}. It will be skipped.")
             custom_theme_dict["events"] = valid_event_list
         else:
             custom_theme_dict["events"] = []  # Ensure it's a list if not properly formed
 
-        if VERBOSE_LOGGING: print("\nCustom theme generated and processed from user story via LLM (theme_manager).")
+        if VERBOSE_LOGGING: logger.debug("\nCustom theme generated and processed from user story via LLM (theme_manager).")
         return custom_theme_dict
 
     except json.JSONDecodeError as e_json:
-        print(f"Error decoding JSON from LLM for theme generation (theme_manager): {e_json}")
-        if 'raw_response_text' in locals() and VERBOSE_LOGGING: print(f"LLM Raw Response was:\n{raw_response_text}")
+        logger.error(f"Error decoding JSON from LLM for theme generation (theme_manager): {e_json}")
+        if 'raw_response_text' in locals() and VERBOSE_LOGGING: logger.debug(f"LLM Raw Response was:\n{raw_response_text}")
         return None
     except Exception as e_llm_theme:
-        print(
-            f"An unexpected error occurred during custom LLM theme generation (theme_manager): {type(e_llm_theme).__name__} - {e_llm_theme}")
-        import traceback
-        traceback.print_exc()
+        logger.error(
+            f"An unexpected error occurred during custom LLM theme generation (theme_manager): {type(e_llm_theme).__name__} - {e_llm_theme}",
+            exc_info=True)
         return None
 
 
 # Attempt to load themes when this module is imported
 load_cultural_themes()
-print("utils.theme_manager initialized and themes loaded (if file found).")
+logger.debug("utils.theme_manager initialized and themes loaded (if file found).")

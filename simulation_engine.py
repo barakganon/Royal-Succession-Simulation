@@ -146,7 +146,7 @@ def configure_simulation_globals(verbose_log: bool, viz_interval: int, use_llm_f
     if hasattr(Person, 'VERBOSE_LOGGING'): Person.VERBOSE_LOGGING = verbose_log
     if hasattr(Person, 'VERBOSE_TRAIT_LOGGING'): Person.VERBOSE_TRAIT_LOGGING = trait_log
 
-    if VERBOSE_LOGGING: print("Simulation globals configured.")
+    if VERBOSE_LOGGING: logger.debug("Simulation globals configured.")
 
 
 
@@ -501,7 +501,7 @@ def _initialize_founder_and_spouse(family_obj: FamilyTree, effective_start_year:
             family_obj.marry_people(founder.id, spouse_for_founder.id, effective_start_year,
                                     is_arranged_external_marriage=True)
         elif VERBOSE_LOGGING:
-            print(
+            logger.debug(
                 f"Initial Marriage SKIPPED for founder {founder.full_name} & {spouse_for_founder.full_name} (eligibility fail). "
                 f"Founder can_marry({marriage_attempt_year}): {founder_can_marry_flag}, "
                 f"Spouse can_marry({marriage_attempt_year}): {spouse_can_marry_flag}")
@@ -510,7 +510,7 @@ def _initialize_founder_and_spouse(family_obj: FamilyTree, effective_start_year:
 def _introduce_new_nobles(family_obj: FamilyTree, current_year: int, history_log_obj: History):
     # ... (Full logic as defined in previous correct version)
     num_to_introduce = random.randint(1, 2)
-    if VERBOSE_LOGGING: print(
+    if VERBOSE_LOGGING: logger.debug(
         f"Year {current_year}: Introducing {num_to_introduce} new noble individuals to the world.")
     for _ in range(num_to_introduce):
         new_person_gender = random.choice(["MALE", "FEMALE"])
@@ -535,7 +535,7 @@ def _introduce_new_nobles(family_obj: FamilyTree, current_year: int, history_log
 
 def _perform_pruning(family_obj: FamilyTree, current_year: int, history_log_obj: History):
     # ... (Full logic as defined in previous correct version)
-    if VERBOSE_LOGGING: print(f"\nYear {current_year}: Evaluating family tree for pruning.")
+    if VERBOSE_LOGGING: logger.debug(f"\nYear {current_year}: Evaluating family tree for pruning.")
     prune_dist_factor = family_obj.theme_config.get("prune_distance_factor", 1.0)
     max_prune_dist = int(globals().get("BASE_PRUNE_MAX_DISTANCE", 4) * prune_dist_factor)
     pruned_individuals_list = family_obj.prune_distant_relatives(max_distance=max(2, max_prune_dist))
@@ -551,7 +551,7 @@ def _perform_pruning(family_obj: FamilyTree, current_year: int, history_log_obj:
 def _perform_visualization(family_obj: FamilyTree, current_year: int, dynasty_id_for_filenames_str: str,
                            generation_counter_val: int):
     # ... (Full logic as defined in previous correct version)
-    if VERBOSE_LOGGING: print(f"\nYear {current_year}: Generating family tree visualization.")
+    if VERBOSE_LOGGING: logger.debug(f"\nYear {current_year}: Generating family tree visualization.")
     visualize_family_tree_snapshot(family_tree_obj=family_obj, year=current_year,
                                    filename_suffix=f"_{dynasty_id_for_filenames_str}_gen{generation_counter_val}",
                                    display_mode="monarch_focus")
@@ -576,12 +576,12 @@ def _process_world_events(family_obj: FamilyTree, current_year: int, history_log
                                        s != family_obj.dynasty_name]
                 chosen_rival_name_str = random.choice(rival_surnames_pool) if rival_surnames_pool else "a Rival House"
                 formatted_narrative = formatted_narrative.replace("{rival_clan_name}", chosen_rival_name_str)
-            if VERBOSE_EVENT_LOGGING: print(f"EVENT TRIGGERED (Year {current_year}): {event_name_str}!")
+            if VERBOSE_EVENT_LOGGING: logger.debug(f"EVENT TRIGGERED (Year {current_year}): {event_name_str}!")
             wealth_change_amount = event_definition_dict.get("wealth_change", 0)
             if wealth_change_amount != 0:
                 prev_wealth = family_obj.dynasty_wealth;
                 family_obj.dynasty_wealth = max(0, family_obj.dynasty_wealth + wealth_change_amount)
-                if VERBOSE_EVENT_LOGGING: print(
+                if VERBOSE_EVENT_LOGGING: logger.debug(
                     f"  Wealth Change: {wealth_change_amount:+.0f}. Old: {prev_wealth}, New: {family_obj.dynasty_wealth}")
             mort_factor = event_definition_dict.get("mortality_impact_factor");
             duration = event_definition_dict.get("duration")
@@ -589,7 +589,7 @@ def _process_world_events(family_obj: FamilyTree, current_year: int, history_log
                 event_id_str = event_definition_dict.get("id", event_name_str.lower().replace(" ", "_"))
                 family_obj.active_event_effects[event_id_str] = {"end_year": current_year + duration,
                                                                  "mortality_impact_factor": float(mort_factor)}
-                if VERBOSE_EVENT_LOGGING: print(
+                if VERBOSE_EVENT_LOGGING: logger.debug(
                     f"  Mortality impact x{float(mort_factor):.2f} for {duration} years due to '{event_name_str}'.")
             event_details_flair = {'event_name': event_name_str, 'event_narrative': formatted_narrative}
             history_log_obj.log_event(year=current_year,
@@ -603,7 +603,7 @@ def _process_world_events(family_obj: FamilyTree, current_year: int, history_log
             if trait_grant and family_obj.current_monarch and family_obj.current_monarch.add_trait(trait_grant,
                                                                                                    current_year,
                                                                                                    f"the {event_name_str}"):
-                if VERBOSE_EVENT_LOGGING: print(
+                if VERBOSE_EVENT_LOGGING: logger.debug(
                     f"  Leader {family_obj.current_monarch.full_name} gained trait: '{trait_grant}'.")
             break  # Only one world event per year
 
@@ -612,30 +612,30 @@ def _simulation_wrap_up(family_obj: FamilyTree, history_log_obj: History, start_
                         dynasty_id_for_files_str: str):
     # ... (Full wrap-up logic as defined in the previous correct response, including stats printing, plot calls, and LLM story generation call) ...
     final_year = start_year + sim_years - 1
-    print(f"\n--- SIMULATION COMPLETED FOR HOUSE OF {family_obj.dynasty_name} ---")
-    print(f"Duration: {start_year} to {final_year} ({sim_years} simulated years)")
+    logger.debug(f"\n--- SIMULATION COMPLETED FOR HOUSE OF {family_obj.dynasty_name} ---")
+    logger.debug(f"Duration: {start_year} to {final_year} ({sim_years} simulated years)")
     history_log_obj.log_generation_summary_to_console()
     if VISUALIZE_TREE_INTERVAL_YEARS >= 0:
-        print(f"\nGenerating final family tree visualization for year {final_year}...")
+        logger.debug(f"\nGenerating final family tree visualization for year {final_year}...")
         visualize_family_tree_snapshot(family_obj, final_year, f"_{dynasty_id_for_files_str}_final",
                                        display_mode="living_nobles")
-    print("\n--- Overall Simulation Statistics ---")
+    logger.debug("\n--- Overall Simulation Statistics ---")
     overall_stats = history_log_obj.get_overall_stats_summary(family_obj, family_obj.all_monarchs_ever_ids, final_year,
                                                               start_year)
     for stat_key, stat_value in overall_stats.items():
         stat_name_pretty = stat_key.replace('_', ' ').capitalize()
         if stat_key == "pruning_reasons_summary":
-            print(f"  {stat_name_pretty}:"); [print(f"    - {r}: {c}") for r, c in stat_value.items()] if isinstance(
-                stat_value, dict) and stat_value else print("    - None")
+            logger.debug(f"  {stat_name_pretty}:"); [logger.debug(f"    - {r}: {c}") for r, c in stat_value.items()] if isinstance(
+                stat_value, dict) and stat_value else logger.debug("    - None")
         elif stat_key == "sample_of_pruned_individuals_overall":
-            print(f"  {stat_name_pretty}:"); [print(f"    - {item}") for item in stat_value] if isinstance(stat_value,
-                                                                                                           list) and stat_value else print(
+            logger.debug(f"  {stat_name_pretty}:"); [logger.debug(f"    - {item}") for item in stat_value] if isinstance(stat_value,
+                                                                                                           list) and stat_value else logger.debug(
                 f"    - {stat_value}")
         else:
-            print(f"  {stat_name_pretty}: {stat_value:.2f}" if isinstance(stat_value,
+            logger.debug(f"  {stat_name_pretty}: {stat_value:.2f}" if isinstance(stat_value,
                                                                           float) else f"  {stat_name_pretty}: {stat_value}")
     if history_log_obj.current_population_over_time:  # Population Plot
-        print("\n--- Plotting Population Over Time ---")
+        logger.debug("\n--- Plotting Population Over Time ---")
         years_pop, pop_counts = zip(*history_log_obj.current_population_over_time)
         plt.figure(figsize=(10, 5));
         plt.plot(years_pop, pop_counts, marker='.', linestyle='-', markersize=3, linewidth=1, color='darkcyan')
@@ -650,7 +650,7 @@ def _simulation_wrap_up(family_obj: FamilyTree, history_log_obj: History, start_
         os.makedirs(viz_dir, exist_ok=True)
         pop_fn = os.path.join(viz_dir, f"pop_plot_{dynasty_id_for_files_str}_{start_year}_to_{final_year}.png")
         plt.savefig(pop_fn, dpi=100, bbox_inches='tight');
-        print(f"Population plot saved: {pop_fn}");
+        logger.debug(f"Population plot saved: {pop_fn}");
         plt.show();
         plt.close()
     birth_death_counts_by_year = defaultdict(lambda: {"births": 0, "deaths": 0})  # Birth/Death Plot
@@ -661,7 +661,7 @@ def _simulation_wrap_up(family_obj: FamilyTree, history_log_obj: History, start_
             elif ev_type == "death":
                 birth_death_counts_by_year[yr]["deaths"] += 1
     if birth_death_counts_by_year:
-        print("\n--- Plotting Births and Deaths Per Year ---")
+        logger.debug("\n--- Plotting Births and Deaths Per Year ---")
         sorted_years = sorted(birth_death_counts_by_year.keys())
         births_data = [birth_death_counts_by_year[yr]["births"] for yr in sorted_years]
         deaths_data = [birth_death_counts_by_year[yr]["deaths"] for yr in sorted_years]
@@ -681,29 +681,29 @@ def _simulation_wrap_up(family_obj: FamilyTree, history_log_obj: History, start_
         bd_fn = os.path.join("visualizations",
                              f"births_deaths_plot_{dynasty_id_for_files_str}_{start_year}_to_{final_year}.png")
         plt.savefig(bd_fn, dpi=100, bbox_inches='tight');
-        print(f"Birth/Death plot saved: {bd_fn}");
+        logger.debug(f"Birth/Death plot saved: {bd_fn}");
         plt.show();
         plt.close()
     full_chronicle = history_log_obj.get_chronicle()  # LLM Story
     if full_chronicle.strip() and LLM_MODEL_INSTANCE and GOOGLE_API_KEY_IS_SET:
-        print("\n--- Generating LLM Narrative Summary ---")
+        logger.debug("\n--- Generating LLM Narrative Summary ---")
         narrative_story = generate_story_from_chronicle(full_chronicle, family_obj.theme_config,
                                                         family_obj.dynasty_name, start_year, final_year)
-        print("\n--- Generated Saga ---");
-        print(narrative_story)
+        logger.debug("\n--- Generated Saga ---");
+        logger.debug(narrative_story)
         story_fn = f"saga_{dynasty_id_for_files_str}_{start_year}_to_{final_year}.txt"
         with open(story_fn, "w", encoding="utf-8") as f:
             f.write(
                 f"Saga of {family_obj.dynasty_name}\nYears:{start_year}-{final_year}\nTheme:{family_obj.theme_config.get('description')}\n{'=' * 30}\n\n{narrative_story}")
-        print(f"\nSaga saved: {story_fn}")
+        logger.debug(f"\nSaga saved: {story_fn}")
     else:
-        print("\nSkipping LLM narrative summary (check chronicle/LLM setup).")
+        logger.debug("\nSkipping LLM narrative summary (check chronicle/LLM setup).")
     chronicle_fn = f"chronicle_{dynasty_id_for_files_str}_{start_year}_to_{final_year}.txt"  # Save Chronicle
     with open(chronicle_fn, "w", encoding="utf-8") as f:
         f.write(
             f"Chronicle of {family_obj.dynasty_name} ({family_obj.theme_config.get('description')})\nYears:{start_year}-{final_year}\n{'-' * 30}\n{full_chronicle}")
-    print(f"\nFull chronicle saved: {chronicle_fn}")
+    logger.debug(f"\nFull chronicle saved: {chronicle_fn}")
     return family_obj, history_log_obj
 
 
-print("simulation_engine.py defined with refactored run_simulation and helpers.")
+logger.debug("simulation_engine.py defined with refactored run_simulation and helpers.")

@@ -1,6 +1,9 @@
 # models/history.py
 from collections import defaultdict
 import random  # For sampling pruned individuals in stats summary
+from utils.logging_config import setup_logger
+
+logger = setup_logger('royal_succession.history')
 
 # --- Configuration Placeholders ---
 # VERBOSE_LOGGING would ideally be imported from a central config or set by the main script.
@@ -67,8 +70,8 @@ class History:
         # Handle initial log buffering (for founder setup)
         if History._buffering_initial_logs:
             History._initial_log_buffer.append(log_entry)
-        elif VERBOSE_LOGGING:  # Direct print to console if not buffering
-            print(f"Year {year if year is not None else '----'}: {event_string}")
+        elif VERBOSE_LOGGING:  # Direct debug log if not buffering
+            logger.debug(f"Year {year if year is not None else '----'}: {event_string}")
 
         # Count all specific event types for overall statistics
         if event_type:
@@ -96,7 +99,7 @@ class History:
     def flush_initial_log_buffer(cls):
         """Prints sorted buffered initial logs to console and deactivates buffering."""
         if VERBOSE_LOGGING and cls._initial_log_buffer:
-            print("\n--- Initial Setup Events (Chronological Order) ---")
+            logger.debug("\n--- Initial Setup Events (Chronological Order) ---")
 
             # Define a sort key for initial events to make console output more logical
             def sort_key_for_initial_log(log_item_tuple: tuple):
@@ -114,16 +117,15 @@ class History:
                 return (year_val, type_order_preference.get(event_type_val, 99))  # Unknown types last
 
             for year_val, event_str_val, _, _, _ in sorted(cls._initial_log_buffer, key=sort_key_for_initial_log):
-                print(f"Year {year_val if year_val is not None else '----'}: {event_str_val}")
-            print("------------------------------------------------\n")
+                logger.debug(f"Year {year_val if year_val is not None else '----'}: {event_str_val}")
+            logger.debug("------------------------------------------------\n")
 
         cls._initial_log_buffer = []  # Clear the buffer
         cls._buffering_initial_logs = False  # Deactivate buffering
 
-    def _console_print(self, message: str):  # Internal helper for printing summaries
-        """Prints a message to the console (respecting VERBOSE_LOGGING if it were used here)."""
-        # For summaries, we usually always want to print them if the method is called.
-        print(message)
+    def _console_print(self, message: str):  # Internal helper for logging summaries
+        """Logs a message at debug level."""
+        logger.debug(message)
 
     def start_new_generation_summary(self, generation_number: int):
         """
@@ -260,4 +262,4 @@ class History:
         return stats
 
 
-print("models.history.History class defined with log buffering, population, pruning stats, and event counts.")
+logger.debug("models.history.History class defined with log buffering, population, pruning stats, and event counts.")

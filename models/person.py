@@ -1,6 +1,9 @@
 # models/person.py
 import random
 import datetime
+from utils.logging_config import setup_logger
+
+logger = setup_logger('royal_succession.person')
 
 # --- Configuration Placeholders ---
 # These constants and global flags would ideally be imported from a central configuration file
@@ -25,8 +28,7 @@ try:
     from ..utils.helpers import generate_narrative_flair
 except ImportError:
     # Fallback if direct run or utils not in python path for this context
-    print(
-        "Warning (models/person.py): Could not import 'generate_narrative_flair' from utils.helpers. Using a placeholder.")
+    logger.warning("Could not import 'generate_narrative_flair' from utils.helpers. Using a placeholder.")
 
 
     def generate_narrative_flair(category, theme_config, subject_name="", object_name="", year=None, details=None):
@@ -140,7 +142,7 @@ class Person:
         # For now, assumes titles are not yet set for placeholders during this specific init part.
         if VERBOSE_TRAIT_LOGGING and newly_assigned_traits:
             # full_name depends on surname which is set above.
-            print(
+            logger.debug(
                 f"Birth Trait Assignment: {self.full_name} (born {self.birth_year}) is {', '.join(newly_assigned_traits)}.")
         return newly_assigned_traits
 
@@ -158,8 +160,8 @@ class Person:
             # This case might occur if current_year is for an event before person's birth
             # or due to an error in year tracking.
             if VERBOSE_LOGGING:
-                print(f"Warning (Person.get_age): {self.full_name} - current_year ({current_year}) "
-                      f"is before birth_year ({self.birth_year}). Age set to 0.")
+                logger.debug(f"Warning (Person.get_age): {self.full_name} - current_year ({current_year}) "
+                             f"is before birth_year ({self.birth_year}). Age set to 0.")
             return 0
 
         effective_end_year = current_year
@@ -194,8 +196,8 @@ class Person:
             if isinstance(theme_abs_val, (int, float)):
                 return float(theme_abs_val)
             elif VERBOSE_LOGGING:
-                print(f"Warning (Person._get_themed_val): Absolute theme key '{absolute_theme_key}' "
-                      f"for {self.full_name} is not numeric ('{theme_abs_val}'). Using base/factor.")
+                logger.debug(f"Warning (Person._get_themed_val): Absolute theme key '{absolute_theme_key}' "
+                             f"for {self.full_name} is not numeric ('{theme_abs_val}'). Using base/factor.")
 
         # 2. Use base value (either passed override or from globals()) and apply theme factor
         base_val_to_use: float
@@ -256,7 +258,7 @@ class Person:
                     reasons_failed.append(f"Age {age:.0f} not in marriageable range [{min_m_age:.0f}-{max_m_age:.0f}]")
                 # Add other specific checks here if they were separated
                 if reasons_failed:
-                    print(
+                    logger.debug(
                         f"DEBUG Person.can_marry for {self.full_name} (Age {age}, Yr {current_year}): FAIL. Reasons: {'; '.join(reasons_failed)}")
         return can_proceed_to_marry
 
@@ -299,7 +301,7 @@ class Person:
                 if not has_not_exceeded_max_children:
                     reasons_failed.append(f"Max children ({int(max_children)}) reached ({len(self.children)})")
                 if reasons_failed:
-                    print(
+                    logger.debug(
                         f"DEBUG Person.can_have_children (F) for {self.full_name} (Age {age}, Yr {current_year}, Children {len(self.children)}): FAIL. Reasons: {'; '.join(reasons_failed)}")
             return can_proceed_to_conceive
         return False
@@ -310,7 +312,7 @@ class Person:
             self.traits.append(trait)
             is_placeholder = any("PlaceholderParent" in t for t in self.titles) if self.titles else False
             if VERBOSE_TRAIT_LOGGING and year and not is_placeholder:
-                print(f"Trait Added: {self.full_name} is now known for being {trait} (Year {year}, due to {reason}).")
+                logger.debug(f"Trait Added: {self.full_name} is now known for being {trait} (Year {year}, due to {reason}).")
             return True
         return False
 
@@ -437,4 +439,4 @@ class Person:
                 f"Born: {self.birth_year}, {status_age_str}{monarch_display_str}{titles_display}{traits_display})")
 
 
-print("models.person.Person class defined with enhanced readability and debug logging.")
+logger.debug("models.person.Person class defined with enhanced readability and debug logging.")
