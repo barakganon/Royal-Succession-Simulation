@@ -57,7 +57,13 @@
                                 <p><strong>Traits:</strong> {{ current_monarch.get_traits()|join(', ') }}</p>
                             </div>
                             <div class="col-md-4 text-center">
+                                {% if current_monarch.portrait_svg %}
+                                <div class="character-portrait" style="width:80px;height:100px;display:inline-block;">
+                                    {{ current_monarch.portrait_svg | safe }}
+                                </div>
+                                {% else %}
                                 <div style="font-size: 64px; color: goldenrod;">👑</div>
+                                {% endif %}
                             </div>
                         </div>
                     {% else %}
@@ -81,13 +87,20 @@
                     {% if living_nobles %}
                         <div class="list-group">
                             {% for person in living_nobles %}
-                                <div class="list-group-item">
-                                    <div class="d-flex w-100 justify-content-between">
-                                        <h5 class="mb-1">{{ person.name }} {{ person.surname }}</h5>
-                                        <small>Age: {{ person_ages[person.id] }}</small>
+                                <div class="list-group-item d-flex align-items-center">
+                                    {% if person.portrait_svg %}
+                                    <div class="character-portrait mr-3 flex-shrink-0" style="width:48px;height:60px;">
+                                        {{ person.portrait_svg | safe }}
                                     </div>
-                                    <p class="mb-1">{{ person.get_titles()|join(', ') }}</p>
-                                    <small>Traits: {{ person.get_traits()|join(', ') }}</small>
+                                    {% endif %}
+                                    <div>
+                                        <div class="d-flex w-100 justify-content-between">
+                                            <h5 class="mb-1">{{ person.name }} {{ person.surname }}</h5>
+                                            <small>Age: {{ person_ages[person.id] }}</small>
+                                        </div>
+                                        <p class="mb-1">{{ person.get_titles()|join(', ') }}</p>
+                                        <small>Traits: {{ person.get_traits()|join(', ') }}</small>
+                                    </div>
                                 </div>
                             {% endfor %}
                         </div>

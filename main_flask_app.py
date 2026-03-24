@@ -2586,10 +2586,11 @@ def initialize_dynasty_founder(dynasty_id: int, theme_config: dict, start_year: 
     
     db.session.add(founder)
     db.session.flush()  # Get ID without committing
-    
+    founder.generate_portrait()
+
     # Set founder as the dynasty founder
     dynasty.founder_person_db_id = founder.id
-    
+
     # Create spouse (80% chance)
     if random.random() < 0.8:
         spouse_gender = "FEMALE" if founder_gender == "MALE" else "MALE"
@@ -2623,11 +2624,12 @@ def initialize_dynasty_founder(dynasty_id: int, theme_config: dict, start_year: 
         
         db.session.add(spouse)
         db.session.flush()  # Get ID without committing
-        
+        spouse.generate_portrait()
+
         # Link spouse and founder
         founder.spouse_sim_id = spouse.id
         spouse.spouse_sim_id = founder.id
-        
+
         # Log marriage
         marriage_log = HistoryLogEntryDB(
             dynasty_id=dynasty_id,
@@ -2839,11 +2841,12 @@ def process_marriage_check(dynasty: DynastyDB, person: PersonDB, current_year: i
         
         db.session.add(spouse)
         db.session.flush()  # Get ID without committing
-        
+        spouse.generate_portrait()
+
         # Link spouse and person
         person.spouse_sim_id = spouse.id
         spouse.spouse_sim_id = person.id
-        
+
         # Log marriage
         marriage_log = HistoryLogEntryDB(
             dynasty_id=dynasty.id,
@@ -2855,7 +2858,7 @@ def process_marriage_check(dynasty: DynastyDB, person: PersonDB, current_year: i
         )
         db.session.add(marriage_log)
         return True
-    
+
     return False
 
 
@@ -2933,9 +2936,11 @@ def process_childbirth_check(dynasty: DynastyDB, woman: PersonDB, current_year: 
             num_traits = min(1, len(available_traits))
             child_traits = random.sample(available_traits, num_traits)
         child.set_traits(child_traits)
-        
+
         db.session.add(child)
-        
+        db.session.flush()  # Ensure child.id is assigned before portrait generation
+        child.generate_portrait()
+
         # Log birth
         birth_log = HistoryLogEntryDB(
             dynasty_id=dynasty.id,
