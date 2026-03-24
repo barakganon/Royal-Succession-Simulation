@@ -4,11 +4,11 @@ Last updated: 2026-03-24
 
 ---
 
-## Current Phase: Sprint 4 (Infrastructure) — Agent I running (sequential)
+## ✅ ALL SPRINTS COMPLETE
 
 ---
 
-## Sprint 1 — Stability ✅ COMPLETE
+## Sprint 1 — Stability ✅
 
 | # | Task | Status |
 |---|------|--------|
@@ -16,85 +16,103 @@ Last updated: 2026-03-24
 | B | Auth Blueprint (`blueprints/auth.py`) | ✅ Merged |
 | C | Integration tests (107 tests, 98 pass, 9 skip) | ✅ Merged |
 
-**Test suite after Sprint 1**: 112 passed, 7 failed (pre-existing legacy tests), 17 skipped
-
 ---
 
-## Sprint 2 — AI & LLM Features ✅ COMPLETE
+## Sprint 2 — AI & LLM Features ✅
 
 | # | Task | Status |
 |---|------|--------|
-| D | AI player (`models/ai_controller.py` + `models/game_manager.py`) | ✅ Merged |
+| D | AI player (`models/ai_controller.py` — 4 phases, LLM + rule-based) | ✅ Merged |
 | E | Living chronicle (`ChronicleEntryDB`, `/game/<id>/chronicle`) | ✅ Merged |
 | F | AI advisor (`/game/<id>/advisor`, dashboard panel) | ✅ Merged |
 
-**Test suite after Sprint 2**: 34 unit tests pass (10 original + 24 AI controller)
-
 ---
 
-## Sprint 3 — Visual Layer ✅ COMPLETE
+## Sprint 3 — Visual Layer ✅
 
 | # | Task | Status |
 |---|------|--------|
 | G | SVG coat of arms (`visualization/heraldry_renderer.py`) | ✅ Merged |
 | H | SVG character portraits (`visualization/portrait_renderer.py`) | ✅ Merged |
 
-**Visible changes**: Heraldic shields on dashboard + territory pages; character faces on dynasty view
+---
 
-**Test suite after Sprint 3**: 34 unit tests pass, no SAWarnings on import
+## Sprint 4 — Infrastructure ✅
+
+| # | Task | Status |
+|---|------|--------|
+| I | Naval combat + blockade + `/dynasty/<id>/naval_battle` | ✅ Merged |
+| J | Real-time battle ticker (Flask-SocketIO + LLM commentary) | ✅ Merged |
+| K | Interactive HTML5 canvas map (replaces Matplotlib PNG) | ✅ Merged |
 
 ---
 
-## Sprint 4 — Infrastructure 🔄 IN PROGRESS (sequential)
+## Final Test Suite
 
-| # | Task | Status | Notes |
-|---|------|--------|-------|
-| I | Naval combat + `/game/<id>/naval_battle` | 🔄 Running | Depends on: nothing |
-| J | Real-time battle ticker (Flask-SocketIO) | 🔲 Pending | Depends on: I |
-| K | Interactive HTML5 canvas map | 🔲 Pending | Depends on: I,J merged |
+| Category | Count |
+|----------|-------|
+| **Passed** | **143** |
+| Failed (pre-existing legacy) | 7 |
+| Skipped | 17 |
+| Total | 167 |
+
+**The 7 failures are all pre-existing** in `test_flask_app.py` and `test_game_flow.py` — wrong expected strings/URLs written before the auth Blueprint refactor. They do not reflect broken functionality.
 
 ---
 
-## Known Issues
+## Complete Feature Inventory
+
+### Authentication
+- `/login`, `/logout`, `/register` — Flask Blueprint (`blueprints/auth.py`)
+- `/dashboard` — user hub with dynasty list, AI advisor panel
+
+### Dynasty & Characters
+- `/dynasty/create`, `/dynasty/<id>`, `/dynasty/<id>/territories`
+- Procedural coat of arms SVG on dashboard + territory page
+- Procedural character portrait SVG on dynasty view (ruler + family)
+
+### Military
+- `/dynasty/<id>/military`, `/recruit_unit`, `/form_army`, `/army/<id>/battle`
+- `/dynasty/<id>/naval_battle` — naval combat with blockade mechanics
+- Real-time battle ticker via SocketIO (live round feed + LLM commentary)
+
+### Economy
+- `/dynasty/<id>/economy`, `/build`, `/upgrade`, `/repair`, `/develop_territory`
+
+### Diplomacy
+- `/dynasty/<id>/diplomacy`, `/diplomatic_action`, `/declare_war`, `/negotiate_peace`
+
+### AI & LLM
+- `/game/<id>/advisor` — AI advisor (LLM or rule-based fallback, cached per turn)
+- `/game/<id>/chronicle` — dynasty chronicle (LLM narrated or template fallback)
+- `AIController` — 4-phase AI for non-human dynasties (diplomacy/military/economy/character)
+
+### World Map
+- `/world/map` — Interactive HTML5 canvas map (click territories, sidebar details)
+- `/game/<id>/map.geojson` — territory data as GeoJSON
+
+---
+
+## Known Remaining Issues
 
 | Issue | Severity | Notes |
 |-------|----------|-------|
-| Circular FK cycle dynasty/person_db/territory on DROP | Medium | `use_alter=True` needed |
-| 7 pre-existing test failures in legacy test files | Low | Wrong expected strings/URLs |
-| `main_flask_app.py` still monolith | High | Auth done; 5 more blueprints remaining |
-| Turn-order enforcement missing | High | Sprint 4+ |
-| No pagination on list endpoints | Medium | Post-MVP |
+| 7 legacy test failures | Low | `test_flask_app.py` + `test_game_flow.py` use wrong expected strings — fix tests |
+| Circular FK cycle on dynasty/person_db/territory DROP | Medium | `use_alter=True` on FKs needed |
+| `main_flask_app.py` still a monolith | High | Auth done; 5 more Blueprints remaining (military/economy/diplomacy/map/dynasty) |
+| Turn-order enforcement missing | High | Server-side lock needed |
+| No pagination on list endpoints | Medium | Will degrade at scale |
+| `chronicle_entry` table not yet created via migration | Medium | Needs `db.create_all()` or Alembic migration |
+| Banking/loans, espionage, court politics | Low | Post-MVP |
 
 ---
 
-## Full Feature Inventory (what's live)
+## Architecture Decisions Made
 
-### Working routes
-- `/login`, `/logout`, `/register`, `/dashboard` (auth Blueprint)
-- `/dynasty/create`, `/dynasty/<id>`, `/dynasty/<id>/territories`
-- `/dynasty/<id>/military`, `/recruit_unit`, `/form_army`, `/army/<id>/battle`
-- `/dynasty/<id>/economy`, `/build`, `/upgrade`, `/repair`
-- `/dynasty/<id>/diplomacy`, `/diplomatic_action`, `/declare_war`, `/negotiate_peace`
-- `/game/<id>/chronicle` ← NEW Sprint 2
-- `/game/<id>/advisor` ← NEW Sprint 2
-- `/game/<id>/naval_battle` ← NEW Sprint 4I (pending)
-
-### New visualizations
-- Procedural heraldic shield SVG per dynasty (stored in DB)
-- Procedural character portrait SVG per person (stored in DB, trait/age-driven)
-
-### AI systems
-- `AIController` — 4 phases, LLM + rule-based fallback
-- `ChronicleEntryDB` — per-turn narrative entries
-
----
-
-## Test Suite History
-
-| Milestone | Unit | Integration | Failed | Skipped |
-|-----------|------|-------------|--------|---------|
-| Baseline | 10 | 13 | 7 | 9 |
-| Sprint 1 | 10 | 112 total | 7 | 17 |
-| Sprint 2 | 34 | — | 7 | 9 |
-| Sprint 3 | 34 | — | 7 | 9 |
-| Sprint 4 | TBD | — | — | — |
+- Auth Blueprint: all auth `url_for` calls use `'auth.<name>'`
+- All LLM prompts in `utils/llm_prompts.py` (6 functions: ai_decision, chronicle, chronicle_fallback, advisor, advisor_fallback, battle_commentary)
+- LLM guard everywhere: `if llm_model is None: return fallback_value`
+- DB models use `back_populates` + `foreign_keys=` — never `backref=`
+- SVGs stored as Text in DB, rendered with `| safe` Jinja filter
+- SocketIO: `async_mode='threading'`, `allow_unsafe_werkzeug=True` for dev
+- Canvas map: hexagonal territories (Territory only has x/y centroids, no polygon data), auto-scaled to canvas
