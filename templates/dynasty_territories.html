@@ -14,6 +14,11 @@
                     <h5 class="mb-0">Dynasty Information</h5>
                 </div>
                 <div class="card-body">
+                    {% if dynasty.coat_of_arms_svg %}
+                    <div class="coat-of-arms-large mb-3" style="width:100px;height:120px;">
+                      {{ dynasty.coat_of_arms_svg | safe }}
+                    </div>
+                    {% endif %}
                     <p><strong>Name:</strong> {{ dynasty.name }}</p>
                     <p><strong>Current Year:</strong> {{ dynasty.current_simulation_year }}</p>
                     <p><strong>Prestige:</strong> {{ dynasty.prestige }}</p>

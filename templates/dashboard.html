@@ -72,7 +72,14 @@
               {% for dynasties in dynasties %}
                 <div class="list-group-item list-group-item-action">
                   <div class="d-flex w-100 justify-content-between">
-                    <h5 class="mb-1">{{ dynasties.name }}</h5>
+                    <h5 class="mb-1">
+                      {% if dynasties.coat_of_arms_svg %}
+                      <div class="coat-of-arms-small d-inline-block me-2" style="width:40px;height:48px;vertical-align:middle;">
+                        {{ dynasties.coat_of_arms_svg | safe }}
+                      </div>
+                      {% endif %}
+                      {{ dynasties.name }}
+                    </h5>
                     <small>Year: {{ dynasties.current_simulation_year }}</small>
                   </div>
                   <p class="mb-1">Wealth: {{ dynasties.current_wealth }} | Prestige: {{ dynasties.prestige }} | Honor: {{ dynasties.honor }}</p>
