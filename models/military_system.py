@@ -33,6 +33,28 @@ except ImportError:
         details_str = f" ({details})" if details else ""
         logger.info(f"Performance: {operation} took {duration:.6f}s{details_str}")
 
+
+def _get_battle_commentary(round_num: int, attacker_losses: int, defender_losses: int) -> str:
+    """Generate one-sentence battle round commentary. Uses LLM if available, else rule-based."""
+    try:
+        from utils.llm_prompts import build_battle_commentary_prompt
+        from utils.helpers import LLM_MODEL_GLOBAL as llm_model
+        if llm_model is not None:
+            prompt = build_battle_commentary_prompt({
+                'round': round_num,
+                'attacker_losses': attacker_losses,
+                'defender_losses': defender_losses
+            })
+            response = llm_model.generate_content(
+                prompt,
+                generation_config={'max_output_tokens': 60}
+            )
+            return response.text.strip()
+    except Exception:
+        pass
+    return f"Round {round_num}: the attacker lost {attacker_losses} and the defender lost {defender_losses} soldiers."
+
+
 class MilitarySystem:
     """
     Core military system that handles unit recruitment, army management,
@@ -644,6 +666,19 @@ class MilitarySystem:
             }
             rounds.append(round_details)
 
+            # Emit real-time battle round event via SocketIO
+            try:
+                from main_flask_app import socketio
+                commentary = _get_battle_commentary(i + 1, attacker_loss, defender_loss)
+                socketio.emit('battle_round', {
+                    'round': i + 1,
+                    'attacker_losses': attacker_loss,
+                    'defender_losses': defender_loss,
+                    'commentary': commentary
+                })
+            except Exception:
+                pass  # SocketIO not available in tests, silently skip
+
             # Check if battle is over
             if attacker_strength <= 0 or defender_strength <= 0:
                 break
@@ -668,6 +703,16 @@ class MilitarySystem:
 
         # Log battle details
         logger.info(f"Battle results: {battle_details}")
+
+        # Emit battle_over event via SocketIO
+        try:
+            from main_flask_app import socketio
+            round_num = len(rounds) - 1  # Exclude initial round 0
+            socketio.emit('battle_over', {
+                'summary': f"Battle ended after {round_num} rounds. Winner: army {winner_dynasty_id}"
+            })
+        except Exception:
+            pass  # SocketIO not available in tests, silently skip
 
         return winner_dynasty_id, attacker_casualties, defender_casualties, battle_details
 

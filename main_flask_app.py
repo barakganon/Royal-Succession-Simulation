@@ -2,6 +2,7 @@
 from flask import Flask, render_template, redirect, url_for, flash, request, jsonify, session as flask_session
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, current_user, login_required
+from flask_socketio import SocketIO, emit
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import json  # For theme handling
@@ -66,6 +67,9 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # Recommended to disable
 
 # Initialize SQLAlchemy with the Flask app
 db.init_app(app)
+
+# Initialize SocketIO for real-time battle ticker
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 # Initialize database initializer
 db_initializer = DatabaseInitializer(app)
@@ -3259,7 +3263,7 @@ def start_flask_app_with_port_fallback(initial_port=8091, max_attempts=10):
                 s.close()
                 
             logger.info(f"Starting Flask application on port {current_port}...")
-            app.run(debug=True, use_reloader=False, host='0.0.0.0', port=current_port, threaded=False)
+            socketio.run(app, host='0.0.0.0', port=current_port, debug=True, allow_unsafe_werkzeug=True, use_reloader=False)
             return True
             
         except socket.error:

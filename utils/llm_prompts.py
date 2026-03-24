@@ -87,6 +87,25 @@ def build_advisor_prompt(dynasty_name: str, year: int, season: str,
     )
 
 
+def build_battle_commentary_prompt(round_data: dict) -> str:
+    """Build a prompt for one-sentence dramatic battle round commentary.
+
+    max_tokens=60. Style: dramatic medieval narrator, one sentence.
+
+    Args:
+        round_data: Dict with keys 'round', 'attacker_losses', 'defender_losses'
+
+    Returns:
+        Formatted prompt string for LLM
+    """
+    return (
+        f"In one sentence, narrate this medieval battle round dramatically: "
+        f"Round {round_data.get('round', '?')}, attacker lost {round_data.get('attacker_losses', 0)} soldiers, "
+        f"defender lost {round_data.get('defender_losses', 0)} soldiers. "
+        f"Be vivid and concise. Do not start with 'Round'."
+    )
+
+
 def generate_advisor_fallback(treasury: float, active_wars: int, has_allies: bool) -> List[str]:
     """Rule-based fallback suggestions when LLM is unavailable."""
     suggestions = []

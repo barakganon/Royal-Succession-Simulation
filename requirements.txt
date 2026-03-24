@@ -7,3 +7,5 @@ Flask-Login # Add when starting web app
 Flask-WTF # Add when starting web app
 SQLAlchemy-Utils # Add when starting web app
 python-dotenv # Add when starting web app
+flask-socketio>=5.3.0
+simple-websocket>=0.9.0

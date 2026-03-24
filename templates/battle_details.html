@@ -199,5 +199,36 @@
             </div>
         </div>
     </div>
+
+    <!-- Battle Ticker Panel -->
+    <div id="battle-ticker" class="card mt-3">
+      <div class="card-header"><strong>&#9876; Live Battle Feed</strong></div>
+      <div class="card-body" id="battle-log" style="max-height:300px;overflow-y:auto;font-family:monospace;font-size:0.9em;">
+        <p class="text-muted">Waiting for battle to begin...</p>
+      </div>
+    </div>
 </div>
+
+<script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+<script>
+  var socket = io();
+  var log = document.getElementById('battle-log');
+
+  socket.on('battle_round', function(data) {
+    var p = document.createElement('p');
+    p.className = 'mb-1';
+    p.innerHTML = '<span class="text-warning">Round ' + data.round + ':</span> ' + data.commentary +
+                  ' <small class="text-muted">(A:-' + data.attacker_losses + ' D:-' + data.defender_losses + ')</small>';
+    log.appendChild(p);
+    log.scrollTop = log.scrollHeight;
+  });
+
+  socket.on('battle_over', function(data) {
+    var p = document.createElement('p');
+    p.className = 'mb-1 fw-bold text-success';
+    p.textContent = '\u2694 Battle over: ' + data.summary;
+    log.appendChild(p);
+    log.scrollTop = log.scrollHeight;
+  });
+</script>
 {% endblock %}
