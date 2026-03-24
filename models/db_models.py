@@ -363,7 +363,7 @@ class Territory(db.Model):
     # Relationships with distinct names to avoid conflicts
     territory_history = db.relationship('HistoryLogEntryDB',
                                       foreign_keys='HistoryLogEntryDB.territory_id',
-                                      backref=db.backref('territory_history_ref', uselist=False))
+                                      overlaps='event_territory,history_events')
     
     territory_governor = db.relationship('PersonDB',
                                        foreign_keys=[governor_id],
