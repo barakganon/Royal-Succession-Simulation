@@ -70,9 +70,13 @@ db.init_app(app)
 # Initialize database initializer
 db_initializer = DatabaseInitializer(app)
 
+# Register Blueprints
+from blueprints.auth import auth as auth_bp
+app.register_blueprint(auth_bp)
+
 # Flask-Login Configuration
 login_manager = LoginManager(app)
-login_manager.login_view = 'login'  # The route Flask-Login redirects to if @login_required fails
+login_manager.login_view = 'auth.login'  # The route Flask-Login redirects to if @login_required fails
 login_manager.login_message = "Please log in to access this page."  # Message shown to user
 login_manager.login_message_category = "info"  # Bootstrap class for the flash message
 
@@ -138,126 +142,9 @@ def load_user(user_id: str) -> User | None:
 def index():
     """Home page."""
     if current_user.is_authenticated:
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     # For unauthenticated users, you might show a landing page
     return render_template('index.html', title="Welcome")  # Create index.html later
-
-
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    """Handles user registration."""
-    if current_user.is_authenticated:
-        return redirect(url_for('dashboard'))  # Already logged in
-
-    if request.method == 'POST':
-        username = request.form.get('username')
-        email = request.form.get('email')  # Optional: add email validation
-        password = request.form.get('password')
-        password2 = request.form.get('password2')
-
-        if not username or not password or not password2:
-            flash('All fields are required!', 'danger')
-            return redirect(url_for('register'))
-        if password != password2:
-            flash('Passwords do not match!', 'danger')
-            return redirect(url_for('register'))
-
-        existing_user_username = User.query.filter_by(username=username).first()
-        if existing_user_username:
-            flash('Username already exists. Please choose a different one.', 'warning')
-            return redirect(url_for('register'))
-
-        # Optional: Check for existing email if you add an email field and want it unique
-        # existing_user_email = User.query.filter_by(email=email).first()
-        # if existing_user_email:
-        #     flash('Email address already registered.', 'warning')
-        #     return redirect(url_for('register'))
-
-        new_user = User(username=username,
-                        email=email if email else f"{username}@example.com")  # Use a placeholder email if not provided
-        new_user.set_password(password)
-        db.session.add(new_user)
-        try:
-            db.session.commit()
-            flash('Congratulations, your account has been created! You can now log in.', 'success')
-            return redirect(url_for('login'))
-        except Exception as e_register:
-            db.session.rollback()
-            flash(f'Error creating account: {e_register}. Please try again.', 'danger')
-            print(f"ERROR during registration commit: {e_register}")
-
-    return render_template('register.html', title='Register')
-
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    """Handles user login."""
-    if current_user.is_authenticated:
-        return redirect(url_for('dashboard'))
-
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        remember_me = True if request.form.get('remember_me') else False
-
-        if not username or not password:
-            flash('Username and password are required.', 'danger')
-            return redirect(url_for('login'))
-
-        user = User.query.filter_by(username=username).first()
-
-        if user and user.check_password(password):
-            login_user(user, remember=remember_me)
-            flash(f'Welcome back, {user.username}!', 'success')
-            next_page = request.args.get('next')  # For redirecting after login if user tried to access a protected page
-            return redirect(next_page) if next_page else redirect(url_for('dashboard'))
-        else:
-            flash('Invalid username or password. Please try again.', 'danger')
-
-    return render_template('login.html', title='Login')
-
-
-@app.route('/logout')
-@login_required  # Ensures only logged-in users can access this
-def logout():
-    """Handles user logout."""
-    logout_user()
-    flash('You have been logged out.', 'info')
-    return redirect(url_for('index'))
-
-
-@app.route('/dashboard')
-@login_required
-def dashboard():
-    """User's main dashboard after login."""
-    # Query DynastyDB for the user's dynasties
-    user_dynasties = DynastyDB.query.filter_by(user_id=current_user.id).order_by(DynastyDB.name).all()
-    
-    # Initialize game systems
-    game_manager = GameManager(db.session)
-    
-    # Get active players
-    active_players = game_manager.get_active_players()
-    
-    # Get game statistics
-    game_stats = {
-        'total_dynasties': DynastyDB.query.count(),
-        'total_territories': Territory.query.count(),
-        'total_battles': Battle.query.count(),
-        'total_treaties': Treaty.query.count()
-    }
-    
-    # Get recent global events
-    recent_global_events = HistoryLogEntryDB.query.order_by(
-        HistoryLogEntryDB.year.desc(), HistoryLogEntryDB.id.desc()
-    ).limit(10).all()
-    
-    return render_template('dashboard.html',
-                          title='Dashboard',
-                          dynasties=user_dynasties,
-                          active_players=active_players,
-                          game_stats=game_stats,
-                          recent_global_events=recent_global_events)
 
 
 # Dynasty creation route
@@ -340,7 +227,7 @@ def view_dynasty(dynasty_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Load theme configuration
     theme_config = {}
@@ -416,7 +303,7 @@ def advance_turn(dynasty_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Number of years to advance per turn
     years_per_turn = 5
@@ -446,7 +333,7 @@ def delete_dynasty(dynasty_id):
     # Check ownership
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     if request.method == 'POST':
         dynasty_name = dynasty.name  # Store for flash message
@@ -495,7 +382,7 @@ def delete_dynasty(dynasty_id):
             
             flash(f'Dynasty "{dynasty_name}" has been permanently deleted.', 'success')
             logger.info(f"Dynasty {dynasty_name} successfully deleted")
-            return redirect(url_for('dashboard'))
+            return redirect(url_for('auth.dashboard'))
         except Exception as e:
             db.session.rollback()
             logger.error(f"Error deleting dynasty {dynasty_id}: {str(e)}", exc_info=True)
@@ -514,7 +401,7 @@ def dynasty_economy(dynasty_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Load theme configuration
     theme_config = {}
@@ -637,7 +524,7 @@ def construct_building(dynasty_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     territory_id = request.form.get('territory_id', type=int)
     building_type_str = request.form.get('building_type')
@@ -676,7 +563,7 @@ def upgrade_building(dynasty_id, building_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     try:
         # Import the economy system
@@ -705,7 +592,7 @@ def repair_building(dynasty_id, building_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     try:
         # Import the economy system
@@ -734,7 +621,7 @@ def develop_territory_economy(dynasty_id, territory_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     try:
         # Import the economy system
@@ -763,7 +650,7 @@ def establish_trade(dynasty_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     target_dynasty_id = request.form.get('target_dynasty_id', type=int)
     resource_type_str = request.form.get('resource_type')
@@ -805,7 +692,7 @@ def cancel_trade(dynasty_id, trade_route_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     try:
         # Import the economy system
@@ -838,7 +725,7 @@ def territory_economy(territory_id):
         dynasty = DynastyDB.query.get(territory.controller_dynasty_id)
         if dynasty and dynasty.owner_user != current_user:
             flash("Not authorized.", "warning")
-            return redirect(url_for('dashboard'))
+            return redirect(url_for('auth.dashboard'))
     
     try:
         # Import the economy system
@@ -1003,7 +890,7 @@ def dynasty_territories(dynasty_id):
     # Check ownership
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Get territories controlled by this dynasty
     territories = Territory.query.filter_by(controller_dynasty_id=dynasty_id).all()
@@ -1056,7 +943,7 @@ def military_view(dynasty_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Get military units and armies
     units = MilitaryUnit.query.filter_by(dynasty_id=dynasty_id, army_id=None).all()
@@ -1094,7 +981,7 @@ def recruit_unit(dynasty_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Get form data
     unit_type_str = request.form.get('unit_type')
@@ -1138,7 +1025,7 @@ def form_army(dynasty_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Get form data
     unit_ids = request.form.getlist('unit_ids', type=int)
@@ -1174,7 +1061,7 @@ def assign_commander(dynasty_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Get form data
     army_id = request.form.get('army_id', type=int)
@@ -1209,7 +1096,7 @@ def army_details(army_id):
     
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Get army composition visualization
     from visualization.military_renderer import MilitaryRenderer
@@ -1255,7 +1142,7 @@ def battle_details(battle_id):
                               battle_result=battle_result)
     else:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
 
 @app.route('/siege/<int:siege_id>')
 @login_required
@@ -1281,7 +1168,7 @@ def siege_details(siege_id):
                               siege_progress=siege_progress)
     else:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
 
 @app.route('/dynasty/<int:dynasty_id>/initiate_battle', methods=['POST'])
 @login_required
@@ -1290,7 +1177,7 @@ def initiate_battle(dynasty_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Get form data
     attacker_army_id = request.form.get('attacker_army_id', type=int)
@@ -1329,7 +1216,7 @@ def initiate_siege(dynasty_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Get form data
     army_id = request.form.get('army_id', type=int)
@@ -1366,7 +1253,7 @@ def update_siege(dynasty_id, siege_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Update siege
     from models.military_system import MilitarySystem
@@ -1389,7 +1276,7 @@ def diplomacy_view(dynasty_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Get all other dynasties
     other_dynasties = DynastyDB.query.filter(DynastyDB.id != dynasty_id).all()
@@ -1481,7 +1368,7 @@ def treaty_view(dynasty_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Get all treaties
     treaties = []
@@ -1522,7 +1409,7 @@ def perform_diplomatic_action(dynasty_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Get form data
     target_dynasty_id = request.form.get('target_dynasty_id', type=int)
@@ -1554,7 +1441,7 @@ def create_treaty(dynasty_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Get form data
     target_dynasty_id = request.form.get('target_dynasty_id', type=int)
@@ -1594,7 +1481,7 @@ def break_treaty(dynasty_id, treaty_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Create diplomacy system
     diplomacy_system = DiplomacySystem(db.session)
@@ -1616,7 +1503,7 @@ def declare_war(dynasty_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Get form data
     target_dynasty_id = request.form.get('target_dynasty_id', type=int)
@@ -1656,7 +1543,7 @@ def negotiate_peace(dynasty_id, war_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Get war
     war = War.query.get_or_404(war_id)
@@ -1712,7 +1599,7 @@ def move_unit(dynasty_id):
     # Check ownership
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Get form data
     unit_id = request.form.get('unit_id', type=int)
@@ -1746,7 +1633,7 @@ def move_army(dynasty_id):
     # Check ownership
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Get form data
     army_id = request.form.get('army_id', type=int)
@@ -1776,7 +1663,7 @@ def time_view(dynasty_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Get current year and season
     current_year = dynasty.current_simulation_year
@@ -1866,7 +1753,7 @@ def advance_time(dynasty_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     try:
         # Import the time system
@@ -1895,7 +1782,7 @@ def schedule_event(dynasty_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     try:
         # Import the time system
@@ -1963,7 +1850,7 @@ def cancel_event(dynasty_id, event_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     try:
         # Import the time system
@@ -1992,7 +1879,7 @@ def timeline_view(dynasty_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Get start and end years from query parameters
     start_year = request.args.get('start_year')
@@ -2093,21 +1980,21 @@ def synchronize_turns():
     
     if not dynasty_ids:
         flash("No dynasties selected for synchronization.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Convert to integers
     try:
         dynasty_ids = [int(did) for did in dynasty_ids]
     except ValueError:
         flash("Invalid dynasty IDs.", "danger")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Check if user owns all dynasties
     for dynasty_id in dynasty_ids:
         dynasty = DynastyDB.query.get(dynasty_id)
         if not dynasty or dynasty.owner_user != current_user:
             flash("You can only synchronize dynasties that you own.", "warning")
-            return redirect(url_for('dashboard'))
+            return redirect(url_for('auth.dashboard'))
     
     try:
         # Import the time system
@@ -2127,7 +2014,7 @@ def synchronize_turns():
     except Exception as e:
         flash(f"Error synchronizing turns: {str(e)}", "danger")
     
-    return redirect(url_for('dashboard'))
+    return redirect(url_for('auth.dashboard'))
     return redirect(url_for('dynasty_territories', dynasty_id=dynasty_id))
 
 @app.route('/dynasty/<int:dynasty_id>/develop_territory', methods=['POST'])
@@ -2140,7 +2027,7 @@ def develop_territory(dynasty_id):
     # Check ownership
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Get form data
     territory_id = request.form.get('territory_id', type=int)
@@ -2176,7 +2063,7 @@ def generate_map():
     # Only allow admins to generate maps
     if current_user.username != 'admin':
         flash("Only administrators can generate maps.", "danger")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Get form data
     template_name = request.form.get('template_name', 'default')
@@ -2207,7 +2094,7 @@ def add_holding(dynasty_id):
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('auth.dashboard'))
     
     # Get form data
     name = request.form.get('name')
