@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Naval Battle Result{% endblock %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Naval Battle Result</h2>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  {% if result.is_blockade %}
+    <div class="alert alert-warning">Blockade established! The enemy has no naval forces to oppose you.</div>
+  {% elif result.winner_army_id is none %}
+    <div class="alert alert-info">No naval units on either side — no battle occurred.</div>
+  {% else %}
+    <div class="alert alert-success">
+      Battle complete after {{ result.rounds }} round(s).
+    </div>
+    <p>
+      <strong>Attacker losses:</strong> {{ result.attacker_losses }} &nbsp;|&nbsp;
+      <strong>Defender losses:</strong> {{ result.defender_losses }}
+    </p>
+  {% endif %}
+
+  <h5>Battle Log</h5>
+  <ul class="list-group mb-3">
+    {% for line in result.battle_log %}
+      <li class="list-group-item">{{ line }}</li>
+    {% else %}
+      <li class="list-group-item text-muted">No log entries.</li>
+    {% endfor %}
+  </ul>
+
+  <a href="{{ url_for('military_view', dynasty_id=dynasty.id) }}" class="btn btn-secondary">
+    Return to Military View
+  </a>
+</div>
+{% endblock %}
