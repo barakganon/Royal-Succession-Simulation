@@ -16,8 +16,12 @@ from models.db_models import (
     db, DynastyDB, PersonDB, Territory, TerrainType, Settlement,
     Resource, ResourceType, TerritoryResource, Building, BuildingType,
     MilitaryUnit, Army, Battle, Siege, War, DiplomaticRelation, Treaty,
-    HistoryLogEntryDB, Region, Province
+    HistoryLogEntryDB, Region, Province, ChronicleEntryDB
 )
+from utils.logging_config import setup_logger
+
+logger = setup_logger('royal_succession.time_system')
+
 
 class Season(enum.Enum):
     """Enumeration of seasons."""
@@ -983,11 +987,78 @@ class TimeSystem:
             )
             self.session.add(log_entry)
             self.session.commit()
-            
+
+            # Generate chronicle entry for this turn
+            try:
+                key_events = self._collect_turn_events(dynasty_id, current_year)
+                chronicle_text = self._generate_chronicle(key_events, dynasty.name, current_year)
+                chronicle_entry = ChronicleEntryDB(
+                    game_id=dynasty_id,
+                    turn=current_year,
+                    year=current_year,
+                    text=chronicle_text
+                )
+                self.session.add(chronicle_entry)
+                self.session.commit()
+                logger.info(f"Chronicle entry created for dynasty {dynasty.name}, year {current_year}.")
+            except Exception as e_chronicle:
+                logger.warning(f"Failed to create chronicle entry for dynasty {dynasty_id}, year {current_year}: {e_chronicle}")
+
             return True, "Resolution phase completed. Turn is now complete."
         
         return False, f"Unknown game phase: {phase}"
-    
+
+    def _collect_turn_events(self, dynasty_id: int, year: int) -> List[str]:
+        """Collect key event descriptions from HistoryLogEntryDB for the given turn year.
+
+        Returns up to 10 event strings recorded for this dynasty in the given year,
+        excluding the generic 'year_end' and 'character_events' placeholder entries.
+        Falls back to an empty list if no entries are found.
+        """
+        try:
+            entries = (
+                self.session.query(HistoryLogEntryDB)
+                .filter_by(dynasty_id=dynasty_id, year=year)
+                .filter(HistoryLogEntryDB.event_type.notin_(["year_end", "character_events"]))
+                .order_by(HistoryLogEntryDB.id.desc())
+                .limit(10)
+                .all()
+            )
+            return [entry.event_string for entry in entries]
+        except Exception as e:
+            logger.warning(f"Could not collect turn events for dynasty {dynasty_id}, year {year}: {e}")
+            return []
+
+    def _generate_chronicle(self, events: List[str], dynasty_name: str, year: int) -> str:
+        """Generate a chronicle entry text using the LLM or a rule-based fallback.
+
+        Args:
+            events: List of event description strings for this turn.
+            dynasty_name: Display name of the dynasty.
+            year: Simulation year for this turn.
+
+        Returns:
+            Chronicle text string.
+        """
+        from utils.helpers import LLM_MODEL_GLOBAL as llm_model
+        from utils.llm_prompts import build_chronicle_prompt, generate_chronicle_fallback
+
+        if llm_model is None:
+            return generate_chronicle_fallback(events, dynasty_name, year)
+        try:
+            prompt = build_chronicle_prompt(events, dynasty_name, year)
+            response = llm_model.generate_content(
+                prompt,
+                generation_config={'max_output_tokens': 150}
+            )
+            if hasattr(response, 'text') and response.text:
+                return response.text.strip()
+            logger.warning(f"LLM chronicle call returned empty response for year {year}.")
+            return generate_chronicle_fallback(events, dynasty_name, year)
+        except Exception as e:
+            logger.warning(f"Chronicle LLM call failed: {e}")
+            return generate_chronicle_fallback(events, dynasty_name, year)
+
     def synchronize_turns(self, dynasty_ids: List[int]) -> Tuple[bool, str]:
         """
         Synchronize turns for multiple dynasties.

@@ -27,7 +27,7 @@ logger = logging.getLogger("royal_succession.flask")
 from models.db_models import (
     db, User, DynastyDB, PersonDB, HistoryLogEntryDB, Territory, Region, Province,
     MilitaryUnit, UnitType, Army, Battle, Siege, War, DiplomaticRelation, Treaty, TreatyType, TradeRoute, Resource,
-    BuildingType, ResourceType, Building, WarGoal
+    BuildingType, ResourceType, Building, WarGoal, ChronicleEntryDB
 )
 from models.map_system import MapGenerator, TerritoryManager, MovementSystem, BorderSystem
 from models.military_system import MilitarySystem
@@ -2442,6 +2442,20 @@ def create_dynasty_placeholder():
 @login_required
 def view_dynasty_placeholder(dynasty_id):
     return redirect(url_for('view_dynasty', dynasty_id=dynasty_id))
+
+
+@app.route('/game/<int:dynasty_id>/chronicle')
+@login_required
+def view_chronicle(dynasty_id):
+    """Display the LLM-narrated living chronicle for a dynasty."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('dashboard'))
+    entries = ChronicleEntryDB.query.filter_by(game_id=dynasty_id).order_by(
+        ChronicleEntryDB.turn.desc()
+    ).all()
+    return render_template('chronicle.html', dynasty=dynasty, entries=entries)
 
 
 # --- Helper Functions for Dynasty Management ---

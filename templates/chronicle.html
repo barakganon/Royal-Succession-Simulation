@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Chronicle of {{ dynasty.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h1>Chronicle of House {{ dynasty.name }}</h1>
+  <p class="text-muted">The official annals of your dynasty, turn by turn.</p>
+  <hr>
+  {% if entries %}
+    {% for entry in entries %}
+    <div class="card mb-3">
+      <div class="card-header">
+        <strong>Year {{ entry.year }}</strong>
+        <span class="text-muted float-right">Turn {{ entry.turn }}</span>
+      </div>
+      <div class="card-body">
+        <p class="card-text font-italic">{{ entry.text }}</p>
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="alert alert-info">
+      No chronicle entries yet. Complete a turn to begin your dynasty's history.
+    </div>
+  {% endif %}
+  <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+</div>
+{% endblock %}

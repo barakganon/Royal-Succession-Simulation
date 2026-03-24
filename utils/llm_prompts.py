@@ -1,8 +1,15 @@
-"""Central repository for all LLM prompt templates.
-
-All prompt functions follow the signature:
-    def build_<name>_prompt(**kwargs) -> str
 """
+Centralised LLM prompt templates for the Royal Succession Simulation.
+
+All prompt-building functions follow the signature:
+    def build_<name>_prompt(**kwargs) -> str
+
+Fallback generators are also co-located here so callers never need to
+inline prompt logic or fallback strings elsewhere.
+"""
+
+from typing import List
+
 from utils.logging_config import setup_logger
 
 logger = setup_logger('royal_succession.llm_prompts')
@@ -37,60 +44,63 @@ def build_ai_decision_prompt(phase: str, game_state: dict, personality: str, ava
     )
 
 
-def build_chronicle_prompt(dynasty_name: str, year: int, season: str, events: list) -> str:
-    """Build a prompt for generating a chronicle entry after a turn.
+def build_chronicle_prompt(events: List[str], dynasty_name: str, year: int) -> str:
+    """Build a prompt for the living chronicle narrator.
 
-    max_tokens=150 for chronicle calls.
-
-    Args:
-        dynasty_name: Name of the dynasty being chronicled
-        year: Game year of the turn
-        season: Current season string
-        events: List of event description strings from the turn
-
-    Returns:
-        Formatted prompt string
+    max_tokens=150. Style: medieval chronicler, 2-3 sentences.
+    Fallback: use generate_chronicle_fallback() instead.
     """
-    events_str = '\n'.join(f"- {e}" for e in events) if events else "- No notable events this turn."
+    events_str = '; '.join(events) if events else 'a quiet turn with no notable events'
     return (
-        f"You are a medieval chronicler recording the history of House {dynasty_name}.\n\n"
-        f"In the {season} of the year {year}, the following events occurred:\n"
-        f"{events_str}\n\n"
-        f"Write 2-3 sentences in the style of a medieval chronicler narrating these events. "
-        f"Be evocative and avoid anachronisms. Do not merely list the events — interpret them "
-        f"into a flowing narrative passage."
+        f"You are a medieval chronicler writing the official history of {dynasty_name}. "
+        f"In the year {year}, the following events transpired: {events_str}. "
+        f"Write 2-3 sentences in the style of a medieval chronicle — formal, dramatic, "
+        f"third-person. Do not use modern language."
     )
 
 
-def build_advisor_prompt(dynasty_name: str, year: int, season: str, treasury: int,
-                         army_size: int, strongest_neighbour: str, active_wars: int,
-                         relation_summary: str) -> str:
-    """Build a prompt for the in-game AI advisor (Hand of the King).
+def generate_chronicle_fallback(events: List[str], dynasty_name: str, year: int) -> str:
+    """Rule-based fallback when LLM is unavailable."""
+    if not events:
+        return f"In the year {year}, the annals of {dynasty_name} record a season of quiet governance."
+    events_str = ', '.join(events[:3])
+    return f"In the year {year}, {dynasty_name} witnessed: {events_str}."
 
-    max_tokens=200 for advisor calls.
 
-    Args:
-        dynasty_name: The player's dynasty name
-        year: Current game year
-        season: Current season string
-        treasury: Current gold in treasury
-        army_size: Total number of troops
-        strongest_neighbour: Name of the most powerful neighbouring dynasty
-        active_wars: Number of ongoing wars
-        relation_summary: Brief text describing current diplomatic posture
+def build_advisor_prompt(dynasty_name: str, year: int, season: str,
+                          treasury: float, strongest_neighbour: str,
+                          active_wars: int) -> str:
+    """Build a prompt for the in-game advisor (Hand of the King).
 
-    Returns:
-        Formatted prompt string
+    max_tokens=200. Returns 2-3 strategic suggestions as a loyal counsellor.
     """
+    war_status = f"{active_wars} active war(s)" if active_wars > 0 else "at peace"
     return (
-        f"You are the trusted Hand of the King, counsellor to House {dynasty_name}.\n\n"
-        f"Current situation — Year {year}, {season}:\n"
-        f"  Treasury: {treasury} gold\n"
-        f"  Military strength: {army_size} troops\n"
-        f"  Most powerful neighbour: {strongest_neighbour}\n"
-        f"  Active wars: {active_wars}\n"
-        f"  Diplomatic posture: {relation_summary}\n\n"
-        f"Provide 2-3 prioritised strategic suggestions written in character as a loyal counsellor. "
-        f"Number each suggestion. Be concise and specific. Focus on the most pressing threats and "
-        f"opportunities given the current situation."
+        f"You are the Hand of the King, loyal advisor to {dynasty_name}. "
+        f"It is {season} of the year {year}. "
+        f"The royal treasury holds {treasury:.0f} gold. "
+        f"The strongest neighbouring power is {strongest_neighbour}. "
+        f"The kingdom is currently {war_status}.\n\n"
+        f"Give exactly 3 strategic suggestions for this turn. "
+        f"Format as a numbered list. Be specific, speak as a faithful counsellor would. "
+        f"Each suggestion should be one sentence."
     )
+
+
+def generate_advisor_fallback(treasury: float, active_wars: int, has_allies: bool) -> List[str]:
+    """Rule-based fallback suggestions when LLM is unavailable."""
+    suggestions = []
+    if treasury < 50:
+        suggestions.append("Your coffers run dangerously low — levy taxes or sell trade rights before new ventures.")
+    if active_wars > 0:
+        suggestions.append("Do not open a second front while war already consumes your armies.")
+    if not has_allies:
+        suggestions.append("Seek allies before your enemies do — even a weak friend is worth having.")
+    if treasury >= 200:
+        suggestions.append("Your treasury is healthy — consider investing in fortifications or new recruits.")
+    if active_wars == 0 and has_allies:
+        suggestions.append("Peace reigns — this is the time to build and grow your dynasty's strength.")
+    # Ensure we always return at least 2 suggestions
+    while len(suggestions) < 2:
+        suggestions.append("Govern wisely and your dynasty will endure beyond your years.")
+    return suggestions[:3]
