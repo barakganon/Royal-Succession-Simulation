@@ -812,85 +812,26 @@ def territory_economy(territory_id):
                           buildings=buildings,
                           economy_chart_url=economy_chart_url)
 
+@app.route('/game/<int:dynasty_id>/map.geojson')
+@login_required
+def map_geojson(dynasty_id):
+    """Serve territory map data as GeoJSON for the canvas map."""
+    from visualization.map_renderer import generate_geojson
+    try:
+        data = generate_geojson(dynasty_id, db.session)
+        return jsonify(data)
+    except Exception as e:
+        logger.error(f"GeoJSON generation failed: {e}")
+        return jsonify({'type': 'FeatureCollection', 'features': []}), 200
+
+
 @app.route('/world/map')
 @login_required
 def world_map():
-    """Display the world map with territories and units."""
-    # Get user dynasties
-    user_dynasties = DynastyDB.query.filter_by(user_id=current_user.id).all()
-    
-    # Get all territories
-    territories = Territory.query.all()
-    
-    # Check if we have territories, if not, we need to generate a map
-    if not territories:
-        # Create a map generator
-        map_generator = MapGenerator(db.session)
-        
-        # Generate a procedural map
-        map_data = map_generator.generate_procedural_map()
-        
-        # Assign some territories to user dynasties
-        territory_manager = TerritoryManager(db.session)
-        
-        # For each user dynasty, assign a random territory as capital
-        for dynasty in user_dynasties:
-            # Get a random territory
-            territory = Territory.query.order_by(db.func.random()).first()
-            if territory:
-                territory_manager.assign_territory(territory.id, dynasty.id, is_capital=True)
-    
-    # Create map renderer
-    map_renderer = MapRenderer(db.session)
-    
-    # Render map
-    map_image = None
-    try:
-        # Check if there are territories to render
-        if territories:
-            # Determine if we should highlight a specific dynasty
-            highlight_dynasty_id = None
-            if len(user_dynasties) == 1:
-                highlight_dynasty_id = user_dynasties[0].id
-            
-            # Define map rendering arguments
-            map_args = {
-                'show_terrain': True,
-                'show_territories': True,
-                'show_settlements': True,
-                'show_units': True,
-                'highlight_dynasty_id': highlight_dynasty_id
-            }
-            
-            # Generate a unique filename for the map
-            filename = f"world_map_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.png"
-            
-            try:
-                map_image = map_renderer.render_world_map(**map_args)
-            except (ImportError, Exception) as e:
-                # Economy system not available or error
-                flash(f"Error loading economy system: {str(e)}", "warning")
-                economy_data = None
-                production_chart_url = None
-            
-            # Construct the URL for the map image
-            #map_image = url_for('static', filename=f'visualizations/{filename}')
-        else:
-            logger.debug("No territories found in the database. Map cannot be rendered.")
-    except Exception as e:
-        logger.error(f"Error rendering map: {e}", exc_info=True)
-    
-    # Get regions and provinces for filtering
-    regions = Region.query.all()
-    provinces = Province.query.all()
-    
-    print(f"DEBUG: world_map - map_image: {map_image}")
-    return render_template('world_map.html',
-                          user_dynasties=user_dynasties,
-                          territories=territories,
-                          regions=regions,
-                          provinces=provinces,
-                          map_image=map_image)
+    """Display the interactive canvas world map."""
+    dynasty = DynastyDB.query.filter_by(user_id=current_user.id).first()
+    dynasty_id = dynasty.id if dynasty else None
+    return render_template('world_map.html', dynasty_id=dynasty_id)
 
 @app.route('/territory/<int:territory_id>')
 @login_required

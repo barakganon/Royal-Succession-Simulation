@@ -548,7 +548,7 @@ def _get_dynasty_colors(self) -> Dict[int, str]:
     """
     # Get all dynasties
     dynasties = self.session.query(DynastyDB).all()
-    
+
     # Create mapping
     from models.db_models import DynastyDB
     dynasty_colors = {}
@@ -564,6 +564,92 @@ def _get_dynasty_colors(self) -> Dict[int, str]:
         dynasty_colors[dynasty.id] = color
 
     return dynasty_colors
+
+
+def _make_hex_polygon(cx: float, cy: float, radius: float = 20) -> List[List[float]]:
+    """Generate a hexagon polygon around a centroid.
+
+    Args:
+        cx: Centre x coordinate
+        cy: Centre y coordinate
+        radius: Radius of the hexagon in coordinate units
+
+    Returns:
+        List of [x, y] pairs forming a closed polygon ring
+    """
+    import math
+    points = []
+    for i in range(6):
+        angle = math.radians(60 * i - 30)
+        points.append([cx + radius * math.cos(angle), cy + radius * math.sin(angle)])
+    points.append(points[0])  # close the ring
+    return points
+
+
+def generate_geojson(dynasty_id: int, session) -> dict:
+    """Generate GeoJSON FeatureCollection of all territories for the canvas map.
+
+    Each territory becomes a GeoJSON Feature with:
+    - geometry: Polygon (hexagon around centroid derived from x_coordinate/y_coordinate)
+    - properties: territory_id, name, owner_dynasty_id, owner_dynasty_name,
+                  terrain_type, is_capital, population, army_count, centroid
+
+    Args:
+        dynasty_id: The dynasty whose perspective we are rendering (used to scope
+                    the query; currently all territories are returned).
+        session: SQLAlchemy database session
+
+    Returns:
+        GeoJSON FeatureCollection dict
+    """
+    from models.db_models import Territory, DynastyDB, Army
+
+    # Pre-build dynasty name cache
+    dynasty_names: Dict[int, str] = {}
+    for d in session.query(DynastyDB).all():
+        dynasty_names[d.id] = d.name
+
+    # Pre-count armies per territory
+    army_counts: Dict[int, int] = {}
+    for army in session.query(Army).filter_by(is_active=True).all():
+        if army.territory_id is not None:
+            army_counts[army.territory_id] = army_counts.get(army.territory_id, 0) + 1
+
+    features = []
+    for t in session.query(Territory).all():
+        cx = t.x_coordinate
+        cy = t.y_coordinate
+
+        if cx is None or cy is None:
+            continue  # skip territories without coordinates
+
+        polygon_points = _make_hex_polygon(cx, cy, radius=20)
+
+        terrain_val = t.terrain_type.value if hasattr(t.terrain_type, 'value') else str(t.terrain_type)
+        owner_id = t.controller_dynasty_id
+        dynasty_name = dynasty_names.get(owner_id) if owner_id else None
+
+        feature = {
+            'type': 'Feature',
+            'geometry': {
+                'type': 'Polygon',
+                'coordinates': [polygon_points]
+            },
+            'properties': {
+                'territory_id': t.id,
+                'name': t.name,
+                'owner_dynasty_id': owner_id,
+                'owner_dynasty_name': dynasty_name,
+                'terrain_type': terrain_val,
+                'is_capital': bool(t.is_capital) if hasattr(t, 'is_capital') else False,
+                'population': getattr(t, 'population', 0),
+                'army_count': army_counts.get(t.id, 0),
+                'centroid': [cx, cy]
+            }
+        }
+        features.append(feature)
+
+    return {'type': 'FeatureCollection', 'features': features}
 
 
 def save_map_to_static(map_renderer: MapRenderer, filename: str, **kwargs) -> str:
