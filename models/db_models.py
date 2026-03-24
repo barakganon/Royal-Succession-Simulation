@@ -5,6 +5,9 @@ from flask_login import UserMixin  # For Flask-Login integration
 import datetime
 import json  # For storing list/dict data like titles, traits
 import enum  # For enumeration types
+from utils.logging_config import setup_logger
+
+logger = setup_logger('royal_succession.db_models')
 
 # Create the SQLAlchemy database instance.
 # This will be initialized with the Flask app in main_flask_app.py
@@ -110,7 +113,7 @@ class DynastyDB(db.Model):
                                         lazy='dynamic')
     battles_won = db.relationship('Battle',
                                  foreign_keys='Battle.winner_dynasty_id',
-                                 backref='winner_dynasty',
+                                 back_populates='winner',
                                  lazy='dynamic')
 
     # For storing serialized complex data like alliances or active global event effects for this dynasty
@@ -392,19 +395,19 @@ class Territory(db.Model):
                                     lazy='dynamic')
     
     territory_battles = db.relationship('Battle',
-                                      backref=db.backref('battles_fought_here', uselist=False),
+                                      back_populates='battle_territory',
                                       lazy='dynamic',
                                       foreign_keys='Battle.territory_id')
-    
+
     territory_sieges = db.relationship('Siege',
-                                      backref=db.backref('sieges_here', uselist=False),
-                                      lazy='dynamic',
-                                      foreign_keys='Siege.territory_id')
-    
+                                     back_populates='siege_territory',
+                                     lazy='dynamic',
+                                     foreign_keys='Siege.territory_id')
+
     territory_wars = db.relationship('War',
-                                    foreign_keys='War.target_territory_id',
-                                    backref=db.backref('wars_fought_over', uselist=False),
-                                    lazy='dynamic')
+                                   foreign_keys='War.target_territory_id',
+                                   back_populates='target_territory',
+                                   lazy='dynamic')
     
     # Metadata
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
@@ -855,8 +858,10 @@ class War(db.Model):
     # Relationships
     battles = db.relationship('Battle', lazy='dynamic',
                              cascade="all, delete-orphan")
-    # history_events is provided as a backref from HistoryLogEntryDB.event_war
-    target_territory = db.relationship('Territory')
+    history_entries = db.relationship('HistoryLogEntryDB')
+    target_territory = db.relationship('Territory',
+                                       foreign_keys=[target_territory_id],
+                                       back_populates='territory_wars')
     
     # Metadata
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
@@ -915,10 +920,13 @@ class Battle(db.Model):
     details_json = db.Column(db.Text, default='{}')  # JSON string of battle details
     
     # Relationships
-    territory = db.relationship('Territory')
+    battle_territory = db.relationship('Territory',
+                                       foreign_keys=[territory_id],
+                                       back_populates='territory_battles')
     attacker = db.relationship('DynastyDB', foreign_keys=[attacker_dynasty_id])
     defender = db.relationship('DynastyDB', foreign_keys=[defender_dynasty_id])
-    winner = db.relationship('DynastyDB', foreign_keys=[winner_dynasty_id])
+    winner = db.relationship('DynastyDB', foreign_keys=[winner_dynasty_id],
+                             back_populates='battles_won')
     attacker_army = db.relationship('Army', foreign_keys=[attacker_army_id])
     defender_army = db.relationship('Army', foreign_keys=[defender_army_id])
     # history_events is provided as a backref from HistoryLogEntryDB.event_battle
@@ -961,7 +969,9 @@ class Siege(db.Model):
     
     # Relationships
     war = db.relationship('War')
-    territory = db.relationship('Territory')
+    siege_territory = db.relationship('Territory',
+                                      foreign_keys=[territory_id],
+                                      back_populates='territory_sieges')
     attacker = db.relationship('DynastyDB', foreign_keys=[attacker_dynasty_id])
     defender = db.relationship('DynastyDB', foreign_keys=[defender_dynasty_id])
     attacker_army = db.relationship('Army', foreign_keys=[attacker_army_id])
@@ -974,4 +984,4 @@ class Siege(db.Model):
         status = "Active" if self.is_active else ("Successful" if self.successful else "Failed")
         return f"<Siege (ID: {self.id}, Territory: {self.territory_id}, Progress: {self.progress:.1f}, {status})>"
 
-print("models.db_models defined (User, DynastyDB, PersonDB, HistoryLogEntryDB, Region, Province, Territory, Settlement, Resource, TerritoryResource, Building, TradeRoute, MilitaryUnit, Army, DiplomaticRelation, Treaty, War, Battle, Siege).")
+logger.debug("models.db_models defined (User, DynastyDB, PersonDB, HistoryLogEntryDB, Region, Province, Territory, Settlement, Resource, TerritoryResource, Building, TradeRoute, MilitaryUnit, Army, DiplomaticRelation, Treaty, War, Battle, Siege).")

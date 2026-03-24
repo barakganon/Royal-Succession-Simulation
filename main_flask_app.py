@@ -185,7 +185,7 @@ def register():
         except Exception as e_register:
             db.session.rollback()
             flash(f'Error creating account: {e_register}. Please try again.', 'danger')
-            print(f"ERROR during registration commit: {e_register}")
+            logger.error(f"ERROR during registration commit: {e_register}")
 
     return render_template('register.html', title='Register')
 
@@ -318,11 +318,17 @@ def create_dynasty():
             current_simulation_year=start_year
         )
         db.session.add(new_dynasty)
-        db.session.commit()
-        
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error creating dynasty '{dynasty_name}': {e}")
+            flash("An error occurred while creating the dynasty.", "danger")
+            return redirect(url_for('create_dynasty'))
+
         # Initialize founder and spouse
         initialize_dynasty_founder(new_dynasty.id, theme_config, start_year, succession_rule)
-        
+
         flash(f'Dynasty "{dynasty_name}" created successfully!', 'success')
         return redirect(url_for('view_dynasty', dynasty_id=new_dynasty.id))
     
@@ -457,8 +463,12 @@ def advance_turn(dynasty_id):
     
     # Update last played timestamp
     dynasty.last_played_at = datetime.datetime.utcnow()
-    db.session.commit()
-    
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error updating last_played_at for dynasty {dynasty.id}: {e}")
+
     return redirect(url_for('view_dynasty', dynasty_id=dynasty.id))
 
 
@@ -716,8 +726,10 @@ def upgrade_building(dynasty_id, building_id):
             flash(message, "warning")
             
     except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error upgrading building {building_id}: {e}")
         flash(f"Error upgrading building: {str(e)}", "danger")
-    
+
     return redirect(url_for('dynasty_economy', dynasty_id=dynasty_id))
 
 @app.route('/dynasty/<int:dynasty_id>/repair_building/<int:building_id>', methods=['POST'])
@@ -745,8 +757,10 @@ def repair_building(dynasty_id, building_id):
             flash(message, "warning")
             
     except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error repairing building {building_id}: {e}")
         flash(f"Error repairing building: {str(e)}", "danger")
-    
+
     return redirect(url_for('dynasty_economy', dynasty_id=dynasty_id))
 
 @app.route('/dynasty/<int:dynasty_id>/develop_territory/<int:territory_id>', methods=['POST'])
@@ -774,8 +788,10 @@ def develop_territory_economy(dynasty_id, territory_id):
             flash(message, "warning")
             
     except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error developing territory {territory_id}: {e}")
         flash(f"Error developing territory: {str(e)}", "danger")
-    
+
     return redirect(url_for('dynasty_economy', dynasty_id=dynasty_id))
 
 @app.route('/dynasty/<int:dynasty_id>/establish_trade', methods=['POST'])
@@ -845,8 +861,10 @@ def cancel_trade(dynasty_id, trade_route_id):
             flash(message, "warning")
             
     except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error canceling trade route {trade_route_id}: {e}")
         flash(f"Error canceling trade route: {str(e)}", "danger")
-    
+
     return redirect(url_for('dynasty_economy', dynasty_id=dynasty_id))
 
 @app.route('/territory/<int:territory_id>/economy')
@@ -962,11 +980,9 @@ def world_map():
             # Construct the URL for the map image
             #map_image = url_for('static', filename=f'visualizations/{filename}')
         else:
-            print("No territories found in the database. Map cannot be rendered.")
+            logger.debug("No territories found in the database. Map cannot be rendered.")
     except Exception as e:
-        print(f"Error rendering map: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Error rendering map: {e}", exc_info=True)
     
     # Get regions and provinces for filtering
     regions = Region.query.all()
@@ -1016,7 +1032,7 @@ def territory_details(territory_id):
     try:
         territory_image = map_renderer.render_territory_map(territory_id)
     except Exception as e:
-        print(f"Error rendering territory map: {e}")
+        logger.error(f"Error rendering territory map: {e}", exc_info=True)
     
     return render_template('territory_details.html',
                           territory=territory,
@@ -1058,7 +1074,7 @@ def dynasty_territories(dynasty_id):
                     contested_territories.append(territory)
                     break
     except Exception as e:
-        print(f"Error determining contested territories: {e}")
+        logger.error(f"Error determining contested territories: {e}", exc_info=True)
     
     # Create map renderer
     map_renderer = MapRenderer(db.session)
@@ -1074,7 +1090,7 @@ def dynasty_territories(dynasty_id):
             highlight_dynasty_id=dynasty_id
         )
     except Exception as e:
-        print(f"Error rendering dynasty map: {e}")
+        logger.error(f"Error rendering dynasty map: {e}", exc_info=True)
     
     return render_template('dynasty_territories.html',
                           dynasty=dynasty,
@@ -2400,6 +2416,8 @@ def develop_territory(dynasty_id):
         territory_manager.develop_territory(territory_id, development_type)
         flash(f"Territory {territory.name} developed successfully.", "success")
     except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to develop territory {territory_id}: {e}")
         flash(f"Failed to develop territory: {e}", "danger")
     
     # Redirect back to territory details page
@@ -2429,6 +2447,8 @@ def generate_map():
         
         flash(f"Map generated successfully with {len(map_data['territories'])} territories.", "success")
     except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to generate map: {e}")
         flash(f"Failed to generate map: {e}", "danger")
     
     # Redirect to world map
@@ -2500,8 +2520,10 @@ def add_holding(dynasty_id):
     except ImportError:
         flash("Economy system not available.", "danger")
     except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error adding holding for dynasty {dynasty_id}: {e}")
         flash(f"Error adding holding: {str(e)}", "danger")
-    
+
     return redirect(url_for('dynasty_economy', dynasty_id=dynasty_id))
 
 
@@ -2648,8 +2670,13 @@ def initialize_dynasty_founder(dynasty_id: int, theme_config: dict, start_year: 
         event_type="succession_end"
     )
     db.session.add(founder_log)
-    
-    db.session.commit()
+
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error initializing dynasty founder for dynasty {dynasty_id}: {e}")
+        return False
     return True
 
 
@@ -2724,18 +2751,14 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
     try:
         generate_family_tree_visualization(dynasty, theme_config)
     except Exception as e:
-        print(f"Error generating family tree: {e}")
-        import traceback
-        traceback.print_exc()
-    
+        logger.error(f"Error generating family tree: {e}", exc_info=True)
+
     try:
         db.session.commit()
         return True, f"Advanced {years_to_advance} years from {start_year} to {end_year}."
     except Exception as commit_error:
         db.session.rollback()
-        print(f"Error committing changes: {commit_error}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Error committing changes: {commit_error}", exc_info=True)
         return False, f"Error advancing turn: {commit_error}"
 
 
@@ -3200,12 +3223,10 @@ def generate_family_tree_visualization(dynasty: DynastyDB, theme_config: dict):
             display_mode="living_nobles"
         )
         
-        print(f"Family tree visualization generated for {dynasty.name} in year {dynasty.current_simulation_year}")
+        logger.debug(f"Family tree visualization generated for {dynasty.name} in year {dynasty.current_simulation_year}")
         return True
     except Exception as e:
-        print(f"Error generating family tree visualization: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Error generating family tree visualization: {str(e)}", exc_info=True)
         return False
 
 

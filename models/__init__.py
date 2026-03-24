@@ -6,8 +6,10 @@
 from .person import Person
 from .history import History
 from .family_tree import FamilyTree
+from utils.logging_config import setup_logger
 
 # You can define a list of all public objects of this module if desired:
 # __all__ = ['Person', 'History', 'FamilyTree']
 
-print("Core simulation models (Person, History, FamilyTree) initialized for import.")
+_logger = setup_logger('royal_succession.models')
+_logger.debug("Core simulation models (Person, History, FamilyTree) initialized for import.")
