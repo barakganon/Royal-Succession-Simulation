@@ -1498,6 +1498,43 @@ def initiate_siege(dynasty_id):
     
     return redirect(url_for('military_view', dynasty_id=dynasty_id))
 
+@app.route('/dynasty/<int:dynasty_id>/naval_battle', methods=['POST'])
+@login_required
+def naval_battle(dynasty_id):
+    """Resolve a naval battle between two armies."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('auth.dashboard'))
+
+    attacker_army_id = request.form.get('attacker_army_id', type=int)
+    defender_army_id = request.form.get('defender_army_id', type=int)
+
+    if not attacker_army_id or not defender_army_id:
+        flash('Both attacker and defender armies are required.', 'danger')
+        return redirect(url_for('military_view', dynasty_id=dynasty_id))
+
+    try:
+        military = MilitarySystem(db.session)
+        result = military.resolve_naval_battle(attacker_army_id, defender_army_id)
+        if result['is_blockade']:
+            flash('Naval battle resolved: Blockade established!', 'info')
+        elif result['winner_army_id'] is None:
+            flash('No naval units on either side — no battle occurred.', 'info')
+        else:
+            flash(f"Naval battle resolved after {result['rounds']} round(s).", 'info')
+        dynasty_data = {
+            'id': dynasty.id,
+            'name': dynasty.name,
+        }
+        return render_template('naval_battle_result.html', result=result, dynasty=dynasty_data)
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Naval battle error for dynasty {dynasty_id}: {e}")
+        flash('An error occurred resolving the naval battle.', 'danger')
+        return redirect(url_for('military_view', dynasty_id=dynasty_id))
+
+
 @app.route('/dynasty/<int:dynasty_id>/update_siege/<int:siege_id>')
 @login_required
 def update_siege(dynasty_id, siege_id):

@@ -359,6 +359,10 @@ class Territory(db.Model):
     
     # Fortification
     fortification_level = db.Column(db.Integer, default=0)  # 0-5, affects siege difficulty
+
+    # Naval / geography flags
+    is_coastal = db.Column(db.Boolean, default=False)  # Territory has coastline
+    is_sea = db.Column(db.Boolean, default=False)       # Territory is a sea zone
     
     # Relationships with distinct names to avoid conflicts
     territory_history = db.relationship('HistoryLogEntryDB',

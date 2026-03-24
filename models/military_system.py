@@ -33,6 +33,15 @@ except ImportError:
         details_str = f" ({details})" if details else ""
         logger.info(f"Performance: {operation} took {duration:.6f}s{details_str}")
 
+# Naval unit types used for filtering in resolve_naval_battle
+NAVAL_UNIT_TYPES = {
+    UnitType.TRANSPORT_SHIP,
+    UnitType.WAR_GALLEY,
+    UnitType.HEAVY_WARSHIP,
+    UnitType.FIRE_SHIP,
+}
+
+
 class MilitarySystem:
     """
     Core military system that handles unit recruitment, army management,
@@ -703,6 +712,154 @@ class MilitarySystem:
         self.session.commit()
 
         return
+
+    def resolve_naval_battle(self, army1_id: int, army2_id: int) -> Dict[str, Any]:
+        """Resolve a naval battle between two armies.
+
+        Only naval units (TRANSPORT_SHIP, WAR_GALLEY, HEAVY_WARSHIP, FIRE_SHIP) participate.
+        If one side has no naval units the other side wins by blockade automatically.
+        A winter season penalty of -20% attack applies when ``is_winter`` is detected via
+        the territory's controlling dynasty game year (falls back to no penalty).
+
+        Args:
+            army1_id: ID of the attacking army.
+            army2_id: ID of the defending army.
+
+        Returns:
+            A dict with keys: winner_army_id, loser_army_id, attacker_losses,
+            defender_losses, rounds, is_blockade, battle_log (list[str]).
+        """
+        logger.debug(f"resolve_naval_battle called: army1_id={army1_id}, army2_id={army2_id}")
+
+        army1 = self.session.query(Army).get(army1_id)
+        army2 = self.session.query(Army).get(army2_id)
+
+        if army1 is None:
+            raise ValueError(f"Army with ID {army1_id} not found")
+        if army2 is None:
+            raise ValueError(f"Army with ID {army2_id} not found")
+
+        # Filter to naval units only
+        naval1 = [u for u in army1.units if u.unit_type in NAVAL_UNIT_TYPES]
+        naval2 = [u for u in army2.units if u.unit_type in NAVAL_UNIT_TYPES]
+
+        battle_log: List[str] = []
+
+        # --- Blockade checks ---
+        if len(naval1) == 0 and len(naval2) == 0:
+            battle_log.append("No naval units on either side. No battle.")
+            logger.info(f"Naval battle {army1_id} vs {army2_id}: no naval units on either side")
+            return {
+                "winner_army_id": None,
+                "loser_army_id": None,
+                "is_blockade": False,
+                "attacker_losses": 0,
+                "defender_losses": 0,
+                "rounds": 0,
+                "battle_log": battle_log,
+            }
+
+        if len(naval1) == 0:
+            battle_log.append("Blockade: attacker has no naval units.")
+            logger.info(f"Naval battle {army1_id} vs {army2_id}: blockade — army1 has no naval units")
+            return {
+                "winner_army_id": army2_id,
+                "loser_army_id": army1_id,
+                "is_blockade": True,
+                "attacker_losses": 0,
+                "defender_losses": 0,
+                "rounds": 0,
+                "battle_log": battle_log,
+            }
+
+        if len(naval2) == 0:
+            battle_log.append("Blockade: defender has no naval units.")
+            logger.info(f"Naval battle {army1_id} vs {army2_id}: blockade — army2 has no naval units")
+            return {
+                "winner_army_id": army1_id,
+                "loser_army_id": army2_id,
+                "is_blockade": True,
+                "attacker_losses": 0,
+                "defender_losses": 0,
+                "rounds": 0,
+                "battle_log": battle_log,
+            }
+
+        # --- Determine seasonal winter penalty ---
+        # Try to detect current season from the dynasty's simulation year parity as a proxy.
+        # A proper integration point would query TimeSystem, but subsystems must not depend on
+        # Flask app context.  We look for a ``current_season`` attribute on the dynasty object.
+        is_winter = False
+        try:
+            attacker_dynasty = self.session.query(DynastyDB).get(army1.dynasty_id)
+            if attacker_dynasty is not None and hasattr(attacker_dynasty, "current_season"):
+                is_winter = str(getattr(attacker_dynasty, "current_season", "")).lower() == "winter"
+        except Exception:
+            pass  # default to no winter penalty
+
+        attack_modifier = 0.8 if is_winter else 1.0
+        if is_winter:
+            battle_log.append("Winter conditions: attacker suffers -20% attack penalty.")
+
+        # --- Strength calculation ---
+        attacker_strength = sum(u.calculate_strength() for u in naval1) * attack_modifier
+        defender_strength = sum(u.calculate_strength() for u in naval2)
+
+        remaining_attacker = attacker_strength
+        remaining_defender = defender_strength
+
+        total_attacker_losses: float = 0.0
+        total_defender_losses: float = 0.0
+        winner_army_id: Optional[int] = None
+        rounds = 0
+
+        # --- Round-based combat (max 10 rounds) ---
+        for round_num in range(1, 11):
+            rounds = round_num
+
+            attacker_damage = remaining_attacker * 0.15
+            defender_damage = remaining_defender * 0.12  # slight defender advantage
+
+            remaining_defender -= attacker_damage
+            remaining_attacker -= defender_damage
+
+            total_attacker_losses += defender_damage * 0.3
+            total_defender_losses += attacker_damage * 0.3
+
+            battle_log.append(
+                f"Round {round_num}: Attacker strength {remaining_attacker:.0f}, "
+                f"Defender strength {remaining_defender:.0f}"
+            )
+
+            if remaining_defender <= 0:
+                winner_army_id = army1_id
+                break
+            if remaining_attacker <= 0:
+                winner_army_id = army2_id
+                break
+
+        # Stalemate — attacker fails to break through
+        if winner_army_id is None:
+            winner_army_id = army2_id
+
+        loser_army_id = army2_id if winner_army_id == army1_id else army1_id
+
+        logger.info(
+            f"Naval battle resolved: army1={army1_id} vs army2={army2_id} "
+            f"winner={winner_army_id} rounds={rounds} "
+            f"attacker_losses={int(total_attacker_losses)} defender_losses={int(total_defender_losses)}"
+        )
+
+        return {
+            "winner_army_id": winner_army_id,
+            "loser_army_id": loser_army_id,
+            "is_blockade": False,
+            "attacker_losses": int(total_attacker_losses),
+            "defender_losses": int(total_defender_losses),
+            "rounds": rounds,
+            "battle_log": battle_log,
+        }
+
 
 # This section was removed as it was a duplicate implementation
     
