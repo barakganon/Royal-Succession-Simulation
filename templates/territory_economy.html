@@ -8,7 +8,7 @@
     
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('auth.dashboard') }}">Dashboard</a></li>
             {% if territory.controller_dynasty %}
             <li class="breadcrumb-item"><a href="{{ url_for('view_dynasty', dynasty_id=territory.controller_dynasty.id) }}">{{ territory.controller_dynasty.name }}</a></li>
             <li class="breadcrumb-item"><a href="{{ url_for('dynasty_economy', dynasty_id=territory.controller_dynasty.id) }}">Economy</a></li>
