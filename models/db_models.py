@@ -61,6 +61,11 @@ class DynastyDB(db.Model):
     infamy = db.Column(db.Integer, default=0)  # Negative reputation from aggressive actions
     honor = db.Column(db.Integer, default=50)  # Trustworthiness in keeping agreements (0-100)
     piety = db.Column(db.Integer, default=50)  # Religious standing (0-100)
+    is_ai_controlled = db.Column(db.Boolean, default=False, nullable=False)
+    ai_personality = db.Column(db.String(20), nullable=True)  # aggressive/diplomatic/economic/balanced
+    # Resource stockpiles used by the military recruitment system
+    current_iron = db.Column(db.Integer, default=50)
+    current_timber = db.Column(db.Integer, default=50)
     
     # Capital territory - main seat of power
     capital_territory_id = db.Column(db.Integer, db.ForeignKey('territory.id'), nullable=True)
@@ -172,11 +177,7 @@ class PersonDB(db.Model):
     commanded_armies = db.relationship('Army',
                                        foreign_keys='Army.commander_id',
                                        lazy='dynamic')
-    # Use consistent naming with Territory model to avoid conflicts
-    governed_territories = db.relationship('Territory',
-                                          foreign_keys='Territory.governor_id',
-                                          backref=db.backref('governor_person_ref', uselist=False),
-                                          lazy='dynamic')
+    # governed_territories is provided as a backref from Territory.territory_governor
 
     # If you want a direct relationship for founder on DynastyDB
     # founded_dynasty_rel = db.relationship('DynastyDB', foreign_keys=[DynastyDB.founder_person_db_id], backref='founder_character', uselist=False)
@@ -363,7 +364,7 @@ class Territory(db.Model):
     
     territory_governor = db.relationship('PersonDB',
                                        foreign_keys=[governor_id],
-                                       backref=db.backref('governed_territory_ref', uselist=False))
+                                       backref=db.backref('governed_territories', lazy='dynamic'))
     
     buildings = db.relationship('Building',
                                backref='territory',
@@ -391,19 +392,19 @@ class Territory(db.Model):
                                     lazy='dynamic')
     
     territory_battles = db.relationship('Battle',
-                                      backref=db.backref('territory', uselist=False),
+                                      backref=db.backref('battles_fought_here', uselist=False),
                                       lazy='dynamic',
                                       foreign_keys='Battle.territory_id')
     
     territory_sieges = db.relationship('Siege',
-                                     backref=db.backref('territory', uselist=False),
-                                     lazy='dynamic',
-                                     foreign_keys='Siege.territory_id')
+                                      backref=db.backref('sieges_here', uselist=False),
+                                      lazy='dynamic',
+                                      foreign_keys='Siege.territory_id')
     
     territory_wars = db.relationship('War',
-                                   foreign_keys='War.target_territory_id',
-                                   backref=db.backref('target_territory', uselist=False),
-                                   lazy='dynamic')
+                                    foreign_keys='War.target_territory_id',
+                                    backref=db.backref('wars_fought_over', uselist=False),
+                                    lazy='dynamic')
     
     # Metadata
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
@@ -791,13 +792,12 @@ class Treaty(db.Model):
     # Terms (stored as JSON)
     terms_json = db.Column(db.Text, default='{}')  # JSON string of terms
     
-    # Relationships
-    history_entries = db.relationship('HistoryLogEntryDB')
-    
+    # history_events is provided as a backref from HistoryLogEntryDB.event_treaty
+
     # Metadata
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     last_updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
-    
+
     def get_terms(self) -> dict:
         """Deserializes terms from JSON string."""
         return json.loads(self.terms_json or '{}')
@@ -855,7 +855,7 @@ class War(db.Model):
     # Relationships
     battles = db.relationship('Battle', lazy='dynamic',
                              cascade="all, delete-orphan")
-    history_entries = db.relationship('HistoryLogEntryDB')
+    # history_events is provided as a backref from HistoryLogEntryDB.event_war
     target_territory = db.relationship('Territory')
     
     # Metadata
@@ -921,7 +921,7 @@ class Battle(db.Model):
     winner = db.relationship('DynastyDB', foreign_keys=[winner_dynasty_id])
     attacker_army = db.relationship('Army', foreign_keys=[attacker_army_id])
     defender_army = db.relationship('Army', foreign_keys=[defender_army_id])
-    history_entries = db.relationship('HistoryLogEntryDB')
+    # history_events is provided as a backref from HistoryLogEntryDB.event_battle
     
     # Metadata
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)

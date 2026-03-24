@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+
+{% block title %}{{ dynasty.name }} - Military Gameplay{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="mt-4 mb-3">{{ dynasty.name }} - Military Operations</h1>
+    
+    <div class="row">
+        <!-- Game Controls -->
+        <div class="col-md-3">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Game Information</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Dynasty:</strong> {{ dynasty.name }}</p>
+                    <p><strong>Current Year:</strong> {{ dynasty.current_simulation_year }}</p>
+                    <p><strong>Wealth:</strong> {{ dynasty.current_wealth }}</p>
+                    <p><strong>Phase:</strong> <span class="badge bg-primary">{{ current_phase }}</span></p>
+                    
+                    <div class="d-grid gap-2 mt-3">
+                        <a href="{{ url_for('military_view', dynasty_id=dynasty.id) }}" class="btn btn-secondary">Military Management</a>
+                        <button id="endTurnBtn" class="btn btn-danger">End Turn</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Selected Unit/Army</h5>
+                </div>
+                <div class="card-body" id="selectedUnitInfo">
+                    <p class="text-muted">No unit or army selected.</p>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div id="actionButtons" class="d-grid gap-2">
+                        <button id="moveBtn" class="btn btn-primary" disabled>Move</button>
+                        <button id="attackBtn" class="btn btn-danger" disabled>Attack</button>
+                        <button id="siegeBtn" class="btn btn-warning" disabled>Siege</button>
+                        <button id="cancelBtn" class="btn btn-secondary" disabled>Cancel Action</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Map Display -->
+        <div class="col-md-9">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">World Map</h5>
+                </div>
+                <div class="card-body">
+                    {% if map_image %}
+                    <img src="{{ map_image }}" class="img-fluid" alt="World Map" id="worldMap">
+                    {% else %}
+                    <div class="alert alert-warning">Map not available</div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="row">
+                <!-- Armies List -->
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Your Armies</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if armies %}
+                            <div class="list-group">
+                                {% for army in armies %}
+                                <button type="button" class="list-group-item list-group-item-action army-item" data-army-id="{{ army.id }}">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">{{ army.name }}</h6>
+                                        <small>Units: {{ army.units|length }}</small>
+                                    </div>
+                                    <p class="mb-1">
+                                        {% if army.commander %}
+                                        Commander: {{ army.commander.name }} {{ army.commander.surname }}
+                                        {% else %}
+                                        No commander
+                                        {% endif %}
+                                    </p>
+                                    <small>
+                                        {% if army.territory %}
+                                        Location: {{ army.territory.name }}
+                                        {% else %}
+                                        No location
+                                        {% endif %}
+                                    </small>
+                                </button>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <p class="text-muted">No armies available.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Territories List -->
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Territories</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if territories %}
+                            <div class="list-group">
+                                {% for territory in territories %}
+                                <button type="button" class="list-group-item list-group-item-action territory-item" data-territory-id="{{ territory.id }}">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">{{ territory.name }}</h6>
+                                        <small>
+                                            {% if territory.controller_dynasty_id == dynasty.id %}
+                                            Controlled
+                                            {% elif territory.controller_dynasty_id %}
+                                            Enemy
+                                            {% else %}
+                                            Neutral
+                                            {% endif %}
+                                        </small>
+                                    </div>
+                                    <p class="mb-1">
+                                        Terrain: {{ territory.terrain_type.value }}
+                                    </p>
+                                    <small>
+                                        {% if territory.settlement %}
+                                        Settlement: {{ territory.settlement.name }}
+                                        {% else %}
+                                        No settlement
+                                        {% endif %}
+                                    </small>
+                                </button>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <p class="text-muted">No territories available.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize variables
+        let selectedArmy = null;
+        let selectedTerritory = null;
+        let currentAction = null;
+        
+        // Army selection
+        const armyItems = document.querySelectorAll('.army-item');
+        armyItems.forEach(item => {
+            item.addEventListener('click', function() {
+                // Remove active class from all army items
+                armyItems.forEach(i => i.classList.remove('active'));
+                
+                // Add active class to clicked item
+                this.classList.add('active');
+                
+                // Set selected army
+                selectedArmy = this.dataset.armyId;
+                
+                // Update selected unit info
+                document.getElementById('selectedUnitInfo').innerHTML = `
+                    <p><strong>Selected Army:</strong> ${this.querySelector('h6').textContent}</p>
+                    <p>${this.querySelector('p').textContent}</p>
+                    <p>${this.querySelector('small').textContent}</p>
+                `;
+                
+                // Enable action buttons
+                document.getElementById('moveBtn').disabled = false;
+                document.getElementById('attackBtn').disabled = false;
+                document.getElementById('siegeBtn').disabled = false;
+            });
+        });
+        
+        // Territory selection
+        const territoryItems = document.querySelectorAll('.territory-item');
+        territoryItems.forEach(item => {
+            item.addEventListener('click', function() {
+                // Remove active class from all territory items
+                territoryItems.forEach(i => i.classList.remove('active'));
+                
+                // Add active class to clicked item
+                this.classList.add('active');
+                
+                // Set selected territory
+                selectedTerritory = this.dataset.territoryId;
+                
+                // If an action is selected, perform it
+                if (currentAction && selectedArmy) {
+                    performAction(currentAction, selectedArmy, selectedTerritory);
+                }
+            });
+        });
+        
+        // Action buttons
+        document.getElementById('moveBtn').addEventListener('click', function() {
+            if (!selectedArmy) return;
+            
+            currentAction = 'move';
+            this.classList.add('active');
+            document.getElementById('attackBtn').classList.remove('active');
+            document.getElementById('siegeBtn').classList.remove('active');
+            document.getElementById('cancelBtn').disabled = false;
+            
+            // Show instruction
+            alert('Select a territory to move to');
+        });
+        
+        document.getElementById('attackBtn').addEventListener('click', function() {
+            if (!selectedArmy) return;
+            
+            currentAction = 'attack';
+            this.classList.add('active');
+            document.getElementById('moveBtn').classList.remove('active');
+            document.getElementById('siegeBtn').classList.remove('active');
+            document.getElementById('cancelBtn').disabled = false;
+            
+            // Show instruction
+            alert('Select an enemy territory to attack');
+        });
+        
+        document.getElementById('siegeBtn').addEventListener('click', function() {
+            if (!selectedArmy) return;
+            
+            currentAction = 'siege';
+            this.classList.add('active');
+            document.getElementById('moveBtn').classList.remove('active');
+            document.getElementById('attackBtn').classList.remove('active');
+            document.getElementById('cancelBtn').disabled = false;
+            
+            // Show instruction
+            alert('Select an enemy territory to siege');
+        });
+        
+        document.getElementById('cancelBtn').addEventListener('click', function() {
+            // Reset action
+            currentAction = null;
+            
+            // Reset button states
+            document.getElementById('moveBtn').classList.remove('active');
+            document.getElementById('attackBtn').classList.remove('active');
+            document.getElementById('siegeBtn').classList.remove('active');
+            this.disabled = true;
+        });
+        
+        // End turn button
+        document.getElementById('endTurnBtn').addEventListener('click', function() {
+            if (confirm('Are you sure you want to end your turn?')) {
+                // Submit form to advance turn
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = `/dynasty/${dynastyId}/advance_turn`;
+                document.body.appendChild(form);
+                form.submit();
+            }
+        });
+        
+        // Function to perform action
+        function performAction(action, armyId, territoryId) {
+            if (!armyId || !territoryId) return;
+            
+            // Create form data
+            const formData = new FormData();
+            formData.append('army_id', armyId);
+            formData.append('territory_id', territoryId);
+            
+            // Determine action URL
+            let actionUrl;
+            switch (action) {
+                case 'move':
+                    actionUrl = `/dynasty/${dynastyId}/move_army`;
+                    break;
+                case 'attack':
+                    actionUrl = `/dynasty/${dynastyId}/initiate_battle`;
+                    break;
+                case 'siege':
+                    actionUrl = `/dynasty/${dynastyId}/initiate_siege`;
+                    break;
+                default:
+                    return;
+            }
+            
+            // Submit form
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = actionUrl;
+            
+            // Add hidden inputs
+            const armyInput = document.createElement('input');
+            armyInput.type = 'hidden';
+            armyInput.name = 'army_id';
+            armyInput.value = armyId;
+            form.appendChild(armyInput);
+            
+            const territoryInput = document.createElement('input');
+            territoryInput.type = 'hidden';
+            territoryInput.name = 'territory_id';
+            territoryInput.value = territoryId;
+            form.appendChild(territoryInput);
+            
+            document.body.appendChild(form);
+            form.submit();
+        }
+    });
+</script>
+{% endblock %}

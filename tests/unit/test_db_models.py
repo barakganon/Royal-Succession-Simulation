@@ -264,7 +264,7 @@ class TestPersonModel:
         assert unskilled_person.can_lead_army() is False
         
         # Test calculate_command_bonus method
-        assert skilled_person.calculate_command_bonus() == 1.15  # 10 * 0.1 + 0.05 (Brave) + 0.1 (Strategist)
+        assert skilled_person.calculate_command_bonus() == pytest.approx(1.15)  # 10 * 0.1 + 0.05 (Brave) + 0.1 (Strategist)
         assert unskilled_person.calculate_command_bonus() == 0.2  # 2 * 0.1
 
 

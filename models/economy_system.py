@@ -458,7 +458,7 @@ class EconomySystem:
                 tax_income *= 1.5  # Cities provide 50% more tax
             elif settlement.settlement_type == "town":
                 tax_income *= 1.2  # Towns provide 20% more tax
-def calculate_dynasty_economy(self, dynasty_id: int) -> Dict[str, Any]:
+    def calculate_dynasty_economy(self, dynasty_id: int) -> Dict[str, Any]:
         """
         Calculate the overall economy for a dynasty.
         
@@ -578,7 +578,7 @@ def calculate_dynasty_economy(self, dynasty_id: int) -> Dict[str, Any]:
             "trade_routes": trade_data
         }
     
-def update_dynasty_economy(self, dynasty_id: int) -> Dict[str, Any]:
+    def update_dynasty_economy(self, dynasty_id: int) -> Dict[str, Any]:
         """
         Update the economy for a dynasty for one turn.
         
@@ -663,7 +663,7 @@ def update_dynasty_economy(self, dynasty_id: int) -> Dict[str, Any]:
             "economy_data": economy_data
         }
     
-def _update_global_market(self):
+    def _update_global_market(self):
         """Update the global market prices based on supply and demand."""
         for resource_type, data in self.global_market_prices.items():
             # Calculate price change based on supply and demand
@@ -683,7 +683,7 @@ def _update_global_market(self):
             # Update price
             data["current_price"] = max(0.1, data["base_price"] * (1 + price_change))
             
-def construct_building(self, territory_id: int, building_type: BuildingType) -> Tuple[bool, str]:
+    def construct_building(self, territory_id: int, building_type: BuildingType) -> Tuple[bool, str]:
         """
         Start construction of a building in a territory.
         
@@ -763,7 +763,7 @@ def construct_building(self, territory_id: int, building_type: BuildingType) -> 
         
         return True, f"Started construction of {building_type.value.replace('_', ' ').title()}"
     
-def upgrade_building(self, building_id: int) -> Tuple[bool, str]:
+    def upgrade_building(self, building_id: int) -> Tuple[bool, str]:
         """
         Upgrade an existing building.
         
@@ -817,7 +817,7 @@ def upgrade_building(self, building_id: int) -> Tuple[bool, str]:
         
         return True, f"Started upgrade of {building.name} to level {building.level + 1}"
     
-def repair_building(self, building_id: int) -> Tuple[bool, str]:
+    def repair_building(self, building_id: int) -> Tuple[bool, str]:
         """
         Repair a damaged building.
         
@@ -866,7 +866,7 @@ def repair_building(self, building_id: int) -> Tuple[bool, str]:
         
         return True, f"Repaired {building.name}"
     
-def establish_trade_route(self, source_dynasty_id: int, target_dynasty_id: int,
+    def establish_trade_route(self, source_dynasty_id: int, target_dynasty_id: int,
                              resource_type: ResourceType, amount: float) -> Tuple[bool, str, Optional[TradeRoute]]:
         """
         Establish a trade route between two dynasties.
@@ -936,7 +936,7 @@ def establish_trade_route(self, source_dynasty_id: int, target_dynasty_id: int,
         
         return True, f"Established trade route for {amount} {resource_type.value} per year", trade_route
     
-def cancel_trade_route(self, trade_route_id: int, dynasty_id: int) -> Tuple[bool, str]:
+    def cancel_trade_route(self, trade_route_id: int, dynasty_id: int) -> Tuple[bool, str]:
         """
         Cancel an existing trade route.
         
@@ -963,7 +963,7 @@ def cancel_trade_route(self, trade_route_id: int, dynasty_id: int) -> Tuple[bool
         
         return True, "Trade route canceled"
     
-def develop_territory(self, territory_id: int) -> Tuple[bool, str]:
+    def develop_territory(self, territory_id: int) -> Tuple[bool, str]:
         """
         Increase the development level of a territory.
         
@@ -1010,7 +1010,7 @@ def develop_territory(self, territory_id: int) -> Tuple[bool, str]:
         
         return True, f"Increased development level of {territory.name} to {territory.development_level}"
     
-def set_tax_policy(self, dynasty_id: int, tax_modifier: float) -> Tuple[bool, str]:
+    def set_tax_policy(self, dynasty_id: int, tax_modifier: float) -> Tuple[bool, str]:
         """
         Set the tax policy for a dynasty.
         
@@ -1033,7 +1033,7 @@ def set_tax_policy(self, dynasty_id: int, tax_modifier: float) -> Tuple[bool, st
         # This would require adding a tax_modifier field to the DynastyDB model
         # For now, we'll just return success
         
-def integrate_with_map_system(self, territory_id: int) -> Dict[str, Any]:
+    def integrate_with_map_system(self, territory_id: int) -> Dict[str, Any]:
         """
         Integrate the economy system with the map system for a territory.
         
@@ -1073,7 +1073,7 @@ def integrate_with_map_system(self, territory_id: int) -> Dict[str, Any]:
             "terrain_efficiency": terrain_efficiency
         }
     
-def integrate_with_military_system(self, dynasty_id: int) -> Dict[str, Any]:
+    def integrate_with_military_system(self, dynasty_id: int) -> Dict[str, Any]:
         """
         Integrate the economy system with the military system for a dynasty.
         
@@ -1119,7 +1119,7 @@ def integrate_with_military_system(self, dynasty_id: int) -> Dict[str, Any]:
             "food_consumption": food_consumption
         }
     
-def integrate_with_diplomacy_system(self, dynasty_id: int) -> Dict[str, Any]:
+    def integrate_with_diplomacy_system(self, dynasty_id: int) -> Dict[str, Any]:
         """
         Integrate the economy system with the diplomacy system for a dynasty.
         
@@ -1185,7 +1185,7 @@ def integrate_with_diplomacy_system(self, dynasty_id: int) -> Dict[str, Any]:
             "treaty_effects": treaty_effects
         }
     
-def integrate_with_character_system(self, dynasty_id: int) -> Dict[str, Any]:
+    def integrate_with_character_system(self, dynasty_id: int) -> Dict[str, Any]:
         """
         Integrate the economy system with the character system for a dynasty.
         

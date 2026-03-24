@@ -11,7 +11,8 @@ from typing import List, Dict, Tuple, Optional, Any
 from sqlalchemy.orm import Session
 
 from models.db_models import (
-    DynastyDB, PersonDB, Territory, MilitaryUnit, UnitType, Army, Battle, Siege, War, HistoryLogEntryDB
+    DynastyDB, PersonDB, Territory, MilitaryUnit, UnitType, Army, Battle, Siege, War, HistoryLogEntryDB,
+    TerrainType
 )
 from models.map_system import MovementSystem
 
@@ -41,13 +42,11 @@ class MilitarySystem:
     def __init__(self, session: Session):
         """
         Initialize the military system.
-        
-        Args:
-            session: SQLAlchemy database session
         """
-        logger.info("Initializing MilitarySystem")
+        logger.debug("MilitarySystem.__init__ called")
         self.session = session
         self.movement_system = MovementSystem(session)
+        logger.debug("MilitarySystem.__init__ finished")
         
         # Unit recruitment costs and stats
         self.unit_costs = {
@@ -68,7 +67,21 @@ class MilitarySystem:
             UnitType.HEAVY_WARSHIP: {"gold": 400, "timber": 200, "iron": 50, "manpower": 150},
             UnitType.FIRE_SHIP: {"gold": 300, "timber": 150, "manpower": 75}
         }
-        
+
+        # Terrain modifiers for combat
+        self.terrain_modifiers = {
+            TerrainType.PLAINS: {"attack": 1.0, "defense": 1.0},
+            TerrainType.HILLS: {"attack": 0.9, "defense": 1.1},
+            TerrainType.MOUNTAINS: {"attack": 0.7, "defense": 1.3},
+            TerrainType.FOREST: {"attack": 1.1, "defense": 0.9},
+            TerrainType.DESERT: {"attack": 1.0, "defense": 1.0},
+            TerrainType.TUNDRA: {"attack": 0.8, "defense": 1.2},
+            TerrainType.COASTAL: {"attack": 1.0, "defense": 1.0},
+            TerrainType.RIVER: {"attack": 1.2, "defense": 0.8},
+            TerrainType.LAKE: {"attack": 1.0, "defense": 1.0},
+            TerrainType.SWAMP: {"attack": 0.9, "defense": 1.1}
+        }
+
         # Unit base stats
         self.unit_stats = {
             UnitType.LEVY_SPEARMEN: {
@@ -166,17 +179,8 @@ class MilitarySystem:
                     territory_id: Optional[int] = None, name: Optional[str] = None) -> Tuple[bool, str, Optional[MilitaryUnit]]:
         """
         Recruit a new military unit for a dynasty.
-        
-        Args:
-            dynasty_id: ID of the dynasty recruiting the unit
-            unit_type: Type of unit to recruit
-            size: Size of the unit (number of troops)
-            territory_id: ID of the territory to recruit in (optional)
-            name: Custom name for the unit (optional)
-            
-        Returns:
-            Tuple of (success, message, unit)
         """
+        logger.debug(f"recruit_unit called with dynasty_id={dynasty_id}, unit_type={unit_type}, size={size}, territory_id={territory_id}, name={name}")
         # Get dynasty
         dynasty = self.session.query(DynastyDB).get(dynasty_id)
         if not dynasty:
@@ -204,10 +208,16 @@ class MilitarySystem:
             # Check if territory is controlled by dynasty
             if territory.controller_dynasty_id != dynasty_id:
                 return False, "Cannot recruit in territory not controlled by dynasty", None
-            
-            # Check if territory has enough manpower
-            manpower_required = unit_cost.get("manpower", 0) * size / 100
-            if territory.base_manpower < manpower_required:
+        
+        # Get unit cost
+        unit_cost = self.unit_costs[unit_type]
+        
+        # Calculate total gold cost
+        total_gold_cost = unit_cost.get("gold", 0) * size / 100
+        
+        # Check if territory has enough manpower
+        manpower_required = unit_cost.get("manpower", 0) * size / 100
+        if territory.base_manpower < manpower_required:
                 return False, f"Not enough manpower in territory. Required: {manpower_required}, Available: {territory.base_manpower}", None
         
         # Create the unit
@@ -226,8 +236,26 @@ class MilitarySystem:
             created_year=dynasty.current_simulation_year
         )
         
+        # Check if dynasty has enough resources
+        if dynasty.current_wealth < total_gold_cost:
+            return False, "Not enough gold to recruit unit", None
+        
         # Deduct costs
         dynasty.current_wealth -= total_gold_cost
+        
+        # Get iron and timber costs
+        iron_cost = unit_cost.get("iron", 0) * size / 100
+        timber_cost = unit_cost.get("timber", 0) * size / 100
+        
+        # Check if dynasty has enough iron and timber
+        if dynasty.current_iron < iron_cost:
+            return False, "Not enough iron to recruit unit", None
+        if dynasty.current_timber < timber_cost:
+            return False, "Not enough timber to recruit unit", None
+        
+        # Deduct iron and timber costs
+        dynasty.current_iron -= iron_cost
+        dynasty.current_timber -= timber_cost
         
         # Deduct manpower from territory if applicable
         if territory:
@@ -249,22 +277,15 @@ class MilitarySystem:
         self.session.add(log_entry)
         self.session.commit()
         
+        logger.debug(f"recruit_unit returning")
         return True, f"Successfully recruited {size} {unit_type.value.replace('_', ' ').title()} troops", new_unit
     
-    def form_army(self, dynasty_id: int, unit_ids: List[int], name: str, 
+    def form_army(self, dynasty_id: int, unit_ids: List[int], name: str,
                  commander_id: Optional[int] = None) -> Tuple[bool, str, Optional[Army]]:
         """
         Form a new army from individual units.
-        
-        Args:
-            dynasty_id: ID of the dynasty forming the army
-            unit_ids: List of unit IDs to include in the army
-            name: Name for the army
-            commander_id: ID of the person to command the army (optional)
-            
-        Returns:
-            Tuple of (success, message, army)
         """
+        logger.debug(f"form_army called with dynasty_id={dynasty_id}, unit_ids={unit_ids}, name={name}, commander_id={commander_id}")
         # Get dynasty
         dynasty = self.session.query(DynastyDB).get(dynasty_id)
         if not dynasty:
@@ -333,19 +354,14 @@ class MilitarySystem:
         self.session.add(log_entry)
         self.session.commit()
         
+        logger.debug(f"form_army returning")
         return True, f"Successfully formed army '{name}' with {len(units)} units", new_army
     
     def assign_commander(self, army_id: int, commander_id: int) -> Tuple[bool, str]:
         """
         Assign a commander to an army.
-        
-        Args:
-            army_id: ID of the army
-            commander_id: ID of the person to command the army
-            
-        Returns:
-            Tuple of (success, message)
         """
+        logger.debug(f"assign_commander called with army_id={army_id}, commander_id={commander_id}")
         # Get army
         army = self.session.query(Army).get(army_id)
         if not army:
@@ -379,18 +395,14 @@ class MilitarySystem:
         self.session.add(log_entry)
         self.session.commit()
         
+        logger.debug(f"assign_commander returning")
         return True, f"Successfully assigned {commander.name} {commander.surname} as commander of army '{army.name}'"
     
     def calculate_maintenance(self, dynasty_id: int) -> Dict[str, float]:
         """
         Calculate the total maintenance cost for all military units of a dynasty.
-        
-        Args:
-            dynasty_id: ID of the dynasty
-            
-        Returns:
-            Dictionary with maintenance costs
         """
+        logger.debug(f"calculate_maintenance called with dynasty_id={dynasty_id}")
         # Get all units belonging to dynasty
         units = self.session.query(MilitaryUnit).filter_by(dynasty_id=dynasty_id).all()
         
@@ -406,6 +418,7 @@ class MilitarySystem:
             total_gold += gold_cost
             total_food += food_cost
         
+        logger.debug(f"calculate_maintenance returning")
         return {
             "gold": total_gold,
             "food": total_food
@@ -414,13 +427,8 @@ class MilitarySystem:
     def apply_maintenance(self, dynasty_id: int) -> Tuple[bool, str, Dict[str, float]]:
         """
         Apply maintenance costs to a dynasty.
-        
-        Args:
-            dynasty_id: ID of the dynasty
-            
-        Returns:
-            Tuple of (success, message, costs)
         """
+        logger.debug(f"apply_maintenance called with dynasty_id={dynasty_id}")
         # Get dynasty
         dynasty = self.session.query(DynastyDB).get(dynasty_id)
         if not dynasty:
@@ -464,26 +472,19 @@ class MilitarySystem:
         self.session.add(log_entry)
         self.session.commit()
         
+        logger.debug(f"apply_maintenance returning")
         return True, f"Successfully paid military maintenance: {costs['gold']} gold", costs
     
-    def initiate_battle(self, attacker_army_id: int, defender_army_id: int, 
+    def initiate_battle(self, attacker_army_id: int, defender_army_id: int,
                        territory_id: int, war_id: Optional[int] = None) -> Tuple[bool, str, Optional[Battle]]:
         """
         Initiate a battle between two armies.
-        
-        Args:
-            attacker_army_id: ID of the attacking army
-            defender_army_id: ID of the defending army
-            territory_id: ID of the territory where the battle takes place
-            war_id: ID of the war this battle is part of (optional)
-            
-        Returns:
-            Tuple of (success, message, battle)
         """
+        logger.debug(f"initiate_battle called with attacker_army_id={attacker_army_id}, defender_army_id={defender_army_id}, territory_id={territory_id}, war_id={war_id}")
         # Get armies
         attacker_army = self.session.query(Army).get(attacker_army_id)
         defender_army = self.session.query(Army).get(defender_army_id)
-        
+
         if not attacker_army:
             return False, f"Attacker army with ID {attacker_army_id} not found", None
         if not defender_army:
@@ -571,42 +572,40 @@ class MilitarySystem:
         self.session.commit()
         
         return True, f"Battle resolved. {winner_name} was victorious.", battle
-    
+
     def _resolve_battle(self, attacker_army: Army, defender_army: Army,
                        territory: Territory) -> Tuple[int, int, int, Dict[str, Any]]:
         """
         Resolve a battle between two armies.
-                
-                Args:
-                    attacker_army: Attacking army
-                    defender_army: Defending army
-                    territory: Territory where the battle takes place
-                    
-            
-        Returns:
-            Tuple of (winner_dynasty_id, attacker_casualties, defender_casualties, battle_details)
         """
+        logger.debug(f"_resolve_battle called with attacker_army={attacker_army}, defender_army={defender_army}, territory={territory}")
         # Calculate initial strengths
         attacker_strength = attacker_army.calculate_total_strength(territory.terrain_type)
         defender_strength = defender_army.calculate_total_strength(territory.terrain_type)
-        
+
+        # Apply terrain modifiers
+        terrain_modifiers = self.terrain_modifiers.get(territory.terrain_type)
+        if terrain_modifiers:
+            attacker_strength *= terrain_modifiers.get("attack", 1.0)
+            defender_strength *= terrain_modifiers.get("defense", 1.0)
+
         # Apply terrain bonuses for defender
         if territory.controller_dynasty_id == defender_army.dynasty_id:
             defender_strength *= 1.2  # 20% bonus for defending controlled territory
-        
+
         # Apply fortification bonus if territory has fortifications
         if territory.fortification_level > 0:
             defender_strength *= (1 + territory.fortification_level * 0.1)  # 10% per fortification level
-        
+
         # Calculate total troops
         attacker_troops = sum(unit.size for unit in attacker_army.units)
         defender_troops = sum(unit.size for unit in defender_army.units)
-        
+
         # Battle simulation
         rounds = []
         attacker_remaining = attacker_troops
         defender_remaining = defender_troops
-        
+
         # Initial round
         initial_round = {
             "round": 0,
@@ -616,82 +615,102 @@ class MilitarySystem:
             "defender_troops": defender_troops
         }
         rounds.append(initial_round)
-        
+
         # Simulate up to 5 rounds of combat
-        for round_num in range(1, 6):
-            # Calculate casualties based on strength ratio
-            attacker_casualties_this_round = int(defender_strength / attacker_strength * random.uniform(0.05, 0.15) * attacker_remaining)
-            defender_casualties_this_round = int(attacker_strength / defender_strength * random.uniform(0.05, 0.15) * defender_remaining)
-            
+        for i in range(5):
+            # Calculate casualties for this round
+            attacker_loss = int(defender_strength * 0.01)
+            defender_loss = int(attacker_strength * 0.01)
+
             # Apply casualties
-            attacker_remaining -= attacker_casualties_this_round
-            defender_remaining -= defender_casualties_this_round
-            
-            # Ensure non-negative
+            attacker_remaining -= attacker_loss
+            defender_remaining -= defender_loss
+
+            # Ensure troops don't go below 0
             attacker_remaining = max(0, attacker_remaining)
             defender_remaining = max(0, defender_remaining)
-            
+
             # Update strengths
-            attacker_strength = attacker_strength * (attacker_remaining / attacker_troops) if attacker_troops > 0 else 0
-            defender_strength = defender_strength * (defender_remaining / defender_troops) if defender_troops > 0 else 0
-            
-            # Record round
-            round_data = {
-                "round": round_num,
-                "attacker_casualties": attacker_casualties_this_round,
-                "defender_casualties": defender_casualties_this_round,
-                "attacker_remaining": attacker_remaining,
-                "defender_remaining": defender_remaining,
+            attacker_strength = attacker_remaining / attacker_troops * attacker_strength if attacker_troops > 0 else 0
+            defender_strength = defender_remaining / defender_troops * defender_strength if defender_troops > 0 else 0
+
+            # Log round details
+            round_details = {
+                "round": i + 1,
                 "attacker_strength": attacker_strength,
-                "defender_strength": defender_strength
+                "defender_strength": defender_strength,
+                "attacker_troops": attacker_remaining,
+                "defender_troops": defender_remaining
             }
-            rounds.append(round_data)
-            
-            # Check for decisive victory
-            if attacker_remaining <= attacker_troops * 0.2 or defender_remaining <= defender_troops * 0.2:
+            rounds.append(round_details)
+
+            # Check if battle is over
+            if attacker_strength <= 0 or defender_strength <= 0:
                 break
-        
+
         # Determine winner
-        attacker_casualty_ratio = (attacker_troops - attacker_remaining) / attacker_troops if attacker_troops > 0 else 1
-        defender_casualty_ratio = (defender_troops - defender_remaining) / defender_troops if defender_troops > 0 else 1
-        
-        winner_dynasty_id = None
-        if attacker_remaining <= 0:
-            winner_dynasty_id = defender_army.dynasty_id
-        elif defender_remaining <= 0:
-            winner_dynasty_id = attacker_army.dynasty_id
-        elif attacker_casualty_ratio > defender_casualty_ratio * 1.5:
-            winner_dynasty_id = defender_army.dynasty_id
-        elif defender_casualty_ratio > attacker_casualty_ratio * 1.5:
+        if attacker_strength > defender_strength:
             winner_dynasty_id = attacker_army.dynasty_id
         else:
-            # No clear winner, determine based on remaining strength
-            if attacker_strength > defender_strength:
-                winner_dynasty_id = attacker_army.dynasty_id
-            else:
-                winner_dynasty_id = defender_army.dynasty_id
-        
+            winner_dynasty_id = defender_army.dynasty_id
+
         # Calculate total casualties
         attacker_casualties = attacker_troops - attacker_remaining
         defender_casualties = defender_troops - defender_remaining
-        
-        # Create battle details
+
+        # Prepare battle details for logging
         battle_details = {
             "rounds": rounds,
-            "initial_attacker_strength": initial_round["attacker_strength"],
-            "initial_defender_strength": initial_round["defender_strength"],
-            "final_attacker_strength": attacker_strength,
-            "final_defender_strength": defender_strength,
-            "attacker_casualty_ratio": attacker_casualty_ratio,
-            "defender_casualty_ratio": defender_casualty_ratio
+            "winner": winner_dynasty_id,
+            "attacker_casualties": attacker_casualties,
+            "defender_casualties": defender_casualties
         }
-        
+
+        # Log battle details
+        logger.info(f"Battle results: {battle_details}")
+
         return winner_dynasty_id, attacker_casualties, defender_casualties, battle_details
-    
+
     def _apply_battle_casualties(self, army: Army, total_casualties: int) -> None:
+        """Apply casualties to units in an army.
+
+        Args:
+            army: The army that suffered casualties
+            total_casualties: Total number of casualties to distribute
         """
-        Apply casualties to units in an army.
-        
+        # Sort units by size (largest to smallest)
+        units = sorted(army.units, key=lambda unit: unit.size, reverse=True)
+
+        # Distribute casualties among units
+        remaining_casualties = total_casualties
+        for unit in units:
+            # Calculate casualties for this unit
+            unit_casualties = min(unit.size, remaining_casualties)
+
+            # Apply casualties
+            unit.size -= unit_casualties
+            remaining_casualties -= unit_casualties
+
+            # If unit is empty, remove it from the army
+            if unit.size <= 0:
+                self.session.delete(unit)
+
+            # If all casualties have been distributed, stop
+            if remaining_casualties <= 0:
+                break
+
+        # Commit changes
+        self.session.commit()
+
+        return
+
+# This section was removed as it was a duplicate implementation
+    
+def _apply_battle_casualties(self, army: Army, total_casualties: int) -> None:
+        """
+        Apply casualties to an army after a battle.
+
+
         Args:
             army: The army that suffered casualties
             total_casualties: Total number of casualties to distribute
@@ -707,6 +726,7 @@ class MilitarySystem:
         # Calculate total troops
         total_troops = sum(unit.size for unit in units)
         if total_troops <= 0:
+            logger.debug(f"_apply_battle_casualties returning")
             return
         
         # Calculate casualty ratio
@@ -744,19 +764,19 @@ class MilitarySystem:
                     unit.size -= remaining_casualties
                     break
     
-    def initiate_siege(self, army_id: int, territory_id: int, 
-                      war_id: Optional[int] = None) -> Tuple[bool, str, Optional[Siege]]:
-        """
-        Initiate a siege of a territory by an army.
-        
-        Args:
-            army_id: ID of the army conducting the siege
-            territory_id: ID of the territory being sieged
-            war_id: ID of the war this siege is part of (optional)
+        def initiate_siege(self, army_id: int, territory_id: int,
+                          war_id: Optional[int] = None) -> Tuple[bool, str, Optional[Siege]]:
+            """
+            Initiate a siege of a territory by an army.
             
-        Returns:
-            Tuple of (success, message, siege)
-        """
+            Args:
+                army_id: ID of the army conducting the siege
+                territory_id: ID of the territory being sieged
+                war_id: ID of the war this siege is part of (optional)
+                
+            Returns:
+                Tuple of (success, message, siege)
+            """
         # Get army
         army = self.session.query(Army).get(army_id)
         if not army:
@@ -832,16 +852,18 @@ class MilitarySystem:
         
         return True, f"Siege of {territory.name} initiated by army '{army.name}'.", siege
     
-    def update_siege(self, siege_id: int) -> Tuple[bool, str, Optional[Siege]]:
-        """
-        Update the progress of a siege.
-        
-        Args:
-            siege_id: ID of the siege to update
+        def update_siege(self, siege_id: int) -> Tuple[bool, str, Optional[Siege]]:
+            """
+            Update a siege.
+
+            Update the progress of a siege.
             
-        Returns:
-            Tuple of (success, message, siege)
-        """
+            Args:
+                siege_id: ID of the siege to update
+                
+            Returns:
+                Tuple of (success, message, siege)
+            """
         # Get siege
         siege = self.session.query(Siege).get(siege_id)
         if not siege:

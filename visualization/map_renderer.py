@@ -34,16 +34,16 @@ class MapRenderer:
         
         # Color schemes for different map elements
         self.terrain_colors = {
-            TerrainType.PLAINS: '#C2D59B',    # Light green
-            TerrainType.HILLS: '#9BBF88',     # Medium green
-            TerrainType.MOUNTAINS: '#8B7355', # Brown
-            TerrainType.FOREST: '#228B22',    # Forest green
-            TerrainType.DESERT: '#F4D03F',    # Sand yellow
-            TerrainType.TUNDRA: '#E8E8E8',    # Light gray
-            TerrainType.COASTAL: '#87CEFA',   # Light blue
-            TerrainType.RIVER: '#1E90FF',     # Blue
-            TerrainType.LAKE: '#4682B4',      # Steel blue
-            TerrainType.SWAMP: '#2F4F4F'      # Dark slate gray
+            TerrainType.PLAINS: '#e0f2be',    # Light green
+            TerrainType.HILLS: '#a3c183',     # Medium green
+            TerrainType.MOUNTAINS: '#778b78', # Brown
+            TerrainType.FOREST: '#2d612d',    # Forest green
+            TerrainType.DESERT: '#f0e68c',    # Sand yellow
+            TerrainType.TUNDRA: '#d3d3d3',    # Light gray
+            TerrainType.COASTAL: '#add8e6',   # Light blue
+            TerrainType.RIVER: '#1e90ff',     # Blue
+            TerrainType.LAKE: '#4682b4',      # Steel blue
+            TerrainType.SWAMP: '#808000'      # Dark Olive Green
         }
         
         # Dynasty colors for territory control
@@ -81,8 +81,8 @@ class MapRenderer:
             'naval': 'D'       # Diamond
         }
     
-    def render_world_map(self, width: int = 12, height: int = 10, 
-                        show_terrain: bool = True, 
+    def render_world_map(self, width: int = 12, height: int = 10,
+                        show_terrain: bool = True,
                         show_territories: bool = True,
                         show_settlements: bool = True,
                         show_resources: bool = False,
@@ -100,15 +100,19 @@ class MapRenderer:
             show_resources: Whether to show resources
             show_units: Whether to show military units
             highlight_dynasty_id: ID of the dynasty to highlight
-            
+        
         Returns:
             Base64 encoded PNG image
         """
         # Create figure
+        print("DEBUG: render_world_map - Creating figure")
         fig, ax = plt.subplots(figsize=(width, height))
+        print("DEBUG: render_world_map - Figure created")
         
         # Get all territories
+        print("DEBUG: render_world_map - Getting all territories")
         territories = self.session.query(Territory).all()
+        print(f"DEBUG: render_world_map - Number of territories: {len(territories)}")
         
         # Get dynasty-color mapping
         dynasty_colors = self._get_dynasty_colors()
@@ -342,193 +346,224 @@ class MapRenderer:
         # Convert to base64 string
         buf.seek(0)
         img_str = base64.b64encode(buf.read()).decode('utf-8')
-        
+        print("DEBUG: render_world_map - Image encoded to base64")
         return img_str
     
-    def render_territory_map(self, territory_id: int, width: int = 8, height: int = 6) -> str:
-        """
-        Render a detailed map of a specific territory.
-        
-        Args:
-            territory_id: ID of the territory to render
-            width: Width of the figure in inches
-            height: Height of the figure in inches
-            
-        Returns:
-            Base64 encoded PNG image
-        """
-        # Get territory
-        territory = self.session.query(Territory).get(territory_id)
-        if not territory:
-            return ""
-        
-        # Create figure
-        fig, ax = plt.subplots(figsize=(width, height))
-        
-        # Get territory position
-        x, y = territory.x_coordinate, territory.y_coordinate
-        
-        # Determine territory color based on terrain
-        color = self.terrain_colors.get(territory.terrain_type, '#FFFFFF')
-        
-        # Draw territory as large circle
-        ax.scatter(x, y, s=5000, c=color, edgecolors='black', linewidth=2, alpha=0.7, zorder=1)
-        
-        # Add territory name
-        ax.text(x, y - 50, territory.name, fontsize=14, ha='center', va='center', 
-               zorder=3, color='black', fontweight='bold')
-        
-        # Add terrain type
-        ax.text(x, y - 30, f"Terrain: {territory.terrain_type.value.capitalize()}", 
-               fontsize=10, ha='center', va='center', zorder=3, color='black')
-        
-        # Add development level
-        ax.text(x, y - 10, f"Development: {territory.development_level}", 
-               fontsize=10, ha='center', va='center', zorder=3, color='black')
-        
-        # Add population
-        ax.text(x, y + 10, f"Population: {territory.population}", 
-               fontsize=10, ha='center', va='center', zorder=3, color='black')
-        
-        # Add controller if any
-        if territory.controller_dynasty_id:
-            from models.db_models import DynastyDB
-            dynasty = self.session.query(DynastyDB).get(territory.controller_dynasty_id)
-            if dynasty:
-                ax.text(x, y + 30, f"Controlled by: {dynasty.name}", 
-                       fontsize=10, ha='center', va='center', zorder=3, color='black')
-        
-        # Get settlements in this territory
-        settlements = self.session.query(Settlement).filter_by(territory_id=territory_id).all()
-        
-        # Draw settlements
-        for i, settlement in enumerate(settlements):
-            # Calculate position in a circle around territory center
-            angle = 2 * np.pi * i / max(1, len(settlements))
-            radius = 30
-            sx = x + radius * np.cos(angle)
-            sy = y + radius * np.sin(angle)
-            
-            # Determine marker
-            marker = self.settlement_markers.get(settlement.settlement_type, 'o')
-            
-            # Determine size based on importance
-            size = 100 + settlement.importance * 30
-            
-            # Draw settlement
-            ax.scatter(sx, sy, s=size, c='black', marker=marker, edgecolors='white', 
-                      linewidth=1, alpha=0.8, zorder=2)
-            
-            # Add settlement name
-            ax.text(sx, sy + 10, settlement.name, fontsize=8, ha='center', 
-                   zorder=3, color='black')
-        
-        # Get resources in this territory
-        territory_resources = self.session.query(TerritoryResource).filter_by(territory_id=territory_id).all()
-        
-        # Draw resources
-        for i, tr in enumerate(territory_resources):
-            # Get resource
-            resource = self.session.query(Resource).get(tr.resource_id)
-            if not resource:
-                continue
-            
-            # Calculate position in a circle around territory center
-            angle = 2 * np.pi * i / max(1, len(territory_resources))
-            radius = 60
-            rx = x + radius * np.cos(angle)
-            ry = y + radius * np.sin(angle)
-            
-            # Determine color based on resource type
-            if resource.is_luxury:
-                color = 'gold'
-            else:
-                color = 'silver'
-            
-            # Draw resource
-            ax.scatter(rx, ry, s=80, c=color, marker='D', edgecolors='black', 
-                      linewidth=1, alpha=0.8, zorder=2)
-            
-            # Add resource name
-            ax.text(rx, ry + 10, resource.name, fontsize=8, ha='center', 
-                   zorder=3, color='black')
-            
-            # Add production info
-            ax.text(rx, ry - 10, f"Prod: {tr.base_production:.1f}", fontsize=6, ha='center', 
-                   zorder=3, color='black')
-        
-        # Get buildings in this territory
-        buildings = self.session.query(Building).filter_by(territory_id=territory_id).all()
-        
-        # Draw buildings
-        for i, building in enumerate(buildings):
-            # Calculate position in a circle around territory center
-            angle = 2 * np.pi * i / max(1, len(buildings))
-            radius = 90
-            bx = x + radius * np.cos(angle)
-            by = y + radius * np.sin(angle)
-            
-            # Draw building
-            ax.scatter(bx, by, s=70, c='brown', marker='s', edgecolors='black', 
-                      linewidth=1, alpha=0.8, zorder=2)
-            
-            # Add building name
-            building_name = building.building_type.value.replace('_', ' ').title()
-            ax.text(bx, by + 10, building_name, fontsize=7, ha='center', 
-                   zorder=3, color='black')
-            
-            # Add level info
-            ax.text(bx, by - 10, f"Level: {building.level}", fontsize=6, ha='center', 
-                   zorder=3, color='black')
-        
-        # Set title
-        ax.set_title(f'Territory Map: {territory.name}')
-        
-        # Remove axis ticks and labels
-        ax.set_xticks([])
-        ax.set_yticks([])
-        
-        # Set axis limits with padding
-        padding = 100
-        ax.set_xlim(x - padding, x + padding)
-        ax.set_ylim(y - padding, y + padding)
-        
-        # Save figure to memory
-        buf = io.BytesIO()
-        plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
-        plt.close(fig)
-        
-        # Convert to base64 string
-        buf.seek(0)
-        img_str = base64.b64encode(buf.read()).decode('utf-8')
-        
-        return img_str
+def save_map_to_static(map_renderer: MapRenderer, filename: str, **kwargs) -> str:
+    """Save a map to the static directory.
     
-    def _get_dynasty_colors(self) -> Dict[int, str]:
-        """
-        Get a mapping of dynasty IDs to colors.
-        
-        Returns:
-            Dictionary mapping dynasty IDs to color strings
-        """
-        # Get all dynasties
+    Args:
+        map_renderer: MapRenderer instance
+        filename: Filename to save as
+        **kwargs: Arguments to pass to render_world_map
+    
+    Returns:
+        Path to the saved file
+    """
+    # Ensure the static/visualizations directory exists
+    static_dir = os.path.join('static', 'visualizations')
+    os.makedirs(static_dir, exist_ok=True)
+    
+    # Create the full filepath
+    filepath = os.path.join(static_dir, filename)
+    
+    # Render the map and save it to the specified path
+    img_str = map_renderer.render_world_map(**kwargs)
+    
+    # Decode the base64 string to binary data
+    img_data = base64.b64decode(img_str)
+    
+    # Write the binary data to the file
+    with open(filepath, 'wb') as f:
+        f.write(img_data)
+    
+    print(f"Map saved to {filepath}")
+    return filepath
+
+def render_territory_map(self, territory_id: int, width: int = 8, height: int = 6) -> str:
+    """
+    Render a detailed map of a specific territory.
+
+    Args:
+        territory_id: ID of the territory to render
+        width: Width of the figure in inches
+        height: Height of the figure in inches
+
+    Returns:
+        Base64 encoded PNG image
+    """
+    # Get territory
+    territory = self.session.query(Territory).get(territory_id)
+    if not territory:
+        return ""
+
+    # Create figure
+    fig, ax = plt.subplots(figsize=(width, height))
+
+    # Get territory position
+    x, y = territory.x_coordinate, territory.y_coordinate
+
+    # Determine territory color based on terrain
+    color = self.terrain_colors.get(territory.terrain_type, '#FFFFFF')
+
+    # Draw territory as large circle
+    ax.scatter(x, y, s=5000, c=color, edgecolors='black', linewidth=2, alpha=0.7, zorder=1)
+
+    # Add territory name
+    ax.text(x, y - 50, territory.name, fontsize=14, ha='center', va='center',
+           zorder=3, color='black', fontweight='bold')
+
+    # Add terrain type
+    ax.text(x, y - 30, f"Terrain: {territory.terrain_type.value.capitalize()}",
+           fontsize=10, ha='center', va='center', zorder=3, color='black')
+
+    # Add development level
+    ax.text(x, y - 10, f"Development: {territory.development_level}",
+           fontsize=10, ha='center', va='center', zorder=3, color='black')
+
+    # Add population
+    ax.text(x, y + 10, f"Population: {territory.population}",
+           fontsize=10, ha='center', va='center', zorder=3, color='black')
+
+    # Add controller if any
+    if territory.controller_dynasty_id:
         from models.db_models import DynastyDB
-        dynasties = self.session.query(DynastyDB).all()
-        
-        # Create mapping
-        dynasty_colors = {}
-        
-        for i, dynasty in enumerate(dynasties):
-            # Use predefined colors if available, otherwise generate
-            if i < len(self.dynasty_colors):
-                color = self.dynasty_colors[i]
-            else:
-                # Generate a random color
-                color = '#' + ''.join([f'{int(c*255):02x}' for c in mcolors.hsv_to_rgb([i/len(dynasties), 0.8, 0.8])])
-            
-            dynasty_colors[dynasty.id] = color
-        
-        return dynasty_colors
+        dynasty = self.session.query(DynastyDB).get(territory.controller_dynasty_id)
+        if dynasty:
+            ax.text(x, y + 30, f"Controlled by: {dynasty.name}",
+                   fontsize=10, ha='center', va='center', zorder=3, color='black')
+
+    # Get settlements in this territory
+    settlements = self.session.query(Settlement).filter_by(territory_id=territory_id).all()
+
+    # Draw settlements
+    for i, settlement in enumerate(settlements):
+        # Calculate position in a circle around territory center
+        angle = 2 * np.pi * i / max(1, len(settlements))
+        radius = 30
+        sx = x + radius * np.cos(angle)
+        sy = y + radius * np.sin(angle)
+
+        # Determine marker
+        marker = self.settlement_markers.get(settlement.settlement_type, 'o')
+
+        # Determine size based on importance
+        size = 100 + settlement.importance * 30
+
+        # Draw settlement
+        ax.scatter(sx, sy, s=size, c='black', marker=marker, edgecolors='white',
+                  linewidth=1, alpha=0.8, zorder=2)
+
+        # Add settlement name
+        ax.text(sx, sy + 10, settlement.name, fontsize=8, ha='center',
+               zorder=3, color='black')
+
+    # Get resources in this territory
+    territory_resources = self.session.query(TerritoryResource).filter_by(territory_id=territory_id).all()
+
+    # Draw resources
+    for i, tr in enumerate(territory_resources):
+        # Get resource
+        resource = self.session.query(Resource).get(tr.resource_id)
+        if not resource:
+            continue
+
+        # Calculate position in a circle around territory center
+        angle = 2 * np.pi * i / max(1, len(territory_resources))
+        radius = 60
+        rx = x + radius * np.cos(angle)
+        ry = y + radius * np.sin(angle)
+
+        # Determine color based on resource type
+        if resource.is_luxury:
+            color = 'gold'
+        else:
+            color = 'silver'
+
+        # Draw resource
+        ax.scatter(rx, ry, s=80, c=color, marker='D', edgecolors='black',
+                  linewidth=1, alpha=0.8, zorder=2)
+
+        # Add resource name
+        ax.text(rx, ry + 10, resource.name, fontsize=8, ha='center',
+               zorder=3, color='black')
+
+        # Add production info
+        ax.text(rx, ry - 10, f"Prod: {tr.base_production:.1f}", fontsize=6, ha='center',
+               zorder=3, color='black')
+
+    # Get buildings in this territory
+    buildings = self.session.query(Building).filter_by(territory_id=territory_id).all()
+
+    # Draw buildings
+    for i, building in enumerate(buildings):
+        # Calculate position in a circle around territory center
+        angle = 2 * np.pi * i / max(1, len(buildings))
+        radius = 90
+        bx = x + radius * np.cos(angle)
+        by = y + radius * np.sin(angle)
+
+        # Draw building
+        ax.scatter(bx, by, s=70, c='brown', marker='s', edgecolors='black',
+                  linewidth=1, alpha=0.8, zorder=2)
+
+        # Add building name
+        building_name = building.building_type.value.replace('_', ' ').title()
+        ax.text(bx, by + 10, building_name, fontsize=7, ha='center',
+               zorder=3, color='black')
+
+        # Add level info
+        ax.text(bx, by - 10, f"Level: {building.level}", fontsize=6, ha='center',
+               zorder=3, color='black')
+
+    # Set title
+    ax.set_title(f'Territory Map: {territory.name}')
+
+    # Remove axis ticks and labels
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+    # Set axis limits with padding
+    padding = 100
+    ax.set_xlim(x - padding, x + padding)
+    ax.set_ylim(y - padding, y + padding)
+
+    # Save figure to memory
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    plt.close(fig)
+
+    # Convert to base64 string
+    buf.seek(0)
+    img_str = base64.b64encode(buf.read()).decode('utf-8')
+
+    return img_str
+
+def _get_dynasty_colors(self) -> Dict[int, str]:
+    """
+    Get a mapping of dynasty IDs to colors.
+
+    Returns:
+        Dictionary mapping dynasty IDs to color strings
+    """
+    # Get all dynasties
+    dynasties = self.session.query(DynastyDB).all()
+    
+    # Create mapping
+    from models.db_models import DynastyDB
+    dynasty_colors = {}
+
+    for i, dynasty in enumerate(dynasties):
+        # Use predefined colors if available, otherwise generate
+        if i < len(self.dynasty_colors):
+            color = self.dynasty_colors[i]
+        else:
+            # Generate a random color
+            color = '#' + ''.join([f'{int(c*255):02x}' for c in mcolors.hsv_to_rgb([i/len(dynasties), 0.8, 0.8])])
+
+        dynasty_colors[dynasty.id] = color
+
+    return dynasty_colors
 
 
 def save_map_to_static(map_renderer: MapRenderer, filename: str, **kwargs) -> str:

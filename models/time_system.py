@@ -68,6 +68,13 @@ class TimeSystem:
         """
         self.session = session
         
+        # Population growth rates by territory
+        self.population_growth_rates = {
+            1: 0.01,  # 1% growth for level 1
+            2: 0.015, # 1.5% growth for level 2
+            3: 0.02   # 2% growth for level 3
+        }
+        
         # Scheduled events queue
         self.scheduled_events = []
         

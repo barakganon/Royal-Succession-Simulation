@@ -40,24 +40,17 @@ def db(app):
 
 @pytest.fixture(scope='function')
 def session(db, app):
-    """Create a new database session for a test."""
+    """Create a clean database session for each test.
+
+    Flask-SQLAlchemy 3.x removed create_scoped_session. We drop and recreate
+    all tables per test so committed rows from one test never bleed into the next.
+    """
     with app.app_context():
-        connection = db.engine.connect()
-        transaction = connection.begin()
-        
-        # Create a session bound to the connection
-        options = dict(bind=connection, binds={})
-        session = db.create_scoped_session(options=options)
-        
-        # Establish session variables
-        db.session = session
-        
-        yield session
-        
-        # Rollback the transaction and close the connection
-        transaction.rollback()
-        connection.close()
-        session.remove()
+        db.drop_all()
+        db.create_all()
+        yield db.session
+        db.session.rollback()
+        db.session.remove()
 
 
 @pytest.fixture(scope='function')

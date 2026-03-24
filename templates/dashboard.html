@@ -69,40 +69,47 @@
         <div class="card-body">
           {% if dynasties %}
             <div class="list-group">
-              {% for dynasty in dynasties %}
+              {% for dynasties in dynasties %}
                 <div class="list-group-item list-group-item-action">
                   <div class="d-flex w-100 justify-content-between">
-                    <h5 class="mb-1">{{ dynasty.name }}</h5>
-                    <small>Year: {{ dynasty.current_simulation_year }}</small>
+                    <h5 class="mb-1">{{ dynasties.name }}</h5>
+                    <small>Year: {{ dynasties.current_simulation_year }}</small>
                   </div>
-                  <p class="mb-1">Wealth: {{ dynasty.current_wealth }} | Prestige: {{ dynasty.prestige }} | Honor: {{ dynasty.honor }}</p>
-                  <small>Last played: {{ dynasty.last_played_at.strftime('%Y-%m-%d %H:%M') if dynasty.last_played_at else 'Never' }}</small>
+                  <p class="mb-1">Wealth: {{ dynasties.current_wealth }} | Prestige: {{ dynasties.prestige }} | Honor: {{ dynasties.honor }}</p>
+                  <small>Last played: {{ dynasties.last_played_at.strftime('%Y-%m-%d %H:%M') if dynasties.last_played_at else 'Never' }}</small>
                   
-                  <div class="mt-2 d-flex justify-content-between">
-                    <div>
-                      <a href="{{ url_for('view_dynasty', dynasty_id=dynasty.id) }}" class="btn btn-primary btn-sm">
-                        <i data-feather="eye"></i> View
-                      </a>
-                      <a href="{{ url_for('military_view', dynasty_id=dynasty.id) }}" class="btn btn-danger btn-sm">
-                        <i data-feather="shield"></i> Military
-                      </a>
-                      <a href="{{ url_for('diplomacy_view', dynasty_id=dynasty.id) }}" class="btn btn-info btn-sm">
-                        <i data-feather="users"></i> Diplomacy
-                      </a>
-                      <a href="{{ url_for('dynasty_economy', dynasty_id=dynasty.id) }}" class="btn btn-success btn-sm">
-                        <i data-feather="dollar-sign"></i> Economy
-                      </a>
-                      <a href="{{ url_for('time_view', dynasty_id=dynasty.id) }}" class="btn btn-secondary btn-sm">
-                        <i data-feather="clock"></i> Time
-                      </a>
+                  <div class="mt-3">
+                    <div class="row">
+                      <div class="col-12 mb-2">
+                        <a href="{{ url_for('view_dynasty', dynasty_id=dynasties.id) }}" class="btn btn-primary btn-sm">
+                          <i data-feather="eye"></i> View
+                        </a>
+                        <a href="{{ url_for('military_view', dynasty_id=dynasties.id) }}" class="btn btn-danger btn-sm">
+                          <i data-feather="shield"></i> Military
+                        </a>
+                        <a href="{{ url_for('military_gameplay', dynasty_id=dynasties.id) }}" class="btn btn-warning btn-sm">
+                          <i data-feather="target"></i> Military Operations
+                        </a>
+                      </div>
+                      <div class="col-12">
+                        <a href="{{ url_for('diplomacy_view', dynasty_id=dynasties.id) }}" class="btn btn-info btn-sm">
+                          <i data-feather="users"></i> Diplomacy
+                        </a>
+                        <a href="{{ url_for('dynasty_economy', dynasty_id=dynasties.id) }}" class="btn btn-success btn-sm">
+                          <i data-feather="dollar-sign"></i> Economy
+                        </a>
+                        <a href="{{ url_for('time_view', dynasty_id=dynasties.id) }}" class="btn btn-secondary btn-sm">
+                          <i data-feather="clock"></i> Time
+                        </a>
                     </div>
-                    <div>
-                      <a href="{{ url_for('advance_turn', dynasty_id=dynasty.id) }}" class="btn btn-warning btn-sm">
-                        <i data-feather="skip-forward"></i> Advance Turn
-                      </a>
-                      <a href="{{ url_for('delete_dynasty', dynasty_id=dynasty.id) }}" class="btn btn-outline-danger btn-sm">
-                        <i data-feather="trash-2"></i> Delete
-                      </a>
+                      <div class="col-12 mt-2">
+                        <a href="{{ url_for('advance_turn', dynasty_id=dynasties.id) }}" class="btn btn-warning btn-sm">
+                          <i data-feather="skip-forward"></i> Advance Turn
+                        </a>
+                        <a href="{{ url_for('delete_dynasty', dynasty_id=dynasties.id) }}" class="btn btn-outline-danger btn-sm">
+                          <i data-feather="trash-2"></i> Delete
+                        </a>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -113,6 +120,7 @@
               You haven't started any dynasties yet. Time to forge your legacy!
             </div>
           {% endif %}
+          <a href="{{ url_for('generate_initial_map') }}" class="btn btn-primary">Generate Initial Map</a>
         </div>
       </div>
     </div>

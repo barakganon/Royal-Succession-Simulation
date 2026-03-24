@@ -17,8 +17,8 @@ from utils.logging_config import setup_logger
 from sqlalchemy.orm import Session
 
 from models.db_models import (
-    User, DynastyDB, PersonDB, Territory, MilitaryUnit, UnitType, Army, War, DiplomaticRelation, HistoryLogEntryDB,
-    Province
+    User, DynastyDB, PersonDB, Territory, MilitaryUnit, UnitType, Army, War, WarGoal,
+    DiplomaticRelation, TreatyType, HistoryLogEntryDB, Province, BuildingType
 )
 from models.diplomacy_system import DiplomacySystem
 from models.economy_system import EconomySystem
@@ -324,10 +324,10 @@ class GameManager:
                     birth_year=founder_birth_year,
                     is_noble=True,
                     is_monarch=True,
-                    diplomacy_skill=random.randint(3, 8),
+                    diplomatic_skill=random.randint(3, 8),
                     stewardship_skill=random.randint(3, 8),
-                    martial_skill=random.randint(3, 8),
-                    intrigue_skill=random.randint(3, 8)
+                    military_skill=random.randint(3, 8),
+                    espionage_skill=random.randint(3, 8)
                 )
                 self.session.add(founder)
                 self.session.flush()  # Get ID
@@ -378,10 +378,10 @@ class GameManager:
                         birth_year=spouse_birth_year,
                         is_noble=True,
                         is_monarch=False,
-                        diplomacy_skill=random.randint(2, 7),
+                        diplomatic_skill=random.randint(2, 7),
                         stewardship_skill=random.randint(2, 7),
-                        martial_skill=random.randint(2, 7),
-                        intrigue_skill=random.randint(2, 7)
+                        military_skill=random.randint(2, 7),
+                        espionage_skill=random.randint(2, 7)
                     )
                     self.session.add(spouse)
                     self.session.flush()  # Get ID
@@ -472,37 +472,41 @@ class GameManager:
     
     def _assign_ai_personality(self, dynasty_id: int) -> None:
         """
-        Assign an AI personality to a dynasty.
-        
+        Assign an AI personality to a dynasty and persist it to the database.
+
         Args:
             dynasty_id: ID of the AI dynasty
         """
         try:
-            # Get available personality types
-            personality_types = list(self.ai_controllers.keys())
-            
-            # Assign a random personality
-            personality = random.choice(personality_types)
-            
-            # Store the mapping
+            dynasty = self.session.query(DynastyDB).get(dynasty_id)
+            if not dynasty:
+                return
+
+            # Re-use an existing persisted personality so it survives server restarts
+            if dynasty.ai_personality and dynasty.ai_personality in self.ai_controllers:
+                self.dynasty_ai_mapping[dynasty_id] = dynasty.ai_personality
+                return
+
+            personality = random.choice(list(self.ai_controllers.keys()))
             self.dynasty_ai_mapping[dynasty_id] = personality
-            
+            dynasty.ai_personality = personality
+            self.session.commit()
             self.logger.info(f"Assigned {personality} AI personality to dynasty {dynasty_id}")
         except Exception as e:
             self.logger.error(f"Error assigning AI personality: {str(e)}")
-            # Fallback to balanced personality
             self.dynasty_ai_mapping[dynasty_id] = 'balanced'
     
     def load_game(self, dynasty_id: int) -> Dict[str, Any]:
         """
         Load a game state for a specific dynasty.
-        
+
         Args:
             dynasty_id: ID of the dynasty to load
-            
+
         Returns:
             Dictionary with game state information
         """
+        start_time = datetime.datetime.now()
         self.logger.info(f"Loading game state for dynasty ID {dynasty_id}")
         
         # Check if we have a valid cached state
@@ -539,6 +543,9 @@ class GameManager:
             },
             'current_phase': GamePhase.PLANNING.value
         }
+        end_time = datetime.datetime.now()
+        duration = (end_time - start_time).total_seconds()
+        self.logger.info(f"Game state loaded for dynasty ID {dynasty_id} in {duration:.4f} seconds")
         
         # Get current monarch
         monarch = self.session.query(PersonDB).filter_by(
@@ -808,9 +815,12 @@ class GameManager:
                 try:
                     self.logger.info(f"Processing AI turn for dynasty {dynasty.name} (ID: {dynasty.id})")
                     
-                    # Ensure dynasty has an AI personality assigned
+                    # Ensure dynasty has an AI personality assigned (reload from DB if needed)
                     if dynasty.id not in self.dynasty_ai_mapping:
-                        self._assign_ai_personality(dynasty.id)
+                        if dynasty.ai_personality and dynasty.ai_personality in self.ai_controllers:
+                            self.dynasty_ai_mapping[dynasty.id] = dynasty.ai_personality
+                        else:
+                            self._assign_ai_personality(dynasty.id)
                     
                     # Generate AI decisions
                     self._generate_ai_decisions(dynasty.id)
@@ -962,7 +972,12 @@ class GameManager:
     def _make_military_decision(self, dynasty_id: int, risk_tolerance: float) -> None:
         """
         Make a military decision for an AI dynasty based on risk tolerance.
-        
+
+        Actions considered (in priority order):
+        1. Recruit units when wealthy enough.
+        2. Group loose units into an army.
+        3. Declare war if aggressive, wealthy, and militarily stronger than a neighbour.
+
         Args:
             dynasty_id: ID of the AI dynasty
             risk_tolerance: Risk tolerance factor (0-1)
@@ -971,148 +986,227 @@ class GameManager:
             dynasty = self.session.query(DynastyDB).get(dynasty_id)
             if not dynasty:
                 return
-                
+
             self.logger.debug(f"Making military decision for dynasty {dynasty.name}")
-            
-            # Get controlled territories
+
             territories = self.session.query(Territory).filter_by(
                 controller_dynasty_id=dynasty_id
             ).all()
-            
             if not territories:
                 return
-                
-            # Determine wealth threshold based on risk tolerance
-            # Higher risk tolerance = willing to spend more of their wealth
+
+            # --- 1. Recruit units when wealth is above threshold ---
             wealth_threshold = max(50, 100 * (1 - risk_tolerance))
-            
             if dynasty.current_wealth > wealth_threshold:
-                # Choose a territory - prefer capital or high development
-                if random.random() < 0.7:  # 70% chance to choose strategically
-                    # Try to find capital first
-                    capital = next((t for t in territories if t.is_capital), None)
-                    if capital:
-                        territory = capital
-                    else:
-                        # Sort by development level and pick one of the top territories
-                        sorted_territories = sorted(territories, key=lambda t: t.development_level, reverse=True)
-                        territory = sorted_territories[0] if sorted_territories else random.choice(territories)
-                else:
-                    territory = random.choice(territories)
-                
-                # Determine unit type based on risk tolerance
+                capital = next((t for t in territories if t.is_capital), None)
+                territory = capital or sorted(territories, key=lambda t: t.development_level, reverse=True)[0]
+
                 if risk_tolerance > 0.7:
-                    # High risk: prefer offensive units
                     unit_types = [UnitType.LIGHT_CAVALRY, UnitType.HEAVY_CAVALRY, UnitType.KNIGHTS]
-                    weights = [0.4, 0.4, 0.2]  # Weighted choice
+                    weights = [0.4, 0.4, 0.2]
                 elif risk_tolerance > 0.4:
-                    # Medium risk: balanced units
                     unit_types = [UnitType.LEVY_SPEARMEN, UnitType.ARCHERS, UnitType.LIGHT_CAVALRY]
                     weights = [0.3, 0.4, 0.3]
                 else:
-                    # Low risk: prefer defensive units
                     unit_types = [UnitType.LEVY_SPEARMEN, UnitType.ARCHERS]
                     weights = [0.6, 0.4]
-                
+
                 unit_type = random.choices(unit_types, weights=weights, k=1)[0]
-                
-                # Size based on wealth and risk tolerance
-                base_size = 100
-                wealth_factor = min(5, dynasty.current_wealth / 100)
-                size = int(base_size * wealth_factor * (0.5 + risk_tolerance))
-                
-                # Cap size based on wealth
-                max_size = dynasty.current_wealth // 2
-                size = min(size, max_size, 1000)
-                
-                # Recruit unit
-                unit_id = self.military_system.recruit_unit(
+                size = min(int(100 * min(5, dynasty.current_wealth / 100) * (0.5 + risk_tolerance)),
+                           dynasty.current_wealth // 2, 1000)
+                size = max(size, 100)  # minimum viable unit
+
+                success, message, new_unit = self.military_system.recruit_unit(
                     dynasty_id=dynasty_id,
                     unit_type=unit_type,
                     size=size,
                     territory_id=territory.id
                 )
-                
-                if unit_id:
-                    self.logger.info(f"AI dynasty {dynasty.name} recruited {size} {unit_type.value} in {territory.name}")
+                if success:
+                    self.logger.info(f"AI {dynasty.name} recruited {size} {unit_type.value} in {territory.name}")
+                else:
+                    self.logger.debug(f"AI {dynasty.name} recruit failed: {message}")
+
+            # --- 2. Consolidate loose units into an army ---
+            loose_units = self.session.query(MilitaryUnit).filter_by(
+                dynasty_id=dynasty_id, army_id=None
+            ).all()
+            if len(loose_units) >= 2:
+                # Group units that share the same territory
+                by_territory: Dict[int, list] = {}
+                for u in loose_units:
+                    if u.territory_id:
+                        by_territory.setdefault(u.territory_id, []).append(u)
+                for tid, group in by_territory.items():
+                    if len(group) >= 2:
+                        # Find a capable commander in that territory's dynasty
+                        commander = self.session.query(PersonDB).filter_by(
+                            dynasty_id=dynasty_id, is_monarch=False, death_year=None
+                        ).filter(PersonDB.military_skill >= 4).first()
+                        success, msg, army = self.military_system.form_army(
+                            dynasty_id=dynasty_id,
+                            unit_ids=[u.id for u in group],
+                            name=f"{dynasty.name} Host",
+                            commander_id=commander.id if commander else None
+                        )
+                        if success:
+                            self.logger.info(f"AI {dynasty.name} formed army from {len(group)} units")
+                        break  # form at most one army per turn
+
+            # --- 3. Consider declaring war (aggressive dynasties only) ---
+            if risk_tolerance > 0.65 and random.random() < risk_tolerance * 0.3:
+                self._consider_war(dynasty_id, risk_tolerance)
+
         except Exception as e:
-            self.logger.error(f"Error making military decision: {str(e)}")
+            self.logger.error(f"Error making military decision for dynasty {dynasty_id}: {str(e)}")
+
+    def _consider_war(self, dynasty_id: int, risk_tolerance: float) -> None:
+        """
+        Evaluate whether to declare war on a neighbouring dynasty.
+        Only proceeds when the AI has a clear military advantage and is not already at war.
+        """
+        try:
+            dynasty = self.session.query(DynastyDB).get(dynasty_id)
+            if not dynasty:
+                return
+
+            # Do not start a second war while already fighting one
+            active_war = self.session.query(War).filter(
+                ((War.attacker_dynasty_id == dynasty_id) | (War.defender_dynasty_id == dynasty_id)),
+                War.is_active == True
+            ).first()
+            if active_war:
+                return
+
+            # Count own military strength
+            own_units = self.session.query(MilitaryUnit).filter_by(dynasty_id=dynasty_id).all()
+            own_strength = sum(u.size for u in own_units)
+            if own_strength < 200:
+                return  # Too weak to consider war
+
+            # Find a candidate enemy: a neighbour with lower military strength
+            other_dynasties = self.session.query(DynastyDB).filter(
+                DynastyDB.id != dynasty_id, DynastyDB.is_ai_controlled == True
+            ).all()
+            random.shuffle(other_dynasties)
+
+            for target in other_dynasties:
+                target_units = self.session.query(MilitaryUnit).filter_by(dynasty_id=target.id).all()
+                target_strength = sum(u.size for u in target_units)
+
+                # Only attack if we outmatch them by at least 50 %
+                if own_strength < target_strength * 1.5:
+                    continue
+
+                # Pick a target territory to conquer
+                target_territory = self.session.query(Territory).filter_by(
+                    controller_dynasty_id=target.id
+                ).first()
+                if not target_territory:
+                    continue
+
+                success, message, war = self.diplomacy_system.declare_war(
+                    attacker_dynasty_id=dynasty_id,
+                    defender_dynasty_id=target.id,
+                    war_goal=WarGoal.CONQUEST,
+                    target_territory_id=target_territory.id
+                )
+                if success:
+                    self.logger.info(
+                        f"AI {dynasty.name} declared war on {target.name} "
+                        f"(strength {own_strength} vs {target_strength})"
+                    )
+                    dynasty.infamy += 10
+                    self.session.commit()
+                return  # attempt at most one war declaration per turn
+
+        except Exception as e:
+            self.logger.error(f"Error in _consider_war for dynasty {dynasty_id}: {str(e)}")
     
     def _make_diplomacy_decision(self, dynasty_id: int, risk_tolerance: float) -> None:
         """
         Make a diplomacy decision for an AI dynasty based on risk tolerance.
-        
+
+        Diplomatic action types are limited to those defined in
+        DiplomacySystem.diplomatic_action_effects. Treaty proposals and war
+        declarations use the dedicated system methods rather than the generic
+        perform_diplomatic_action path.
+
         Args:
             dynasty_id: ID of the AI dynasty
             risk_tolerance: Risk tolerance factor (0-1)
         """
         try:
-            # Get other dynasties
-            other_dynasties = self.session.query(DynastyDB).filter(
-                DynastyDB.id != dynasty_id
-            ).all()
-            
-            if not other_dynasties:
-                return
-                
             dynasty = self.session.query(DynastyDB).get(dynasty_id)
             if not dynasty:
                 return
-                
+
+            other_dynasties = self.session.query(DynastyDB).filter(
+                DynastyDB.id != dynasty_id
+            ).all()
+            if not other_dynasties:
+                return
+
             self.logger.debug(f"Making diplomacy decision for dynasty {dynasty.name}")
-            
-            # Choose target dynasty - not completely random
-            # Higher chance to target dynasties with existing relations
+
+            # Prefer dynasties we already have a relationship with
             related_ids = self._get_related_dynasties(dynasty_id)
-            
-            if related_ids and random.random() < 0.7:  # 70% chance to focus on existing relations
-                target_dynasty_id = random.choice(related_ids)
-                target_dynasty = self.session.query(DynastyDB).get(target_dynasty_id)
+            if related_ids and random.random() < 0.7:
+                target_dynasty = self.session.query(DynastyDB).get(random.choice(related_ids))
             else:
                 target_dynasty = random.choice(other_dynasties)
-            
-            # Get current relation
-            relation_status, relation_score = self.diplomacy_system.get_relation_status(
-                dynasty_id, target_dynasty.id
-            )
-            
-            # Determine action based on relation and risk tolerance
+
+            if not target_dynasty:
+                return
+
+            _, relation_score = self.diplomacy_system.get_relation_status(dynasty_id, target_dynasty.id)
+
+            # Choose an action using only valid action keys from diplomatic_action_effects
             if relation_score < -50:
-                # Very negative relations
-                if risk_tolerance > 0.7 and random.random() < 0.3:
-                    # High risk: consider war
-                    action_type = "declare_war"
+                # Very hostile — send olive branch or escalate
+                if risk_tolerance > 0.7 and random.random() < 0.25:
+                    action_type = "issue_ultimatum"
                 else:
-                    # Try to improve slightly
                     action_type = "send_envoy"
+
             elif relation_score < 0:
-                # Negative relations
+                # Unfriendly — try to warm relations
                 action_type = random.choice(["send_envoy", "gift"])
+
             elif relation_score < 50:
-                # Neutral relations
+                # Neutral — build goodwill
                 action_type = random.choice(["send_envoy", "gift", "cultural_exchange"])
+
             else:
-                # Positive relations
+                # Friendly — deepen ties or, for aggressive AIs, exploit them
                 if risk_tolerance < 0.3:
-                    # Low risk: consolidate friendship
-                    action_type = random.choice(["gift", "cultural_exchange", "propose_alliance"])
+                    action_type = random.choice(["gift", "cultural_exchange", "royal_education"])
                 else:
-                    # Higher risk: more varied actions
-                    action_type = random.choice(["send_envoy", "gift", "cultural_exchange", "propose_alliance", "request_military_access"])
-            
-            # Execute action
+                    action_type = random.choice(["send_envoy", "gift", "cultural_exchange", "arrange_marriage"])
+
+            # Execute simple diplomatic action
             success, message = self.diplomacy_system.perform_diplomatic_action(
                 actor_dynasty_id=dynasty_id,
                 target_dynasty_id=target_dynasty.id,
                 action_type=action_type
             )
-            
             if success:
-                self.logger.info(f"AI dynasty {dynasty.name} performed {action_type} towards dynasty {target_dynasty.name}")
+                self.logger.info(f"AI {dynasty.name} performed '{action_type}' towards {target_dynasty.name}")
             else:
-                self.logger.warning(f"AI dynasty {dynasty.name} failed to perform {action_type}: {message}")
+                self.logger.debug(f"AI {dynasty.name} diplomatic action '{action_type}' failed: {message}")
+
+            # Separately, consider proposing a non-aggression pact with friendly neighbours
+            if relation_score >= 25 and random.random() < 0.4:
+                ok, msg, _ = self.diplomacy_system.create_treaty(
+                    dynasty1_id=dynasty_id,
+                    dynasty2_id=target_dynasty.id,
+                    treaty_type=TreatyType.NON_AGGRESSION
+                )
+                if ok:
+                    self.logger.info(f"AI {dynasty.name} signed non-aggression pact with {target_dynasty.name}")
+
         except Exception as e:
-            self.logger.error(f"Error making diplomacy decision: {str(e)}")
+            self.logger.error(f"Error making diplomacy decision for dynasty {dynasty_id}: {str(e)}")
     
     def _make_economy_decision(self, dynasty_id: int, risk_tolerance: float) -> None:
         """
@@ -1168,7 +1262,7 @@ class GameManager:
                     # Choose building type based on risk tolerance
                     if risk_tolerance > 0.7:
                         # High risk: military buildings
-                        building_types = [BuildingType.BARRACKS, BuildingType.WALLS, BuildingType.WATCHTOWER]
+                        building_types = [BuildingType.BARRACKS, BuildingType.FORTRESS, BuildingType.TRAINING_GROUND]
                     elif risk_tolerance > 0.4:
                         # Medium risk: balanced buildings
                         building_types = [BuildingType.MARKET, BuildingType.FARM, BuildingType.MINE, BuildingType.BARRACKS]
