@@ -74,6 +74,9 @@ class DynastyDB(db.Model):
     capital_territory_id = db.Column(db.Integer, db.ForeignKey('territory.id'), nullable=True)
     capital = db.relationship('Territory', foreign_keys=[capital_territory_id])
 
+    # Procedural SVG coat of arms — generated at dynasty creation, stored as SVG string
+    coat_of_arms_svg = db.Column(db.Text, nullable=True)
+
     # Relationships to related simulation data for this dynasty
     # 'dynamic' allows for querying, e.g., dynasty.persons.filter_by(...).all()
     # 'cascade="all, delete-orphan"' means if a DynastyDB is deleted, its associated persons and history logs are also deleted.

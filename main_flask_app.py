@@ -43,6 +43,7 @@ from visualization.military_renderer import MilitaryRenderer
 from visualization.diplomacy_renderer import DiplomacyRenderer
 from visualization.economy_renderer import EconomyRenderer
 from visualization.time_renderer import TimeRenderer
+from visualization.heraldry_renderer import generate_coat_of_arms
 
 # Import theme utilities
 from utils.theme_manager import load_cultural_themes, get_all_theme_names, generate_theme_from_story_llm, get_theme
@@ -212,6 +213,14 @@ def create_dynasty():
             logger.error(f"Error creating dynasty '{dynasty_name}': {e}")
             flash("An error occurred while creating the dynasty.", "danger")
             return redirect(url_for('create_dynasty'))
+
+        # Generate and store procedural coat of arms
+        try:
+            new_dynasty.coat_of_arms_svg = generate_coat_of_arms(new_dynasty.id, new_dynasty.name)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to generate coat of arms for dynasty {new_dynasty.id}: {e}")
 
         # Initialize founder and spouse
         initialize_dynasty_founder(new_dynasty.id, theme_config, start_year, succession_rule)
@@ -3216,6 +3225,29 @@ def generate_family_tree_visualization(dynasty: DynastyDB, theme_config: dict):
         return False
 
 
+# --- Backfill coat of arms for existing dynasties ---
+def backfill_coat_of_arms():
+    """Generate coat of arms SVG for any dynasty that does not yet have one.
+
+    Called once at startup; safe to re-run (guarded by None check).
+    """
+    try:
+        dynasties_without_arms = DynastyDB.query.filter(DynastyDB.coat_of_arms_svg == None).all()  # noqa: E711
+        if not dynasties_without_arms:
+            return
+        logger.info(f"Backfilling coat of arms for {len(dynasties_without_arms)} dynasty/dynasties.")
+        for dynasty in dynasties_without_arms:
+            try:
+                dynasty.coat_of_arms_svg = generate_coat_of_arms(dynasty.id, dynasty.name)
+            except Exception as e:
+                logger.error(f"Failed to backfill coat of arms for dynasty {dynasty.id}: {e}")
+        db.session.commit()
+        logger.info("Coat of arms backfill complete.")
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Coat of arms backfill failed: {e}")
+
+
 # --- Initialize Test User ---
 def initialize_test_user():
     """Initialize a test user in the database if it doesn't exist."""
@@ -3288,7 +3320,10 @@ if __name__ == '__main__':
             
             # Initialize test user
             initialize_test_user()
-            
+
+            # Backfill coat of arms for existing dynasties that lack one
+            backfill_coat_of_arms()
+
             logger.info("Database initialization completed.")
 
         # Pre-load themes from JSON file into theme_manager when app starts
