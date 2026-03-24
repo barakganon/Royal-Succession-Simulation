@@ -59,6 +59,38 @@
     </div>
   </div>
 
+  <!-- AI Advisor Panel -->
+  {% for dynasties in dynasties %}
+  <div id="advisor-panel-{{ dynasties.id }}" class="card mb-3 border-warning" style="display:none;">
+    <div class="card-header d-flex justify-content-between align-items-center bg-warning bg-opacity-10">
+      <strong>&#9876; Hand of the King &mdash; Counsel for {{ dynasties.name }}</strong>
+      <button type="button" class="btn-close" onclick="document.getElementById('advisor-panel-{{ dynasties.id }}').style.display='none'"></button>
+    </div>
+    <div class="card-body" id="advisor-suggestions-{{ dynasties.id }}">
+      <p class="text-muted">Loading counsel...</p>
+    </div>
+  </div>
+  <script>
+  (function() {
+    var dynastyId = {{ dynasties.id }};
+    var panel = document.getElementById('advisor-panel-' + dynastyId);
+    var container = document.getElementById('advisor-suggestions-' + dynastyId);
+    fetch('/game/' + dynastyId + '/advisor')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.suggestions && data.suggestions.length) {
+          var html = '<ol>';
+          data.suggestions.forEach(function(s) { html += '<li>' + s + '</li>'; });
+          html += '</ol>';
+          container.innerHTML = html;
+          panel.style.display = '';
+        }
+      })
+      .catch(function() { /* silently hide on error */ });
+  })();
+  </script>
+  {% endfor %}
+
   <!-- Your Dynasties Section -->
   <div class="row mb-4">
     <div class="col-md-8">
