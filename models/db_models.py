@@ -974,4 +974,21 @@ class Siege(db.Model):
         status = "Active" if self.is_active else ("Successful" if self.successful else "Failed")
         return f"<Siege (ID: {self.id}, Territory: {self.territory_id}, Progress: {self.progress:.1f}, {status})>"
 
-print("models.db_models defined (User, DynastyDB, PersonDB, HistoryLogEntryDB, Region, Province, Territory, Settlement, Resource, TerritoryResource, Building, TradeRoute, MilitaryUnit, Army, DiplomaticRelation, Treaty, War, Battle, Siege).")
+class ChronicleEntryDB(db.Model):
+    """Stores LLM-narrated chronicle entries, one per turn per game."""
+    __tablename__ = 'chronicle_entry'
+
+    id = db.Column(db.Integer, primary_key=True)
+    game_id = db.Column(db.Integer, db.ForeignKey('dynasty.id'), nullable=False)
+    turn = db.Column(db.Integer, nullable=False)
+    year = db.Column(db.Integer, nullable=False)
+    text = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
+    dynasty = db.relationship('DynastyDB', foreign_keys=[game_id])
+
+    def __repr__(self):
+        return f"<ChronicleEntryDB (GameID: {self.game_id}, Turn: {self.turn}, Year: {self.year})>"
+
+
+print("models.db_models defined (User, DynastyDB, PersonDB, HistoryLogEntryDB, Region, Province, Territory, Settlement, Resource, TerritoryResource, Building, TradeRoute, MilitaryUnit, Army, DiplomaticRelation, Treaty, War, Battle, Siege, ChronicleEntryDB).")
