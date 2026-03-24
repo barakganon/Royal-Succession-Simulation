@@ -480,7 +480,7 @@
             var negotiatePeaceForm = document.getElementById('negotiatePeaceForm');
             
             targetDynastyNameSpan.textContent = dynastyName;
-            negotiatePeaceForm.action = "{{ url_for('negotiate_peace', dynasty_id=dynasty.id) }}/" + warId;
+            negotiatePeaceForm.action = "{{ url_for('negotiate_peace', dynasty_id=dynasty.id, war_id=0) }}".replace('/0', '/') + warId;
         });
     });
 </script>
