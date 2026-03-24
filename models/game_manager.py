@@ -25,6 +25,7 @@ from models.economy_system import EconomySystem
 from models.map_system import MapGenerator, TerritoryManager, MovementSystem, BorderSystem
 from models.military_system import MilitarySystem
 from models.time_system import TimeSystem, GamePhase
+from models.ai_controller import AIController
 
 
 class GameManager:
@@ -91,8 +92,11 @@ class GameManager:
             }
         }
         
-        # Dynasty to AI controller mapping
+        # Dynasty to AI controller mapping (personality-type strings for legacy logic)
         self.dynasty_ai_mapping = {}
+
+        # Personality-driven AIController instances keyed by dynasty_id
+        self._ai_controller_instances: Dict[int, AIController] = {}
         
         # Game state cache with TTL and invalidation tracking
         self.game_state_cache = {
@@ -495,7 +499,82 @@ class GameManager:
         except Exception as e:
             self.logger.error(f"Error assigning AI personality: {str(e)}")
             self.dynasty_ai_mapping[dynasty_id] = 'balanced'
-    
+
+    def register_ai_dynasties(self, user_id: Optional[int] = None) -> int:
+        """Create one :class:`~models.ai_controller.AIController` per non-human dynasty.
+
+        Should be called once after game creation (or on server startup) so
+        that every AI dynasty has a personality-driven controller ready for
+        :meth:`process_ai_turns`.
+
+        If *user_id* is supplied, only that user's AI dynasties are registered;
+        otherwise all AI dynasties in the database are registered.
+
+        Dynasties that already have an ``AIController`` in
+        ``_ai_controller_instances`` are skipped so this method is safe to call
+        multiple times.
+
+        Returns:
+            Number of controllers registered during this call.
+        """
+        import json as _json
+        import os as _os
+
+        # Load predefined personality strings from the themes file
+        personalities: List[str] = []
+        themes_path = _os.path.join(
+            _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
+            'themes', 'cultural_themes.json'
+        )
+        try:
+            with open(themes_path, 'r', encoding='utf-8') as fh:
+                themes_data = _json.load(fh)
+            personalities = themes_data.get('ai_personalities', [])
+        except Exception as exc:
+            self.logger.warning(f"Could not load ai_personalities from themes file: {exc}")
+
+        if not personalities:
+            personalities = [
+                "This dynasty seeks to expand its power through any means necessary.",
+                "This dynasty values trade and diplomacy above military conquest.",
+                "This dynasty defends its borders fiercely but never strikes first.",
+            ]
+
+        try:
+            query = self.session.query(DynastyDB).filter_by(is_ai_controlled=True)
+            if user_id is not None:
+                query = query.filter_by(user_id=user_id)
+            ai_dynasties = query.all()
+        except Exception as exc:
+            self.logger.error(f"register_ai_dynasties: DB query failed: {exc}")
+            return 0
+
+        registered = 0
+        for dynasty in ai_dynasties:
+            if dynasty.id in self._ai_controller_instances:
+                continue  # already registered
+
+            # Pick a personality: prefer what is stored on the dynasty record,
+            # otherwise assign a random one from the predefined list.
+            personality_str: str = dynasty.ai_personality or ''
+            if not personality_str or personality_str in self.ai_controllers:
+                # The stored value is a legacy type key (aggressive/diplomatic/…),
+                # not a sentence — replace it with a proper personality string.
+                personality_str = personalities[dynasty.id % len(personalities)]
+
+            controller = AIController(
+                session=self.session,
+                dynasty_id=dynasty.id,
+                personality=personality_str,
+            )
+            self._ai_controller_instances[dynasty.id] = controller
+            registered += 1
+            self.logger.info(
+                f"Registered AIController for dynasty '{dynasty.name}' (ID {dynasty.id})"
+            )
+
+        return registered
+
     def load_game(self, dynasty_id: int) -> Dict[str, Any]:
         """
         Load a game state for a specific dynasty.
@@ -811,20 +890,30 @@ class GameManager:
             success_count = 0
             error_count = 0
             
+            # Ensure all AI dynasties have personality-driven controllers
+            self.register_ai_dynasties(user_id=user_id)
+
             for dynasty in ai_dynasties:
                 try:
                     self.logger.info(f"Processing AI turn for dynasty {dynasty.name} (ID: {dynasty.id})")
-                    
-                    # Ensure dynasty has an AI personality assigned (reload from DB if needed)
-                    if dynasty.id not in self.dynasty_ai_mapping:
-                        if dynasty.ai_personality and dynasty.ai_personality in self.ai_controllers:
-                            self.dynasty_ai_mapping[dynasty.id] = dynasty.ai_personality
-                        else:
-                            self._assign_ai_personality(dynasty.id)
-                    
-                    # Generate AI decisions
-                    self._generate_ai_decisions(dynasty.id)
-                    
+
+                    # --- Personality-driven decisions via AIController ---
+                    controller = self._ai_controller_instances.get(dynasty.id)
+                    if controller is not None:
+                        game_state = controller._build_game_state()
+                        controller.decide_diplomacy(game_state)
+                        controller.decide_military(game_state)
+                        controller.decide_economy(game_state)
+                        controller.decide_character(game_state)
+                    else:
+                        # Fallback: legacy rule-based decisions
+                        if dynasty.id not in self.dynasty_ai_mapping:
+                            if dynasty.ai_personality and dynasty.ai_personality in self.ai_controllers:
+                                self.dynasty_ai_mapping[dynasty.id] = dynasty.ai_personality
+                            else:
+                                self._assign_ai_personality(dynasty.id)
+                        self._generate_ai_decisions(dynasty.id)
+
                     # Process turn
                     turn_success, turn_message = self.time_system.process_turn(dynasty.id)
                     

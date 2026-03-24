@@ -1,4 +1,11 @@
 {
+  "ai_personalities": [
+    "House Vane is paranoid and expansionist — always assumes neighbours are plotting and strikes first.",
+    "House Aurelius is patient and mercantile — prefers trade alliances over war, but is ruthless when threatened.",
+    "House Brennan is honourable and defensive — never starts wars but never surrenders territory.",
+    "House Kestrel is cunning and opportunistic — switches alliances to maximise short-term gain.",
+    "House Solberg is pious and isolationist — avoids foreign entanglements, focuses on domestic growth."
+  ],
   "MEDIEVAL_EUROPEAN": {
     "description": "A classic European aristocratic family, navigating feudal politics, chivalry, and dynastic marriages.",
     "start_year_suggestion": 1000,
