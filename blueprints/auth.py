@@ -5,6 +5,9 @@ from flask_login import login_user, logout_user, login_required, current_user
 
 from models.db_models import db, User, DynastyDB, HistoryLogEntryDB, Territory, Battle, Treaty
 from models.game_manager import GameManager
+from utils.logging_config import setup_logger
+
+logger = setup_logger('royal_succession.auth')
 
 auth = Blueprint('auth', __name__)
 
@@ -50,8 +53,7 @@ def register():
         except Exception as e_register:
             db.session.rollback()
             flash(f'Error creating account: {e_register}. Please try again.', 'danger')
-            import logging
-            logging.getLogger('royal_succession.flask').error(f"ERROR during registration commit: {e_register}")
+            logger.error(f"ERROR during registration commit: {e_register}")
 
     return render_template('register.html', title='Register')
 
