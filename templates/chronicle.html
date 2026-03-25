@@ -1,28 +1,87 @@
 {% extends "base.html" %}
-{% block title %}Chronicle of {{ dynasty.name }}{% endblock %}
+{% block title %}Chronicle of {{ dynasty.name }} — Dynasty Saga{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-  <h1>Chronicle of House {{ dynasty.name }}</h1>
-  <p class="text-muted">The official annals of your dynasty, turn by turn.</p>
-  <hr>
+<div class="container py-4">
+
+  <!-- ── Breadcrumb ── -->
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('auth.dashboard') }}">Dashboard</a></li>
+      <li class="breadcrumb-item"><a href="{{ url_for('dynasty.view_dynasty', dynasty_id=dynasty.id) }}">{{ dynasty.name }}</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Chronicle</li>
+    </ol>
+  </nav>
+
+  <!-- ── Page header ── -->
+  <div class="text-center mb-4">
+    {% if dynasty.coat_of_arms_svg %}
+    <div class="mx-auto mb-3" style="width:72px;height:88px;">
+      {{ dynasty.coat_of_arms_svg | safe }}
+    </div>
+    {% endif %}
+    <h1 style="font-family:'Cinzel',serif;color:var(--gold);">Chronicle of House {{ dynasty.name }}</h1>
+    <p style="font-family:'Crimson Text',serif;font-style:italic;color:var(--text-muted);font-size:1.05rem;">
+      The official annals of your dynasty, recorded turn by turn.
+    </p>
+    <hr class="section-divider">
+  </div>
+
   {% if entries %}
-    {% for entry in entries %}
-    <div class="card mb-3">
-      <div class="card-header">
-        <strong>Year {{ entry.year }}</strong>
-        <span class="text-muted float-right">Turn {{ entry.turn }}</span>
+
+  <!-- ── Entry cards ── -->
+  <div class="row justify-content-center">
+    <div class="col-lg-9">
+      {% for entry in entries %}
+      <div class="card mb-4" style="border-left:3px solid var(--gold);">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span style="font-family:'Cinzel',serif;font-size:.95rem;color:var(--gold);">
+            &#128240; Year {{ entry.year }}
+          </span>
+          <span class="badge badge-secondary" style="font-family:'Crimson Text',serif;font-size:.8rem;">
+            Turn {{ entry.turn }}
+          </span>
+        </div>
+        <div class="card-body">
+          <p class="card-text mb-0"
+             style="font-family:'Crimson Text',serif;font-size:1.08rem;line-height:1.7;font-style:italic;color:var(--text-light);">
+            {{ entry.text }}
+          </p>
+        </div>
       </div>
-      <div class="card-body">
-        <p class="card-text font-italic">{{ entry.text }}</p>
-      </div>
+      {% endfor %}
     </div>
-    {% endfor %}
+  </div>
+
   {% else %}
-    <div class="alert alert-info">
-      No chronicle entries yet. Complete a turn to begin your dynasty's history.
+
+  <!-- ── Empty state ── -->
+  <div class="row justify-content-center">
+    <div class="col-lg-6">
+      <div class="card text-center py-5">
+        <div class="card-body">
+          <div style="font-size:3rem;margin-bottom:1rem;color:var(--gold);opacity:.6;">&#128240;</div>
+          <h4 style="font-family:'Cinzel',serif;color:var(--gold);">The Pages Are Blank</h4>
+          <p style="font-family:'Crimson Text',serif;font-style:italic;color:var(--text-muted);font-size:1.05rem;">
+            No chronicle entries yet. Complete a turn to begin your dynasty's history.
+          </p>
+          <a href="{{ url_for('dynasty.advance_turn', dynasty_id=dynasty.id) }}"
+             class="btn btn-success mt-2">
+            &#9654; Advance Turn
+          </a>
+        </div>
+      </div>
     </div>
+  </div>
+
   {% endif %}
-  <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+
+  <!-- ── Back button ── -->
+  <div class="text-center mt-3 mb-5">
+    <a href="{{ url_for('dynasty.view_dynasty', dynasty_id=dynasty.id) }}" class="btn btn-outline-secondary">
+      &#8592; Back to {{ dynasty.name }}
+    </a>
+  </div>
+
 </div>
 {% endblock %}

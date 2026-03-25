@@ -61,18 +61,18 @@ class TestFlaskApp:
         """Test that the login page loads correctly."""
         response = client.get('/login')
         assert response.status_code == 200
-        assert b'Login' in response.data
-        assert b'Username' in response.data
-        assert b'Password' in response.data
+        assert b'Enter the Realm' in response.data
+        assert b'username' in response.data  # input name attribute
+        assert b'password' in response.data  # input name attribute
 
     def test_register_page(self, client):
         """Test that the register page loads correctly."""
         response = client.get('/register')
         assert response.status_code == 200
-        assert b'Register' in response.data
-        assert b'Username' in response.data
+        assert b'Pledge Your Name' in response.data
+        assert b'username' in response.data  # input name attribute
         assert b'Email' in response.data
-        assert b'Password' in response.data
+        assert b'password' in response.data  # input name attribute
 
     def test_login_functionality(self, client, app):
         """Test the login functionality."""

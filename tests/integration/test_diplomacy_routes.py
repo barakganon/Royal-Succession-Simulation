@@ -86,7 +86,7 @@ class TestDiplomacyAuthGuards:
 
     def test_diplomacy_view_unauthenticated_goes_to_login(self, plain_client):
         response = plain_client.get('/dynasty/1/diplomacy', follow_redirects=True)
-        assert b'Log In' in response.data
+        assert b'Enter the Realm' in response.data
 
     def test_treaties_unauthenticated_redirects(self, plain_client):
         response = plain_client.get('/dynasty/1/treaties', follow_redirects=False)
@@ -94,7 +94,7 @@ class TestDiplomacyAuthGuards:
 
     def test_treaties_unauthenticated_goes_to_login(self, plain_client):
         response = plain_client.get('/dynasty/1/treaties', follow_redirects=True)
-        assert b'Log In' in response.data
+        assert b'Enter the Realm' in response.data
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "skills": {
+    "ai-game-art-generation": {
+      "source": "omer-metin/skills-for-antigravity",
+      "sourceType": "github",
+      "computedHash": "e1d0cc5dd30126348c9db8b97c7965c8e9a81c7f07030afa4745f597d7493e52"
+    },
+    "brainstorming": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "computedHash": "963807d5bb323fbfad4dd5110b920c5bc45859e5eab06f2574e709c593a884c8"
+    },
+    "character-design": {
+      "source": "omer-metin/skills-for-antigravity",
+      "sourceType": "github",
+      "computedHash": "4a7b9636547a0d4d5cd396aa0a4e6df73532f200147a58e1961c974647d91112"
+    },
+    "elevenlabs-music": {
+      "source": "inferen-sh/skills",
+      "sourceType": "github",
+      "computedHash": "1c5e90ff78fb564cd97a1c381d96f78dcbdf708307b6f4a7d124b57e629a5698"
+    },
+    "elevenlabs-tts": {
+      "source": "inferen-sh/skills",
+      "sourceType": "github",
+      "computedHash": "d4f43c5fa865590bf0b8f70994b1901022ce21cba1f45ff373bf60ed96a5433c"
+    },
+    "find-skills": {
+      "source": "vercel-labs/skills",
+      "sourceType": "github",
+      "computedHash": "d31e234f0c90694a670222cdd1dafa853e051d7066beda389f1097c22dadd461"
+    },
+    "flask-python": {
+      "source": "mindrally/skills",
+      "sourceType": "github",
+      "computedHash": "7e55af409afc150c883017cbd8ee290d480b3f8013aab813db40868829707369"
+    },
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "computedHash": "063a0e6448123cd359ad0044cc46b0e490cc7964d45ef4bb9fd842bd2ffbca67"
+    },
+    "game-ui-design": {
+      "source": "omer-metin/skills-for-antigravity",
+      "sourceType": "github",
+      "computedHash": "cff8acaf58f3f4255f76fb962775fb1a2fec1fce49a54a50bde2c1efd5eb33ec"
+    },
+    "openai-image-gen": {
+      "source": "0xbigboss/claude-code",
+      "sourceType": "github",
+      "computedHash": "956c160a645d8ad68d2503542ffa58dda28f71af27aea810c9ec0fb217765f02"
+    },
+    "pdf": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "computedHash": "cfbc539377088ca7e44a813b30c306327385bbd973cd7a721e1743f60837dd62"
+    },
+    "pixel-art-sprites": {
+      "source": "omer-metin/skills-for-antigravity",
+      "sourceType": "github",
+      "computedHash": "6d7f3d45af2fa94e0fe9abe08575e859aa0f24297305ee8b89ac64a7534c9825"
+    },
+    "pytest": {
+      "source": "bobmatnyc/claude-mpm-skills",
+      "sourceType": "github",
+      "computedHash": "91ee61c66315a02b9fd3165488604f20d84a1f55cfbeedbbb35c6d0b6fc5e1e3"
+    },
+    "python-code-quality": {
+      "source": "laurigates/claude-plugins",
+      "sourceType": "github",
+      "computedHash": "700c42b27d3c7686a71828f65dd8b141fcd56e264905a7bd4761d11ca8bc0c37"
+    },
+    "sqlalchemy-orm": {
+      "source": "bobmatnyc/claude-mpm-skills",
+      "sourceType": "github",
+      "computedHash": "b3e79184c5ac53544551e38ee2906cb1e7d62d6ed9debbbf6f30f86f17e8dfa1"
+    },
+    "stable-diffusion-image-generation": {
+      "source": "davila7/claude-code-templates",
+      "sourceType": "github",
+      "computedHash": "5255b6e2dc1394c3a043092715f8b02a3dbf228bafbe0b2fb972b21882517328"
+    },
+    "ui-ux-pro-max": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "computedHash": "0a413bf988d06481f69bb81df2070741c3ba12dd9f1be2706d57f259c905992d"
+    },
+    "vercel-react-best-practices": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "computedHash": "bbc31a48537b473ff4feea6360ef0de3bfdcbef26c14f4967a5deefe8ca801d3"
+    }
+  }
+}

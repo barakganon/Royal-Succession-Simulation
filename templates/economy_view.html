@@ -9,7 +9,7 @@
   <nav aria-label="breadcrumb" class="mt-1">
     <ol class="breadcrumb">
       <li class="breadcrumb-item"><a href="{{ url_for('auth.dashboard') }}">Dashboard</a></li>
-      <li class="breadcrumb-item"><a href="{{ url_for('view_dynasty', dynasty_id=dynasty.id) }}">{{ dynasty.name }}</a></li>
+      <li class="breadcrumb-item"><a href="{{ url_for('dynasty.view_dynasty', dynasty_id=dynasty.id) }}">{{ dynasty.name }}</a></li>
       <li class="breadcrumb-item active" aria-current="page">Economy</li>
     </ol>
   </nav>
@@ -22,8 +22,8 @@
     <h1 class="page-title">&#128176; {{ dynasty.name }} — Economy</h1>
     <span class="badge badge-secondary ml-2">Year {{ dynasty.current_simulation_year }}</span>
     <div class="ml-auto d-flex" style="gap:.4rem;">
-      <a href="{{ url_for('view_dynasty', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-secondary">&#8592; Dynasty</a>
-      <a href="{{ url_for('advance_turn', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-success">&#9654; Advance Turn</a>
+      <a href="{{ url_for('dynasty.view_dynasty', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-secondary">&#8592; Dynasty</a>
+      <a href="{{ url_for('dynasty.advance_turn', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-success">&#9654; Advance Turn</a>
     </div>
   </div>
     
@@ -162,7 +162,7 @@
                                 <tbody>
                                     {% for territory in economy_data.territories %}
                                     <tr>
-                                        <td><a href="{{ url_for('territory_details', territory_id=territory.id) }}">{{ territory.name }}</a></td>
+                                        <td><a href="{{ url_for('map.territory_details', territory_id=territory.id) }}">{{ territory.name }}</a></td>
                                         <td>{{ territory.development_level }}</td>
                                         <td>{{ territory.population }}</td>
                                         <td>{{ territory.tax_income|int }} Gold</td>
@@ -172,12 +172,12 @@
                                                     Actions
                                                 </button>
                                                 <div class="dropdown-menu">
-                                                    <a class="dropdown-item" href="{{ url_for('territory_economy', territory_id=territory.id) }}">View Economy</a>
+                                                    <a class="dropdown-item" href="{{ url_for('economy.territory_economy', territory_id=territory.id) }}">View Economy</a>
                                                     <button class="dropdown-item" data-toggle="modal" data-target="#constructBuildingModal" 
                                                             data-territory-id="{{ territory.id }}" data-territory-name="{{ territory.name }}">
                                                         Construct Building
                                                     </button>
-                                                    <form action="{{ url_for('develop_territory_economy', dynasty_id=dynasty.id, territory_id=territory.id) }}" method="post">
+                                                    <form action="{{ url_for('economy.develop_territory_economy', dynasty_id=dynasty.id, territory_id=territory.id) }}" method="post">
                                                         <button type="submit" class="dropdown-item">Develop Territory</button>
                                                     </form>
                                                 </div>
@@ -224,7 +224,7 @@
                                         <td>{{ route.amount }}</td>
                                         <td>{{ route.profit|int }} Gold</td>
                                         <td>
-                                            <form action="{{ url_for('cancel_trade', dynasty_id=dynasty.id, trade_route_id=route.id) }}" method="post">
+                                            <form action="{{ url_for('economy.cancel_trade', dynasty_id=dynasty.id, trade_route_id=route.id) }}" method="post">
                                                 <button type="submit" class="btn btn-sm btn-danger">Cancel</button>
                                             </form>
                                         </td>
@@ -282,7 +282,7 @@
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
-                <form action="{{ url_for('construct_building', dynasty_id=dynasty.id) }}" method="post">
+                <form action="{{ url_for('economy.construct_building', dynasty_id=dynasty.id) }}" method="post">
                     <div class="modal-body">
                         <input type="hidden" name="territory_id" id="territoryId">
                         <p>Construct a new building in <span id="territoryName"></span>.</p>
@@ -324,7 +324,7 @@
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
-                <form action="{{ url_for('establish_trade', dynasty_id=dynasty.id) }}" method="post">
+                <form action="{{ url_for('economy.establish_trade', dynasty_id=dynasty.id) }}" method="post">
                     <div class="modal-body">
                         <div class="form-group">
                             <label for="targetDynasty">Trade Partner</label>

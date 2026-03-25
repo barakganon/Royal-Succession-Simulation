@@ -755,6 +755,55 @@ hr {
   border-color: var(--dark-border);
 }
 
+/* ── Turn Report ── */
+.turn-report-stat {
+  background-color: var(--dark-card);
+  border: 1px solid var(--dark-border);
+  border-top: 3px solid var(--gold);
+  border-radius: 6px;
+  padding: 1rem;
+  text-align: center;
+  margin-bottom: 1rem;
+}
+.turn-report-stat .turn-stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  font-family: 'Cinzel', serif;
+  color: var(--gold);
+  line-height: 1.1;
+}
+.turn-report-stat .turn-stat-label {
+  font-size: .75rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-muted);
+  margin-top: .2rem;
+}
+
+/* Turn report event list — reuses .event-item from Sprint 6B but adds
+   a flex layout that works without the absolute-positioned icon of the
+   standard event timeline. */
+.turn-report-event-list .event-item {
+  display: flex;
+  align-items: flex-start;
+  gap: .55rem;
+  padding: .45rem 0;
+  border-bottom: 1px solid var(--dark-border);
+  position: static;   /* override absolute positioning from base rule */
+  margin-bottom: 0;
+}
+.turn-report-event-list .event-item:last-child {
+  border-bottom: none;
+}
+.turn-report-event-list .event-item .event-icon {
+  position: static;   /* override absolute from base rule */
+  font-size: 1rem;
+  flex-shrink: 0;
+  min-width: 1.4rem;
+  text-align: center;
+  line-height: 1.6;
+}
+
 /* ── Responsive adjustments ── */
 @media (max-width: 768px) {
   body {

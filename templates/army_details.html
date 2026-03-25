@@ -28,7 +28,7 @@
                     {% endif %}
                     
                     {% if army.territory_id %}
-                    <p><strong>Location:</strong> <a href="{{ url_for('territory_details', territory_id=army.territory_id) }}">{{ army.current_territory.name }}</a></p>
+                    <p><strong>Location:</strong> <a href="{{ url_for('map.territory_details', territory_id=army.territory_id) }}">{{ army.current_territory.name }}</a></p>
                     {% else %}
                     <p><strong>Location:</strong> <span class="text-muted">Not deployed</span></p>
                     {% endif %}
@@ -152,7 +152,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form action="{{ url_for('assign_commander', dynasty_id=dynasty.id) }}" method="post">
+                <form action="{{ url_for('military.assign_commander', dynasty_id=dynasty.id) }}" method="post">
                     <input type="hidden" name="army_id" value="{{ army.id }}">
                     
                     <div class="form-group mb-3">
@@ -182,7 +182,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form action="{{ url_for('move_army', dynasty_id=dynasty.id) }}" method="post">
+                <form action="{{ url_for('military.move_army', dynasty_id=dynasty.id) }}" method="post">
                     <input type="hidden" name="army_id" value="{{ army.id }}">
                     
                     <div class="form-group mb-3">
@@ -216,7 +216,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form action="{{ url_for('initiate_siege', dynasty_id=dynasty.id) }}" method="post">
+                <form action="{{ url_for('military.initiate_siege', dynasty_id=dynasty.id) }}" method="post">
                     <input type="hidden" name="army_id" value="{{ army.id }}">
                     <input type="hidden" name="territory_id" value="{{ army.territory_id }}">
                     

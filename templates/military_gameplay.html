@@ -20,7 +20,7 @@
                     <p><strong>Phase:</strong> <span class="badge bg-primary">{{ current_phase }}</span></p>
                     
                     <div class="d-grid gap-2 mt-3">
-                        <a href="{{ url_for('military_view', dynasty_id=dynasty.id) }}" class="btn btn-secondary">Military Management</a>
+                        <a href="{{ url_for('military.military_view', dynasty_id=dynasty.id) }}" class="btn btn-secondary">Military Management</a>
                         <button id="endTurnBtn" class="btn btn-danger">End Turn</button>
                     </div>
                 </div>

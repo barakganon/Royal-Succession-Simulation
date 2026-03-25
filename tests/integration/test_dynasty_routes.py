@@ -91,7 +91,7 @@ class TestDynastyAuthGuards:
 
     def test_create_dynasty_unauthenticated_goes_to_login(self, plain_client):
         response = plain_client.get('/dynasty/create', follow_redirects=True)
-        assert b'Log In' in response.data
+        assert b'Enter the Realm' in response.data
 
     def test_view_dynasty_unauthenticated_redirects(self, plain_client):
         response = plain_client.get('/dynasty/1/view', follow_redirects=False)
@@ -99,7 +99,7 @@ class TestDynastyAuthGuards:
 
     def test_dashboard_protected(self, plain_client):
         response = plain_client.get('/dashboard', follow_redirects=True)
-        assert b'Log In' in response.data
+        assert b'Enter the Realm' in response.data
 
 
 # ---------------------------------------------------------------------------

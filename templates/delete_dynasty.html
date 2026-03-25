@@ -33,9 +33,9 @@
                         <li>All dynasty settings and properties</li>
                     </ul>
                     
-                    <form method="POST" action="{{ url_for('delete_dynasty', dynasty_id=dynasty.id) }}">
+                    <form method="POST" action="{{ url_for('dynasty.delete_dynasty', dynasty_id=dynasty.id) }}">
                         <div class="d-flex justify-content-between mt-4">
-                            <a href="{{ url_for('view_dynasty', dynasty_id=dynasty.id) }}" class="btn btn-secondary">
+                            <a href="{{ url_for('dynasty.view_dynasty', dynasty_id=dynasty.id) }}" class="btn btn-secondary">
                                 <i class="fas fa-arrow-left"></i> Cancel
                             </a>
                             <button type="submit" class="btn btn-danger">

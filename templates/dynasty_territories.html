@@ -26,7 +26,7 @@
                     <p><strong>Territories:</strong> {{ territories|length }}</p>
                     
                     {% if dynasty.capital %}
-                    <p><strong>Capital:</strong> <a href="{{ url_for('territory_details', territory_id=dynasty.capital.id) }}">{{ dynasty.capital.name }}</a></p>
+                    <p><strong>Capital:</strong> <a href="{{ url_for('map.territory_details', territory_id=dynasty.capital.id) }}">{{ dynasty.capital.name }}</a></p>
                     {% else %}
                     <p><strong>Capital:</strong> <span class="text-danger">None</span></p>
                     {% endif %}
@@ -62,7 +62,7 @@
                     <ul class="list-group">
                         {% for territory in border_territories %}
                         <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <a href="{{ url_for('territory_details', territory_id=territory.id) }}">{{ territory.name }}</a>
+                            <a href="{{ url_for('map.territory_details', territory_id=territory.id) }}">{{ territory.name }}</a>
                             {% if territory in contested_territories %}
                             <span class="badge bg-danger">Contested</span>
                             {% endif %}
@@ -134,7 +134,7 @@
                                         {% endfor %}
                                     </td>
                                     <td>
-                                        <a href="{{ url_for('territory_details', territory_id=territory.id) }}" class="btn btn-sm btn-primary">View</a>
+                                        <a href="{{ url_for('map.territory_details', territory_id=territory.id) }}" class="btn btn-sm btn-primary">View</a>
                                         <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#developTerritoryModal" data-territory-id="{{ territory.id }}" data-territory-name="{{ territory.name }}">Develop</button>
                                     </td>
                                 </tr>
@@ -169,7 +169,7 @@
                                     <td>{{ unit.unit_type.value }}</td>
                                     <td>
                                         {% if unit.territory_id %}
-                                        <a href="{{ url_for('territory_details', territory_id=unit.territory_id) }}">
+                                        <a href="{{ url_for('map.territory_details', territory_id=unit.territory_id) }}">
                                             {{ unit.current_territory.name }}
                                         </a>
                                         {% else %}
@@ -213,7 +213,7 @@
                                     <td>{{ army.name }}</td>
                                     <td>
                                         {% if army.territory_id %}
-                                        <a href="{{ url_for('territory_details', territory_id=army.territory_id) }}">
+                                        <a href="{{ url_for('map.territory_details', territory_id=army.territory_id) }}">
                                             {{ army.current_territory.name }}
                                         </a>
                                         {% else %}
@@ -253,7 +253,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form id="developTerritoryForm" action="{{ url_for('develop_territory', dynasty_id=dynasty.id) }}" method="post">
+                <form id="developTerritoryForm" action="{{ url_for('economy.develop_territory', dynasty_id=dynasty.id) }}" method="post">
                     <input type="hidden" name="territory_id" id="developTerritoryId">
                     
                     <p>Develop <strong id="territoryNameDisplay"></strong></p>
@@ -283,7 +283,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form id="moveUnitForm" action="{{ url_for('move_unit', dynasty_id=dynasty.id) }}" method="post">
+                <form id="moveUnitForm" action="{{ url_for('military.move_unit', dynasty_id=dynasty.id) }}" method="post">
                     <input type="hidden" name="unit_id" id="moveUnitId">
                     
                     <div class="form-group mb-3">
@@ -312,7 +312,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form id="moveArmyForm" action="{{ url_for('move_army', dynasty_id=dynasty.id) }}" method="post">
+                <form id="moveArmyForm" action="{{ url_for('military.move_army', dynasty_id=dynasty.id) }}" method="post">
                     <input type="hidden" name="army_id" id="moveArmyId">
                     
                     <div class="form-group mb-3">

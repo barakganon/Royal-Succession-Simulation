@@ -68,13 +68,13 @@ class TestLoginPage:
 
     def test_get_login_contains_form_fields(self, client):
         response = client.get('/login')
-        assert b'Username' in response.data
-        assert b'Password' in response.data
+        assert b'username' in response.data  # input name attribute
+        assert b'password' in response.data  # input name attribute
 
     def test_get_login_contains_login_heading(self, client):
         response = client.get('/login')
-        # Template renders "Log In" heading
-        assert b'Log In' in response.data
+        # Template renders "Enter the Realm" heading
+        assert b'Enter the Realm' in response.data
 
 
 # ---------------------------------------------------------------------------
@@ -145,8 +145,8 @@ class TestRegisterPage:
 
     def test_get_register_contains_form_fields(self, client):
         response = client.get('/register')
-        assert b'Username' in response.data
-        assert b'Password' in response.data
+        assert b'username' in response.data  # input name attribute
+        assert b'password' in response.data  # input name attribute
 
     def test_get_register_contains_email_field(self, client):
         response = client.get('/register')
@@ -171,7 +171,7 @@ class TestRegisterPost:
         )
         assert response.status_code == 200
         # After successful registration, user is redirected to login page
-        assert b'Log In' in response.data
+        assert b'Enter the Realm' in response.data
 
     def test_valid_registration_shows_success_flash(self, client):
         response = client.post(
@@ -264,7 +264,7 @@ class TestLogout:
         # Unauthenticated access to /logout should redirect to /login
         response = client.get('/logout', follow_redirects=True)
         assert response.status_code == 200
-        assert b'Log In' in response.data
+        assert b'Enter the Realm' in response.data
 
 
 # ---------------------------------------------------------------------------
@@ -279,7 +279,7 @@ class TestDashboardAuthGuard:
     def test_dashboard_unauthenticated_redirects_to_login(self, client):
         response = client.get('/dashboard', follow_redirects=True)
         assert response.status_code == 200
-        assert b'Log In' in response.data
+        assert b'Enter the Realm' in response.data
 
     def test_dashboard_authenticated_returns_200(self, logged_in_client):
         response = logged_in_client.get('/dashboard')

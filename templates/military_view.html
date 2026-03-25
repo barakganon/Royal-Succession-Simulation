@@ -9,7 +9,7 @@
   <nav aria-label="breadcrumb" class="mt-1">
     <ol class="breadcrumb">
       <li class="breadcrumb-item"><a href="{{ url_for('auth.dashboard') }}">Dashboard</a></li>
-      <li class="breadcrumb-item"><a href="{{ url_for('view_dynasty', dynasty_id=dynasty.id) }}">{{ dynasty.name }}</a></li>
+      <li class="breadcrumb-item"><a href="{{ url_for('dynasty.view_dynasty', dynasty_id=dynasty.id) }}">{{ dynasty.name }}</a></li>
       <li class="breadcrumb-item active" aria-current="page">Military</li>
     </ol>
   </nav>
@@ -21,9 +21,9 @@
     {% endif %}
     <h1 class="page-title">&#9876; {{ dynasty.name }} — Military</h1>
     <div class="ml-auto d-flex" style="gap:.4rem;">
-      <a href="{{ url_for('view_dynasty', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-secondary">&#8592; Dynasty</a>
-      <a href="{{ url_for('advance_turn', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-success">&#9654; Advance Turn</a>
-      <a href="{{ url_for('military_gameplay', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-warning">&#127919; Operations</a>
+      <a href="{{ url_for('dynasty.view_dynasty', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-secondary">&#8592; Dynasty</a>
+      <a href="{{ url_for('dynasty.advance_turn', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-success">&#9654; Advance Turn</a>
+      <a href="{{ url_for('military.military_gameplay', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-warning">&#127919; Operations</a>
     </div>
   </div>
     
@@ -111,7 +111,7 @@
                                     <td>{{ army.name }}</td>
                                     <td>
                                         {% if army.territory_id %}
-                                        <a href="{{ url_for('territory_details', territory_id=army.territory_id) }}">
+                                        <a href="{{ url_for('map.territory_details', territory_id=army.territory_id) }}">
                                             {{ army.current_territory.name }}
                                         </a>
                                         {% else %}
@@ -127,7 +127,7 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <a href="{{ url_for('army_details', army_id=army.id) }}" class="btn btn-sm btn-primary">View</a>
+                                        <a href="{{ url_for('military.army_details', army_id=army.id) }}" class="btn btn-sm btn-primary">View</a>
                                         <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#assignCommanderModal" data-army-id="{{ army.id }}">Assign Commander</button>
                                     </td>
                                 </tr>
@@ -166,7 +166,7 @@
                                     <td>{{ unit.unit_type.value.replace('_', ' ').title() }}</td>
                                     <td>
                                         {% if unit.territory_id %}
-                                        <a href="{{ url_for('territory_details', territory_id=unit.territory_id) }}">
+                                        <a href="{{ url_for('map.territory_details', territory_id=unit.territory_id) }}">
                                             {{ unit.current_territory.name }}
                                         </a>
                                         {% else %}
@@ -210,7 +210,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form action="{{ url_for('recruit_unit', dynasty_id=dynasty.id) }}" method="post">
+                <form action="{{ url_for('military.recruit_unit', dynasty_id=dynasty.id) }}" method="post">
                     <div class="form-group mb-3">
                         <label for="unit_type">Unit Type:</label>
                         <select class="form-select" name="unit_type" id="unit_type" required>
@@ -277,7 +277,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form action="{{ url_for('form_army', dynasty_id=dynasty.id) }}" method="post">
+                <form action="{{ url_for('military.form_army', dynasty_id=dynasty.id) }}" method="post">
                     <div class="form-group mb-3">
                         <label for="name">Army Name:</label>
                         <input type="text" class="form-control" name="name" id="name" required>
@@ -334,7 +334,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form action="{{ url_for('assign_commander', dynasty_id=dynasty.id) }}" method="post">
+                <form action="{{ url_for('military.assign_commander', dynasty_id=dynasty.id) }}" method="post">
                     <input type="hidden" name="army_id" id="assignCommanderArmyId">
                     
                     <div class="form-group mb-3">

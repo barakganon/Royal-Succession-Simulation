@@ -14,10 +14,10 @@
                     <h5 class="mb-0">Battle Information</h5>
                 </div>
                 <div class="card-body">
-                    <p><strong>Location:</strong> <a href="{{ url_for('territory_details', territory_id=battle.territory_id) }}">{{ battle.territory.name }}</a></p>
+                    <p><strong>Location:</strong> <a href="{{ url_for('map.territory_details', territory_id=battle.territory_id) }}">{{ battle.territory.name }}</a></p>
                     <p><strong>Year:</strong> {{ battle.year }}</p>
-                    <p><strong>Attacker:</strong> <a href="{{ url_for('view_dynasty', dynasty_id=battle.attacker_dynasty_id) }}">{{ attacker_dynasty.name }}</a></p>
-                    <p><strong>Defender:</strong> <a href="{{ url_for('view_dynasty', dynasty_id=battle.defender_dynasty_id) }}">{{ defender_dynasty.name }}</a></p>
+                    <p><strong>Attacker:</strong> <a href="{{ url_for('dynasty.view_dynasty', dynasty_id=battle.attacker_dynasty_id) }}">{{ attacker_dynasty.name }}</a></p>
+                    <p><strong>Defender:</strong> <a href="{{ url_for('dynasty.view_dynasty', dynasty_id=battle.defender_dynasty_id) }}">{{ defender_dynasty.name }}</a></p>
                     
                     {% if battle.winner_dynasty_id %}
                     <p><strong>Winner:</strong> 
@@ -53,7 +53,7 @@
                 <div class="card-body">
                     <h6>Attacker Army</h6>
                     {% if battle.attacker_army %}
-                    <p><strong>Name:</strong> <a href="{{ url_for('army_details', army_id=battle.attacker_army_id) }}">{{ battle.attacker_army.name }}</a></p>
+                    <p><strong>Name:</strong> <a href="{{ url_for('military.army_details', army_id=battle.attacker_army_id) }}">{{ battle.attacker_army.name }}</a></p>
                     <p><strong>Commander:</strong> 
                         {% if battle.attacker_army.commander_id %}
                         {{ battle.attacker_army.commander.name }} {{ battle.attacker_army.commander.surname }}
@@ -69,7 +69,7 @@
                     
                     <h6>Defender Army</h6>
                     {% if battle.defender_army %}
-                    <p><strong>Name:</strong> <a href="{{ url_for('army_details', army_id=battle.defender_army_id) }}">{{ battle.defender_army.name }}</a></p>
+                    <p><strong>Name:</strong> <a href="{{ url_for('military.army_details', army_id=battle.defender_army_id) }}">{{ battle.defender_army.name }}</a></p>
                     <p><strong>Commander:</strong> 
                         {% if battle.defender_army.commander_id %}
                         {{ battle.defender_army.commander.name }} {{ battle.defender_army.commander.surname }}
@@ -194,8 +194,8 @@
     <div class="row">
         <div class="col-12">
             <div class="d-grid gap-2 d-md-flex justify-content-md-center">
-                <a href="{{ url_for('military_view', dynasty_id=attacker_dynasty.id if attacker_dynasty.owner_user == current_user else defender_dynasty.id) }}" class="btn btn-primary">Back to Military View</a>
-                <a href="{{ url_for('territory_details', territory_id=battle.territory_id) }}" class="btn btn-secondary">View Territory</a>
+                <a href="{{ url_for('military.military_view', dynasty_id=attacker_dynasty.id if attacker_dynasty.owner_user == current_user else defender_dynasty.id) }}" class="btn btn-primary">Back to Military View</a>
+                <a href="{{ url_for('map.territory_details', territory_id=battle.territory_id) }}" class="btn btn-secondary">View Territory</a>
             </div>
         </div>
     </div>

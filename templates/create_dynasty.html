@@ -1,102 +1,149 @@
 {% extends "base.html" %}
 
-{% block title %}Create New Dynasty - Dynasty Saga{% endblock %}
+{% block title %}Found Your Dynasty — Dynasty Saga{% endblock %}
 
 {% block content %}
 <div class="container">
-    <h1 class="mb-4">Create Your Dynasty</h1>
-    
-    <form method="POST" action="{{ url_for('create_dynasty') }}">
+
+  <!-- Page header -->
+  <div class="d-flex align-items-center pt-3 pb-2 mb-1 border-bottom">
+    <h1 class="h2 mb-0">&#9876; Found Your Dynasty</h1>
+  </div>
+  <hr class="section-divider mb-4">
+
+  <form method="POST" action="{{ url_for('dynasty.create_dynasty') }}">
+    <div class="row">
+
+      <!-- Left column: core fields -->
+      <div class="col-md-6">
+
+        <!-- Dynasty Name -->
         <div class="card mb-4">
-            <div class="card-header">
-                <h3>Basic Information</h3>
+          <div class="card-header">Dynasty Name</div>
+          <div class="card-body">
+            <div class="form-group mb-0">
+              <label for="dynasty_name">House Name</label>
+              <input type="text" class="form-control" id="dynasty_name" name="dynasty_name"
+                     placeholder="e.g. Blackwood, Silverhand…" required>
+              <small class="form-text text-muted">The name of your noble house, remembered by history.</small>
             </div>
-            <div class="card-body">
-                <div class="form-group">
-                    <label for="dynasty_name">Dynasty Name</label>
-                    <input type="text" class="form-control" id="dynasty_name" name="dynasty_name" required>
-                    <small class="form-text text-muted">The name of your noble house (e.g., "Blackwood", "Silverhand")</small>
-                </div>
-            </div>
+          </div>
         </div>
 
+        <!-- Simulation Settings -->
         <div class="card mb-4">
-            <div class="card-header">
-                <h3>Theme Selection</h3>
+          <div class="card-header">Simulation Settings</div>
+          <div class="card-body">
+            <div class="form-group">
+              <label for="start_year">Starting Year</label>
+              <input type="number" class="form-control" id="start_year" name="start_year"
+                     placeholder="Leave blank to use theme default">
+              <small class="form-text text-muted">The year your dynasty's chronicle begins.</small>
             </div>
-            <div class="card-body">
-                <div class="form-group">
-                    <div class="custom-control custom-radio">
-                        <input type="radio" id="theme_predefined" name="theme_type" value="predefined" class="custom-control-input" checked>
-                        <label class="custom-control-label" for="theme_predefined">Use a Predefined Theme</label>
-                    </div>
-                    
-                    <div class="mt-3 ml-4 predefined-options">
-                        <select class="form-control" id="theme_key" name="theme_key">
-                            {% for theme_name in themes %}
-                                <option value="{{ theme_name }}">{{ theme_name.replace('_', ' ').title() }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-group mt-4">
-                    <div class="custom-control custom-radio">
-                        <input type="radio" id="theme_custom" name="theme_type" value="custom" class="custom-control-input">
-                        <label class="custom-control-label" for="theme_custom">Generate Custom Theme from Story</label>
-                    </div>
-                    
-                    <div class="mt-3 ml-4 custom-options" style="display: none;">
-                        <textarea class="form-control" id="user_story" name="user_story" rows="6" placeholder="Write a brief origin story for your dynasty..."></textarea>
-                        <small class="form-text text-muted">
-                            Describe your dynasty's culture, location, values, and history. The AI will generate a custom theme based on your story.
-                            {% if not llm_available %}
-                                <span class="text-danger">Note: LLM features are currently unavailable. Custom theme generation may not work.</span>
-                            {% endif %}
-                        </small>
-                    </div>
-                </div>
+            <div class="form-group mb-0">
+              <label for="succession_rule">Succession Rule</label>
+              <select class="form-control" id="succession_rule" name="succession_rule">
+                <option value="">Use Theme Default</option>
+                <option value="PRIMOGENITURE_MALE_PREFERENCE">Primogeniture (Male Preference)</option>
+                <option value="PRIMOGENITURE_ABSOLUTE">Primogeniture (Absolute)</option>
+                <option value="ELECTIVE_NOBLE_COUNCIL">Elective Noble Council</option>
+              </select>
             </div>
+          </div>
         </div>
 
-        <div class="card mb-4">
-            <div class="card-header">
-                <h3>Simulation Settings</h3>
-            </div>
-            <div class="card-body">
-                <div class="form-group">
-                    <label for="start_year">Starting Year (Optional)</label>
-                    <input type="number" class="form-control" id="start_year" name="start_year" placeholder="Leave blank to use theme default">
-                </div>
-                
-                <div class="form-group">
-                    <label for="succession_rule">Succession Rule</label>
-                    <select class="form-control" id="succession_rule" name="succession_rule">
-                        <option value="">Use Theme Default</option>
-                        <option value="PRIMOGENITURE_MALE_PREFERENCE">Primogeniture (Male Preference)</option>
-                        <option value="PRIMOGENITURE_ABSOLUTE">Primogeniture (Absolute)</option>
-                        <option value="ELECTIVE_NOBLE_COUNCIL">Elective Noble Council</option>
-                    </select>
-                </div>
-            </div>
-        </div>
+      </div><!-- /col-md-6 left -->
 
-        <div class="text-center mb-5">
-            <button type="submit" class="btn btn-primary btn-lg">Create Dynasty</button>
+      <!-- Right column: theme selection -->
+      <div class="col-md-6">
+        <div class="card mb-4" style="height: calc(100% - 1.5rem);">
+          <div class="card-header">Cultural Theme</div>
+          <div class="card-body" style="display: flex; flex-direction: column; gap: 1rem;">
+
+            <!-- Option 1: Predefined -->
+            <div class="custom-control custom-radio">
+              <input type="radio" id="theme_predefined" name="theme_type" value="predefined"
+                     class="custom-control-input" checked>
+              <label class="custom-control-label" for="theme_predefined"
+                     style="font-family: 'Cinzel', serif; font-size: 0.9rem; letter-spacing: 0.03em;">
+                Use a Predefined Theme
+              </label>
+            </div>
+
+            <div class="predefined-options"
+                 style="max-height: 200px; overflow-y: auto; border: 1px solid var(--dark-border);
+                        border-radius: 4px; background: #0d1628; padding: .5rem;">
+              {% for theme_name in themes %}
+                <div class="custom-control custom-radio py-1 px-2"
+                     style="border-bottom: 1px solid rgba(15,52,96,0.4);">
+                  <input type="radio" id="theme_opt_{{ loop.index }}" name="theme_key"
+                         value="{{ theme_name }}" class="custom-control-input"
+                         {% if loop.first %}checked{% endif %}>
+                  <label class="custom-control-label" for="theme_opt_{{ loop.index }}"
+                         style="font-family: 'Crimson Text', serif; font-size: 1rem;
+                                color: var(--text-light); cursor: pointer; width: 100%;">
+                    {{ theme_name.replace('_', ' ').title() }}
+                  </label>
+                </div>
+              {% endfor %}
+            </div>
+
+            <!-- Option 2: Custom LLM -->
+            <div class="custom-control custom-radio mt-2">
+              <input type="radio" id="theme_custom" name="theme_type" value="custom"
+                     class="custom-control-input">
+              <label class="custom-control-label" for="theme_custom"
+                     style="font-family: 'Cinzel', serif; font-size: 0.9rem; letter-spacing: 0.03em;">
+                Generate Custom Theme from Story
+              </label>
+            </div>
+
+            <!-- Custom story textarea (collapsible) -->
+            <div class="custom-options" style="display: none;">
+              <textarea class="form-control" id="user_story" name="user_story" rows="6"
+                        placeholder="Write a brief origin story for your dynasty…"
+                        style="background: linear-gradient(135deg, #1e1500 0%, #0d1628 100%);
+                               border-color: var(--gold); color: var(--text-light);
+                               font-family: 'Crimson Text', serif; font-size: 1rem;
+                               resize: vertical;"></textarea>
+              <small class="form-text text-muted mt-1">
+                Describe your dynasty's culture, location, values, and history. The AI will craft a unique theme.
+                {% if not llm_available %}
+                  <span class="text-danger">Note: LLM features are currently unavailable. Custom theme generation may not work.</span>
+                {% endif %}
+              </small>
+            </div>
+
+          </div>
         </div>
-    </form>
+      </div><!-- /col-md-6 right -->
+
+    </div><!-- /row -->
+
+    <!-- Submit -->
+    <div class="text-center mb-5">
+      <button type="submit" class="btn btn-success btn-lg px-5"
+              style="font-size: 1.1rem; letter-spacing: 0.06em;">
+        &#9876; Forge Your Legacy
+      </button>
+    </div>
+
+  </form>
 </div>
 
 <script>
-    // Toggle between predefined and custom theme options
-    document.getElementById('theme_predefined').addEventListener('change', function() {
-        document.querySelector('.predefined-options').style.display = 'block';
-        document.querySelector('.custom-options').style.display = 'none';
-    });
-    
-    document.getElementById('theme_custom').addEventListener('change', function() {
-        document.querySelector('.predefined-options').style.display = 'none';
-        document.querySelector('.custom-options').style.display = 'block';
-    });
+  // Toggle between predefined and custom theme sections
+  document.getElementById('theme_predefined').addEventListener('change', function() {
+    document.querySelector('.predefined-options').style.display = 'block';
+    document.querySelector('.custom-options').style.display = 'none';
+  });
+
+  document.getElementById('theme_custom').addEventListener('change', function() {
+    document.querySelector('.predefined-options').style.display = 'none';
+    document.querySelector('.custom-options').style.display = 'block';
+  });
+
+  // Sync the scrollable radio list selection into the hidden select
+  // (the predefined radio buttons already carry name="theme_key" directly)
 </script>
 {% endblock %}

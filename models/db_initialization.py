@@ -137,7 +137,7 @@ class DatabaseInitializer:
 
                 # Ensure chronicle_entry table exists (may be missing on older deployments)
                 if 'chronicle_entry' not in inspector.get_table_names():
-                    ChronicleEntryDB.__table__.create(db.engine)
+                    ChronicleEntryDB.__table__.create(db.engine, checkfirst=True)
                     self.logger.info("Created chronicle_entry table.")
 
         except Exception as e:

@@ -27,22 +27,22 @@
     <a href="{{ url_for('auth.dashboard') }}" class="btn btn-sm btn-secondary">
       &#8592; Dashboard
     </a>
-    <a href="{{ url_for('advance_turn', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-success">
+    <a href="{{ url_for('dynasty.advance_turn', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-success">
       &#9654; Advance Turn
     </a>
-    <a href="{{ url_for('military_view', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-primary">
+    <a href="{{ url_for('military.military_view', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-primary">
       &#9876; Military
     </a>
-    <a href="{{ url_for('dynasty_economy', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-warning">
+    <a href="{{ url_for('economy.dynasty_economy', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-warning">
       &#128176; Economy
     </a>
-    <a href="{{ url_for('diplomacy_view', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-info">
+    <a href="{{ url_for('diplomacy.diplomacy_view', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-info">
       &#128506; Diplomacy
     </a>
-    <a href="{{ url_for('world_map') }}" class="btn btn-sm btn-secondary">
+    <a href="{{ url_for('map.world_map') }}" class="btn btn-sm btn-secondary">
       &#128507; World Map
     </a>
-    <a href="{{ url_for('delete_dynasty', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-outline-danger ml-auto">
+    <a href="{{ url_for('dynasty.delete_dynasty', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-outline-danger ml-auto">
       &#128465; Delete Dynasty
     </a>
   </div>

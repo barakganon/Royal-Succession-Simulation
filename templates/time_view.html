@@ -35,7 +35,7 @@
                         <div class="col-md-6">
                             <h6>Advance Time</h6>
                             <p>Process the current turn and advance to the next year.</p>
-                            <form action="{{ url_for('advance_time', dynasty_id=dynasty.id) }}" method="post">
+                            <form action="{{ url_for('map.advance_time', dynasty_id=dynasty.id) }}" method="post">
                                 <button type="submit" class="btn btn-primary">Advance to Next Year</button>
                             </form>
                         </div>
@@ -118,7 +118,7 @@
                             <h6>Seasonal Map</h6>
                             <img src="{{ seasonal_map_image_url }}" class="img-fluid" alt="Seasonal Map">
                             <p class="text-center mt-2">
-                                <a href="{{ url_for('seasonal_map', year=current_year) }}" class="btn btn-sm btn-outline-primary">View Full Map</a>
+                                <a href="{{ url_for('map.seasonal_map', year=current_year) }}" class="btn btn-sm btn-outline-primary">View Full Map</a>
                             </p>
                         </div>
                     </div>
@@ -133,7 +133,7 @@
                             <h5 class="mb-0">Schedule Events</h5>
                         </div>
                         <div class="card-body">
-                            <form action="{{ url_for('schedule_event', dynasty_id=dynasty.id) }}" method="post">
+                            <form action="{{ url_for('map.schedule_event', dynasty_id=dynasty.id) }}" method="post">
                                 <div class="mb-3">
                                     <label for="event_type" class="form-label">Event Type</label>
                                     <select class="form-select" id="event_type" name="event_type" required>
@@ -212,7 +212,7 @@
                                                 <td>{{ event.data.action }}</td>
                                                 <td>{{ event.priority }}</td>
                                                 <td>
-                                                    <form action="{{ url_for('cancel_event', dynasty_id=dynasty.id, event_id=event.id) }}" method="post" style="display: inline;">
+                                                    <form action="{{ url_for('map.cancel_event', dynasty_id=dynasty.id, event_id=event.id) }}" method="post" style="display: inline;">
                                                         <button type="submit" class="btn btn-sm btn-danger">Cancel</button>
                                                     </form>
                                                 </td>
@@ -268,7 +268,7 @@
                             <h6>Timeline Visualization</h6>
                             <img src="{{ timeline_image_url }}" class="img-fluid" alt="Timeline">
                             <p class="text-center mt-2">
-                                <a href="{{ url_for('timeline_view', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-outline-primary">View Full Timeline</a>
+                                <a href="{{ url_for('map.timeline_view', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-outline-primary">View Full Timeline</a>
                             </p>
                         </div>
                         {% endif %}

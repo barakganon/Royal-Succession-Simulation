@@ -10,8 +10,8 @@
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="{{ url_for('auth.dashboard') }}">Dashboard</a></li>
             {% if territory.controller_dynasty %}
-            <li class="breadcrumb-item"><a href="{{ url_for('view_dynasty', dynasty_id=territory.controller_dynasty.id) }}">{{ territory.controller_dynasty.name }}</a></li>
-            <li class="breadcrumb-item"><a href="{{ url_for('dynasty_economy', dynasty_id=territory.controller_dynasty.id) }}">Economy</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('dynasty.view_dynasty', dynasty_id=territory.controller_dynasty.id) }}">{{ territory.controller_dynasty.name }}</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('economy.dynasty_economy', dynasty_id=territory.controller_dynasty.id) }}">Economy</a></li>
             {% endif %}
             <li class="breadcrumb-item active" aria-current="page">{{ territory.name }}</li>
         </ol>
@@ -36,7 +36,7 @@
                             <p><strong>Tax Income:</strong> {{ tax_income|int }} Gold</p>
                             <p><strong>Controller:</strong> 
                                 {% if territory.controller_dynasty %}
-                                    <a href="{{ url_for('view_dynasty', dynasty_id=territory.controller_dynasty.id) }}">{{ territory.controller_dynasty.name }}</a>
+                                    <a href="{{ url_for('dynasty.view_dynasty', dynasty_id=territory.controller_dynasty.id) }}">{{ territory.controller_dynasty.name }}</a>
                                 {% else %}
                                     None
                                 {% endif %}
@@ -53,7 +53,7 @@
                     
                     {% if territory.controller_dynasty and territory.controller_dynasty.owner_user == current_user %}
                     <div class="mt-3">
-                        <form action="{{ url_for('develop_territory_economy', dynasty_id=territory.controller_dynasty.id, territory_id=territory.id) }}" method="post">
+                        <form action="{{ url_for('economy.develop_territory_economy', dynasty_id=territory.controller_dynasty.id, territory_id=territory.id) }}" method="post">
                             <button type="submit" class="btn btn-primary">Develop Territory (Level {{ territory.development_level + 1 }})</button>
                         </form>
                     </div>
@@ -169,13 +169,13 @@
                                 {% if territory.controller_dynasty and territory.controller_dynasty.owner_user == current_user %}
                                 <div class="btn-group mt-2" role="group">
                                     {% if not building.is_under_construction and building.level < 5 %}
-                                    <form action="{{ url_for('upgrade_building', dynasty_id=territory.controller_dynasty.id, building_id=building.id) }}" method="post">
+                                    <form action="{{ url_for('economy.upgrade_building', dynasty_id=territory.controller_dynasty.id, building_id=building.id) }}" method="post">
                                         <button type="submit" class="btn btn-sm btn-primary mr-1">Upgrade</button>
                                     </form>
                                     {% endif %}
                                     
                                     {% if not building.is_under_construction and building.condition < 0.9 %}
-                                    <form action="{{ url_for('repair_building', dynasty_id=territory.controller_dynasty.id, building_id=building.id) }}" method="post">
+                                    <form action="{{ url_for('economy.repair_building', dynasty_id=territory.controller_dynasty.id, building_id=building.id) }}" method="post">
                                         <button type="submit" class="btn btn-sm btn-warning">Repair</button>
                                     </form>
                                     {% endif %}
@@ -217,7 +217,7 @@
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
-                <form action="{{ url_for('construct_building', dynasty_id=territory.controller_dynasty.id) }}" method="post">
+                <form action="{{ url_for('economy.construct_building', dynasty_id=territory.controller_dynasty.id) }}" method="post">
                     <div class="modal-body">
                         <input type="hidden" name="territory_id" value="{{ territory.id }}">
                         <p>Construct a new building in {{ territory.name }}.</p>

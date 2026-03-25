@@ -1,3 +1,22 @@
 # Ignore all log files and directories
 logs/
 *.log
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+
+# Database files
+instance/
+tests/instance/
+
+# Generated visualizations (PNG family trees)
+visualizations/
+static/visualizations/
+
+# OS files
+.DS_Store
+
+# Claude internal
+.claude/worktrees/

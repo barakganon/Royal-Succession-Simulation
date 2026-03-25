@@ -1,6 +1,63 @@
 # Royal Succession Simulation — Development Status
 
-Last updated: 2026-03-25
+Last updated: 2026-03-25 (Sprint 6.5 complete)
+
+---
+
+## Sprint 7 — Blueprint Refactor ✅
+
+| # | Blueprint | Routes Extracted | Status |
+|---|-----------|-----------------|--------|
+| 7-1 | `blueprints/dynasty.py` | create_dynasty, view_dynasty, advance_turn, turn_report, delete_dynasty + 9 helpers | ✅ Done |
+| 7-2 | `blueprints/military.py` | 18 routes: military_view, recruit_unit, form_army, battle, siege, naval_battle, move_army, etc. | ✅ Done |
+| 7-3 | `blueprints/economy.py` | 13 routes: dynasty_economy, build/upgrade/repair_building, develop_territory, trade, etc. | ✅ Done |
+| 7-4 | `blueprints/diplomacy.py` | 7 routes: diplomacy_view, treaty_view, diplomatic_action, declare_war, negotiate_peace, etc. | ✅ Done |
+| 7-5 | `blueprints/map.py` | 18 routes: world_map, map.geojson, territory_details, dynasty_territories, chronicle, advisor, time_view, etc. | ✅ Done |
+
+**Result:** `main_flask_app.py` reduced from ~3300 lines → 290 lines (app setup, blueprint registration, shared helpers only).
+All tests maintained: **163 passed, 17 skipped, 0 failures** after every extraction step.
+All `url_for()` references updated across all templates to use `blueprint.function` prefixes.
+
+---
+
+## Sprint 6.5 — Turn Report & Remaining Page Styling ✅
+
+| # | Task | Status |
+|---|------|--------|
+| 6.5A-1 | `process_dynasty_turn()` returns 3-tuple `(success, message, turn_summary)` with structured event list | ✅ Done |
+| 6.5A-2 | `advance_turn` stores summary in flask session; redirects to `/dynasty/<id>/turn_report` | ✅ Done |
+| 6.5A-3 | `turn_report` route queries AI dynasty events for World News panel | ✅ Done |
+| 6.5A-4 | `templates/turn_report.html` — stat row, Your Chronicle timeline, World News panel, event type breakdown, Continue button | ✅ Done |
+| 6.5B-1 | `templates/login.html` — "Enter the Realm" card with gold top-border | ✅ Done |
+| 6.5B-2 | `templates/register.html` — "Pledge Your Name" card | ✅ Done |
+| 6.5B-3 | `templates/create_dynasty.html` — "Found Your Dynasty" with themed theme selector | ✅ Done |
+| 6.5B-4 | `templates/diplomacy_view.html` — breadcrumb, color-coded relation scores with progress bars, war/treaty sections | ✅ Done |
+| 6.5B-5 | `templates/chronicle.html` — parchment-style entry cards with year badges, empty state, CoA header | ✅ Done |
+
+**CSS additions in `static/style.css`:**
+- `.turn-report-stat` stat box (big number + label)
+- `.turn-report-event-list` flex event list (inline icons, no absolute positioning)
+- `.section-divider` gold diamond divider line
+
+---
+
+## Sprint 6B — UI Panel & Template Overhaul ✅
+
+| # | Task | Status |
+|---|------|--------|
+| 6B-1 | `templates/view_dynasty.html` — ruler card with portrait, family grid, event timeline, CoA header, action bar | ✅ Done |
+| 6B-2 | `templates/dashboard.html` — dynasty cards with CoA thumbnails, paginated list, AI advisor parchment panel | ✅ Done |
+| 6B-3 | `templates/military_view.html` — breadcrumb, themed cards, action buttons | ✅ Done |
+| 6B-4 | `templates/economy_view.html` — same treatment as military | ✅ Done |
+
+---
+
+## Sprint 6C — Art Layer ✅
+
+| # | Task | Status |
+|---|------|--------|
+| 6C-1 | `visualization/heraldry_renderer.py` enhanced — 10+ charges, quartered shields, border treatments, motto banner | ✅ Done |
+| 6C-2 | `visualization/portrait_renderer.py` enhanced — 4 age tiers, 7 trait mappings, crown/collar accessories | ✅ Done |
 
 ---
 
@@ -188,8 +245,8 @@ Sprint 5B fixed the 7 pre-existing failures in `test_flask_app.py` + `test_game_
 | Circular FK cycle on dynasty/person_db/territory DROP | Medium | `use_alter=True` on FKs needed |
 | `main_flask_app.py` still a monolith | High | Auth done; 5 more Blueprints remaining (military/economy/diplomacy/map/dynasty) |
 | Turn-order enforcement | ✅ Fixed | `is_turn_processing` Boolean lock + `block_if_turn_processing` decorator (Sprint 5C) |
-| No pagination on list endpoints | Medium | Will degrade at scale |
-| `chronicle_entry` table not yet created via migration | Medium | Needs `db.create_all()` or Alembic migration |
+| No pagination on list endpoints | ✅ Fixed | Dashboard paginated 20/page (Sprint 5D); living_nobles capped at 50 |
+| `chronicle_entry` table creation | ✅ Fixed | `checkfirst=True` on explicit `.create()` call (Sprint 5D) |
 | Banking/loans, espionage, court politics | Low | Post-MVP |
 
 ---

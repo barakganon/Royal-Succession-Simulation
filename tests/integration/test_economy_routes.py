@@ -67,7 +67,7 @@ class TestEconomyAuthGuards:
 
     def test_dynasty_economy_unauthenticated_goes_to_login(self, plain_client):
         response = plain_client.get('/dynasty/1/economy', follow_redirects=True)
-        assert b'Log In' in response.data
+        assert b'Enter the Realm' in response.data
 
     def test_world_economy_unauthenticated_redirects(self, plain_client):
         response = plain_client.get('/world/economy', follow_redirects=False)
@@ -75,7 +75,7 @@ class TestEconomyAuthGuards:
 
     def test_world_economy_unauthenticated_goes_to_login(self, plain_client):
         response = plain_client.get('/world/economy', follow_redirects=True)
-        assert b'Log In' in response.data
+        assert b'Enter the Realm' in response.data
 
 
 # ---------------------------------------------------------------------------

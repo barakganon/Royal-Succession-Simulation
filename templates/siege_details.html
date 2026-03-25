@@ -14,14 +14,14 @@
                     <h5 class="mb-0">Siege Information</h5>
                 </div>
                 <div class="card-body">
-                    <p><strong>Territory:</strong> <a href="{{ url_for('territory_details', territory_id=siege.territory_id) }}">{{ siege.territory.name }}</a></p>
+                    <p><strong>Territory:</strong> <a href="{{ url_for('map.territory_details', territory_id=siege.territory_id) }}">{{ siege.territory.name }}</a></p>
                     <p><strong>Start Year:</strong> {{ siege.start_year }}</p>
                     {% if siege.end_year %}
                     <p><strong>End Year:</strong> {{ siege.end_year }}</p>
                     <p><strong>Duration:</strong> {{ siege.end_year - siege.start_year }} years</p>
                     {% endif %}
-                    <p><strong>Attacker:</strong> <a href="{{ url_for('view_dynasty', dynasty_id=siege.attacker_dynasty_id) }}">{{ attacker_dynasty.name }}</a></p>
-                    <p><strong>Defender:</strong> <a href="{{ url_for('view_dynasty', dynasty_id=siege.defender_dynasty_id) }}">{{ defender_dynasty.name }}</a></p>
+                    <p><strong>Attacker:</strong> <a href="{{ url_for('dynasty.view_dynasty', dynasty_id=siege.attacker_dynasty_id) }}">{{ attacker_dynasty.name }}</a></p>
+                    <p><strong>Defender:</strong> <a href="{{ url_for('dynasty.view_dynasty', dynasty_id=siege.defender_dynasty_id) }}">{{ defender_dynasty.name }}</a></p>
                     
                     <p><strong>Status:</strong> 
                         {% if siege.is_active %}
@@ -53,7 +53,7 @@
                 </div>
                 <div class="card-body">
                     {% if siege.attacker_army %}
-                    <p><strong>Name:</strong> <a href="{{ url_for('army_details', army_id=siege.attacker_army_id) }}">{{ siege.attacker_army.name }}</a></p>
+                    <p><strong>Name:</strong> <a href="{{ url_for('military.army_details', army_id=siege.attacker_army_id) }}">{{ siege.attacker_army.name }}</a></p>
                     <p><strong>Commander:</strong> 
                         {% if siege.attacker_army.commander_id %}
                         {{ siege.attacker_army.commander.name }} {{ siege.attacker_army.commander.surname }}
@@ -194,7 +194,7 @@
                                 <p>Siege ongoing. Progress: {{ (siege.progress * 100)|int }}%</p>
                                 
                                 {% if siege.attacker_dynasty_id == attacker_dynasty.id and attacker_dynasty.owner_user == current_user %}
-                                <form action="{{ url_for('update_siege', dynasty_id=attacker_dynasty.id, siege_id=siege.id) }}" method="get">
+                                <form action="{{ url_for('military.update_siege', dynasty_id=attacker_dynasty.id, siege_id=siege.id) }}" method="get">
                                     <button type="submit" class="btn btn-primary">Update Siege Progress</button>
                                 </form>
                                 {% endif %}
@@ -210,8 +210,8 @@
     <div class="row">
         <div class="col-12">
             <div class="d-grid gap-2 d-md-flex justify-content-md-center">
-                <a href="{{ url_for('military_view', dynasty_id=attacker_dynasty.id if attacker_dynasty.owner_user == current_user else defender_dynasty.id) }}" class="btn btn-primary">Back to Military View</a>
-                <a href="{{ url_for('territory_details', territory_id=siege.territory_id) }}" class="btn btn-secondary">View Territory</a>
+                <a href="{{ url_for('military.military_view', dynasty_id=attacker_dynasty.id if attacker_dynasty.owner_user == current_user else defender_dynasty.id) }}" class="btn btn-primary">Back to Military View</a>
+                <a href="{{ url_for('map.territory_details', territory_id=siege.territory_id) }}" class="btn btn-secondary">View Territory</a>
             </div>
         </div>
     </div>

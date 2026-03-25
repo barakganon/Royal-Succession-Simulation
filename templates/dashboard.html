@@ -7,13 +7,13 @@
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
   <h1 class="h2">Royal Succession — Dashboard</h1>
   <div class="btn-toolbar mb-2 mb-md-0">
-    <a href="{{ url_for('create_dynasty') }}" class="btn btn-sm btn-outline-success mr-2">
+    <a href="{{ url_for('dynasty.create_dynasty') }}" class="btn btn-sm btn-outline-success mr-2">
       <span data-feather="plus-circle"></span> Start New Dynasty
     </a>
-    <a href="{{ url_for('world_map') }}" class="btn btn-sm btn-outline-primary mr-2">
+    <a href="{{ url_for('map.world_map') }}" class="btn btn-sm btn-outline-primary mr-2">
       <span data-feather="globe"></span> World Map
     </a>
-    <a href="{{ url_for('world_economy_view') }}" class="btn btn-sm btn-outline-info">
+    <a href="{{ url_for('economy.world_economy_view') }}" class="btn btn-sm btn-outline-info">
       <span data-feather="dollar-sign"></span> World Economy
     </a>
   </div>
@@ -136,30 +136,30 @@
 
               <!-- Action buttons column -->
               <div class="d-flex flex-column flex-shrink-0" style="gap:.3rem;min-width:120px;">
-                <a href="{{ url_for('view_dynasty', dynasty_id=dynasty_item.id) }}"
+                <a href="{{ url_for('dynasty.view_dynasty', dynasty_id=dynasty_item.id) }}"
                    class="btn btn-sm btn-primary">
                   <span data-feather="eye" style="width:13px;height:13px;"></span> View
                 </a>
-                <a href="{{ url_for('advance_turn', dynasty_id=dynasty_item.id) }}"
+                <a href="{{ url_for('dynasty.advance_turn', dynasty_id=dynasty_item.id) }}"
                    class="btn btn-sm btn-success">
                   &#9654; Advance Turn
                 </a>
                 <div class="d-flex" style="gap:.3rem;">
-                  <a href="{{ url_for('military_view', dynasty_id=dynasty_item.id) }}"
+                  <a href="{{ url_for('military.military_view', dynasty_id=dynasty_item.id) }}"
                      class="btn btn-sm btn-danger flex-fill" title="Military">&#9876;</a>
-                  <a href="{{ url_for('dynasty_economy', dynasty_id=dynasty_item.id) }}"
+                  <a href="{{ url_for('economy.dynasty_economy', dynasty_id=dynasty_item.id) }}"
                      class="btn btn-sm btn-warning flex-fill" title="Economy">&#128176;</a>
-                  <a href="{{ url_for('diplomacy_view', dynasty_id=dynasty_item.id) }}"
+                  <a href="{{ url_for('diplomacy.diplomacy_view', dynasty_id=dynasty_item.id) }}"
                      class="btn btn-sm btn-info flex-fill" title="Diplomacy">&#128506;</a>
                 </div>
-                <a href="{{ url_for('military_gameplay', dynasty_id=dynasty_item.id) }}"
+                <a href="{{ url_for('military.military_gameplay', dynasty_id=dynasty_item.id) }}"
                    class="btn btn-sm btn-secondary">
                   <span data-feather="target" style="width:13px;height:13px;"></span> Operations
                 </a>
                 <div class="d-flex" style="gap:.3rem;">
-                  <a href="{{ url_for('time_view', dynasty_id=dynasty_item.id) }}"
+                  <a href="{{ url_for('map.time_view', dynasty_id=dynasty_item.id) }}"
                      class="btn btn-sm btn-secondary flex-fill" title="Time">&#128336;</a>
-                  <a href="{{ url_for('delete_dynasty', dynasty_id=dynasty_item.id) }}"
+                  <a href="{{ url_for('dynasty.delete_dynasty', dynasty_id=dynasty_item.id) }}"
                      class="btn btn-sm btn-outline-danger flex-fill" title="Delete">&#128465;</a>
                 </div>
               </div>
@@ -191,7 +191,7 @@
         {% endif %}
 
         <div class="mt-2 px-1">
-          <a href="{{ url_for('generate_initial_map') }}" class="btn btn-primary btn-sm">
+          <a href="{{ url_for('map.generate_initial_map') }}" class="btn btn-primary btn-sm">
             <span data-feather="map" style="width:13px;height:13px;"></span> Generate Initial Map
           </a>
         </div>

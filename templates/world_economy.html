@@ -128,9 +128,9 @@
                                     <td>{{ dynasty.controlled_territories.count() }}</td>
                                     <td>
                                         {% if dynasty.owner_user == current_user %}
-                                            <a href="{{ url_for('dynasty_economy', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-primary">View Economy</a>
+                                            <a href="{{ url_for('economy.dynasty_economy', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-primary">View Economy</a>
                                         {% else %}
-                                            <a href="{{ url_for('view_dynasty', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-secondary">View Dynasty</a>
+                                            <a href="{{ url_for('dynasty.view_dynasty', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-secondary">View Dynasty</a>
                                         {% endif %}
                                     </td>
                                 </tr>

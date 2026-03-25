@@ -196,14 +196,14 @@
                 </div>
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
-                        <a href="{{ url_for('seasonal_map', year=year-1) }}" class="btn btn-outline-primary">Previous Year ({{ year-1 }})</a>
-                        <a href="{{ url_for('seasonal_map', year=year+1) }}" class="btn btn-outline-primary">Next Year ({{ year+1 }})</a>
+                        <a href="{{ url_for('map.seasonal_map', year=year-1) }}" class="btn btn-outline-primary">Previous Year ({{ year-1 }})</a>
+                        <a href="{{ url_for('map.seasonal_map', year=year+1) }}" class="btn btn-outline-primary">Next Year ({{ year+1 }})</a>
                     </div>
                 </div>
             </div>
             
             <div class="text-center mb-4">
-                <a href="{{ url_for('world_map') }}" class="btn btn-primary">Back to World Map</a>
+                <a href="{{ url_for('map.world_map') }}" class="btn btn-primary">Back to World Map</a>
             </div>
         </div>
     </div>

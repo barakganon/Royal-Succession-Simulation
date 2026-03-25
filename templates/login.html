@@ -1,36 +1,53 @@
 {% extends "base.html" %}
 
-{% block title %}Login - Dynasty Saga{% endblock %}
+{% block title %}Enter the Realm — Dynasty Saga{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h3>Log In</h3>
-            </div>
-            <div class="card-body">
-                <form method="POST" action="{{ url_for('auth.login') }}">
-                    <div class="form-group">
-                        <label for="username">Username</label>
-                        <input type="text" class="form-control" id="username" name="username" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="password">Password</label>
-                        <input type="password" class="form-control" id="password" name="password" required>
-                    </div>
-                    <div class="form-group form-check">
-                        <input type="checkbox" class="form-check-input" id="remember_me" name="remember_me">
-                        <label class="form-check-label" for="remember_me">Remember Me</label>
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-block">Login</button>
-                </form>
-            </div>
-            <div class="card-footer text-center">
-                <small>Don't have an account? <a href="{{ url_for('auth.register') }}">Register Here</a></small>
-                 <!-- <br><small><a href="#">Forgot Password?</a></small> -->
-            </div>
-        </div>
+  <div class="col-12" style="max-width: 420px; margin: 3rem auto;">
+
+    <!-- Flash messages above the form -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div class="card" style="border-top: 3px solid var(--gold);">
+      <div class="card-header text-center" style="padding: 1.1rem 1.25rem;">
+        <h3 style="margin-bottom: 0; font-size: 1.4rem;">&#9876; Enter the Realm</h3>
+      </div>
+      <div class="card-body" style="padding: 1.75rem 2rem;">
+        <form method="POST" action="{{ url_for('auth.login') }}">
+          <div class="form-group">
+            <label for="username">Your Name</label>
+            <input type="text" class="form-control" id="username" name="username" placeholder="Noble name…" required>
+          </div>
+          <div class="form-group">
+            <label for="password">Secret Word</label>
+            <input type="password" class="form-control" id="password" name="password" placeholder="Speak the pass…" required>
+          </div>
+          <div class="form-group form-check" style="margin-bottom: 1.25rem;">
+            <input type="checkbox" class="form-check-input" id="remember_me" name="remember_me">
+            <label class="form-check-label" for="remember_me" style="font-family: 'Crimson Text', serif; font-size: 1rem; color: var(--text-muted);">Remember me</label>
+          </div>
+          <button type="submit" class="btn btn-success btn-block" style="font-size: 1rem; padding: .55rem;">Enter</button>
+        </form>
+      </div>
+      <div class="card-footer text-center" style="background: transparent; border-top: 1px solid var(--dark-border); padding: .85rem 1.25rem;">
+        <small style="font-family: 'Crimson Text', serif; color: var(--text-muted);">
+          New to the realm? <a href="{{ url_for('auth.register') }}">Pledge your name here &rarr;</a>
+        </small>
+      </div>
     </div>
+
+  </div>
 </div>
 {% endblock %}

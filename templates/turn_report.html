@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block title %}Turn Report — {{ dynasty.name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+  <!-- ── Header ── -->
+  <div class="text-center mb-4">
+    {% if dynasty.coat_of_arms_svg %}
+    <div class="coat-of-arms-small mx-auto mb-3" style="width:80px;height:96px;">
+      {{ dynasty.coat_of_arms_svg | safe }}
+    </div>
+    {% endif %}
+    <h1 style="font-family:'Cinzel',serif;color:var(--gold);">Chronicles of House {{ dynasty.name }}</h1>
+    <p class="text-muted" style="font-family:'Crimson Text',serif;font-style:italic;font-size:1.05rem;">
+      The Years {{ summary.start_year }} — {{ summary.end_year }}
+    </p>
+    <hr class="section-divider">
+  </div>
+
+  <!-- ── Summary stat row ── -->
+  <div class="row mb-4 justify-content-center">
+    <div class="col-6 col-md-3">
+      <div class="turn-report-stat">
+        <div class="turn-stat-value">{{ summary.events | length }}</div>
+        <div class="turn-stat-label">Events This Turn</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="turn-report-stat">
+        <div class="turn-stat-value">{{ summary.living_count }}</div>
+        <div class="turn-stat-label">Living Members</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="turn-report-stat">
+        <div class="turn-stat-value">{{ summary.current_wealth }}</div>
+        <div class="turn-stat-label">Treasury (Gold)</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="turn-report-stat">
+        <div class="turn-stat-value">{{ dynasty.current_simulation_year }}</div>
+        <div class="turn-stat-label">Current Year</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+
+    <!-- ── Your Chronicle ── -->
+    <div class="col-lg-7 mb-4">
+      <div class="card h-100">
+        <div class="card-header">
+          <h4 class="mb-0">&#128240; Your Chronicle</h4>
+        </div>
+        <div class="card-body" style="max-height:440px;overflow-y:auto;">
+          {% if summary.events %}
+          <div class="turn-report-event-list">
+            {% for event in summary.events %}
+
+              {# Determine icon and colour class from event type #}
+              {% set t = event.type | lower %}
+              {% if t == 'death' %}
+                {% set icon = '&#9760;' %}
+                {% set cls = 'text-danger' %}
+              {% elif t == 'birth' %}
+                {% set icon = '&#128118;' %}
+                {% set cls = 'text-success' %}
+              {% elif t == 'succession_end' or t == 'succession' %}
+                {% set icon = '&#128081;' %}
+                {% set cls = 'text-warning' %}
+              {% elif t == 'succession_start' %}
+                {% set icon = '&#9876;' %}
+                {% set cls = 'text-warning' %}
+              {% elif t == 'marriage' %}
+                {% set icon = '&#128141;' %}
+                {% set cls = 'text-info' %}
+              {% elif t == 'world_event' or t == 'event' %}
+                {% set icon = '&#9670;' %}
+                {% set cls = '' %}
+              {% else %}
+                {% set icon = '&#9670;' %}
+                {% set cls = '' %}
+              {% endif %}
+
+              <div class="event-item">
+                <span class="event-icon {{ cls }}">{{ icon | safe }}</span>
+                <div style="flex:1;min-width:0;">
+                  <div class="event-year">Year {{ event.year }}</div>
+                  <div class="event-text">{{ event.text }}</div>
+                </div>
+              </div>
+
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="text-muted" style="font-style:italic;">
+            A quiet span of years — no notable events were recorded.
+          </p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- ── World News ── -->
+    <div class="col-lg-5 mb-4">
+      <div class="card h-100">
+        <div class="card-header">
+          <h4 class="mb-0">&#127757; World News</h4>
+        </div>
+        <div class="card-body" style="max-height:440px;overflow-y:auto;">
+          {% if ai_news %}
+          {% for ai in ai_news %}
+          <div class="mb-3">
+            <h6 style="font-family:'Cinzel',serif;color:var(--gold);">
+              &#9876; {{ ai.dynasty_name }}
+            </h6>
+            <div class="turn-report-event-list">
+              {% for e in ai.events %}
+              <div class="event-item">
+                <span class="event-icon">
+                  {% if e.type == 'death' %}&#9760;
+                  {% elif e.type == 'birth' %}&#128118;
+                  {% elif 'succession' in e.type %}&#128081;
+                  {% elif e.type == 'marriage' %}&#128141;
+                  {% else %}&#9670;
+                  {% endif %}
+                </span>
+                <div style="flex:1;min-width:0;">
+                  <div class="event-year">Year {{ e.year }}</div>
+                  <div class="event-text">{{ e.text }}</div>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% if not loop.last %}
+          <hr style="border-color:var(--dark-border);margin:.5rem 0;">
+          {% endif %}
+          {% endfor %}
+          {% else %}
+          <p class="text-muted" style="font-style:italic;">
+            No news reaches you from neighbouring realms.
+          </p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /.row -->
+
+  <!-- ── Event type breakdown (compact legend) ── -->
+  {% if summary.events %}
+  {% set deaths = summary.events | selectattr('type', 'equalto', 'death') | list | length %}
+  {% set births = summary.events | selectattr('type', 'equalto', 'birth') | list | length %}
+  {% set marriages = summary.events | selectattr('type', 'equalto', 'marriage') | list | length %}
+  {% if deaths > 0 or births > 0 or marriages > 0 %}
+  <div class="row mb-4 justify-content-center">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-body py-2 text-center">
+          <span class="mr-4">
+            <span class="text-danger">&#9760;</span>
+            <strong class="text-danger">{{ deaths }}</strong>
+            <small class="text-muted"> death{{ 's' if deaths != 1 }}</small>
+          </span>
+          <span class="mr-4">
+            <span class="text-success">&#128118;</span>
+            <strong class="text-success">{{ births }}</strong>
+            <small class="text-muted"> birth{{ 's' if births != 1 }}</small>
+          </span>
+          <span>
+            <span class="text-info">&#128141;</span>
+            <strong class="text-info">{{ marriages }}</strong>
+            <small class="text-muted"> marriage{{ 's' if marriages != 1 }}</small>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+  {% endif %}
+
+  <!-- ── Actions ── -->
+  <div class="text-center mt-2 mb-4">
+    <a href="{{ url_for('dynasty.view_dynasty', dynasty_id=dynasty.id) }}"
+       class="btn btn-success btn-lg px-5 mr-2">
+      &#9654; Continue to {{ dynasty.name }}
+    </a>
+    <a href="{{ url_for('auth.dashboard') }}"
+       class="btn btn-outline-secondary btn-lg">
+      Dashboard
+    </a>
+  </div>
+
+</div><!-- /.container -->
+{% endblock %}

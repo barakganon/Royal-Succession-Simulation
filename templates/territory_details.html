@@ -48,7 +48,7 @@
                     <h5 class="mb-0">Develop Territory</h5>
                 </div>
                 <div class="card-body">
-                    <form action="{{ url_for('develop_territory', dynasty_id=territory.controller_dynasty_id) }}" method="post">
+                    <form action="{{ url_for('economy.develop_territory', dynasty_id=territory.controller_dynasty_id) }}" method="post">
                         <input type="hidden" name="territory_id" value="{{ territory.id }}">
                         
                         <div class="form-group mb-3">
@@ -282,7 +282,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form id="moveUnitForm" action="{{ url_for('move_unit', dynasty_id=territory.controller_dynasty_id) }}" method="post">
+                <form id="moveUnitForm" action="{{ url_for('military.move_unit', dynasty_id=territory.controller_dynasty_id) }}" method="post">
                     <input type="hidden" name="unit_id" id="moveUnitId">
                     
                     <div class="form-group mb-3">
@@ -311,7 +311,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form id="moveArmyForm" action="{{ url_for('move_army', dynasty_id=territory.controller_dynasty_id) }}" method="post">
+                <form id="moveArmyForm" action="{{ url_for('military.move_army', dynasty_id=territory.controller_dynasty_id) }}" method="post">
                     <input type="hidden" name="army_id" id="moveArmyId">
                     
                     <div class="form-group mb-3">

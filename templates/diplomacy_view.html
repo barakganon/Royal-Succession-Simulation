@@ -1,487 +1,561 @@
 {% extends "base.html" %}
 
-{% block title %}Diplomacy - {{ dynasty.name }}{% endblock %}
+{% block title %}Diplomacy — {{ dynasty.name }}{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <h1>Diplomacy - {{ dynasty.name }}</h1>
-    
-    <div class="row mb-4">
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="card-title mb-0">Reputation</h5>
-                </div>
-                <div class="card-body">
-                    <div class="d-flex justify-content-between mb-2">
-                        <span><strong>Prestige:</strong></span>
-                        <span>{{ reputation.prestige }}</span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span><strong>Honor:</strong></span>
-                        <span>{{ reputation.honor }}</span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span><strong>Infamy:</strong></span>
-                        <span>{{ reputation.infamy }}</span>
-                    </div>
-                    <div class="mt-3">
-                        <p class="small text-muted">
-                            <strong>Prestige</strong> affects your diplomatic weight and influence.<br>
-                            <strong>Honor</strong> affects how much others trust you in agreements.<br>
-                            <strong>Infamy</strong> makes others less likely to ally with you.
-                        </p>
-                    </div>
-                </div>
-            </div>
+<div class="container mt-3">
+
+  <!-- ── Page header bar with breadcrumb ── -->
+  <div class="page-header-bar mb-3">
+    <nav aria-label="breadcrumb" class="breadcrumb mb-0">
+      <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="{{ url_for('auth.dashboard') }}">Dashboard</a></li>
+        {% if dynasty %}
+          <li class="breadcrumb-item"><a href="{{ url_for('dynasty.view_dynasty', dynasty_id=dynasty.id) }}">{{ dynasty.name }}</a></li>
+        {% endif %}
+        <li class="breadcrumb-item active" aria-current="page">Diplomacy</li>
+      </ol>
+    </nav>
+  </div>
+
+  <!-- ── Dynasty title + CoA ── -->
+  <div class="d-flex align-items-center mb-4 pb-2 border-bottom">
+    {% if dynasty.coat_of_arms_svg %}
+      <div class="dynasty-coa mr-3" style="width:44px; height:54px; flex-shrink:0;">
+        {{ dynasty.coat_of_arms_svg | safe }}
+      </div>
+    {% endif %}
+    <div>
+      <h1 class="mb-0" style="font-size:1.7rem;">&#9876; Diplomacy</h1>
+      <p class="mb-0" style="font-family:'Crimson Text',serif; color:var(--text-muted); font-style:italic;">
+        House {{ dynasty.name }}
+      </p>
+    </div>
+  </div>
+
+  <!-- ── Reputation + Relations ── -->
+  <div class="row mb-4">
+
+    <!-- Reputation card -->
+    <div class="col-md-4 mb-3">
+      <div class="card h-100">
+        <div class="card-header">Reputation</div>
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span><strong>Prestige</strong></span>
+            <span class="badge badge-primary badge-pill">{{ reputation.prestige }}</span>
+          </div>
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span><strong>Honor</strong></span>
+            <span class="badge badge-info badge-pill">{{ reputation.honor }}</span>
+          </div>
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <span><strong>Infamy</strong></span>
+            <span class="badge badge-danger badge-pill">{{ reputation.infamy }}</span>
+          </div>
+          <hr style="border-color:var(--dark-border);">
+          <p class="small text-muted mb-0" style="font-family:'Crimson Text',serif;">
+            <strong>Prestige</strong> — diplomatic weight &amp; influence.<br>
+            <strong>Honor</strong> — trustworthiness in agreements.<br>
+            <strong>Infamy</strong> — reduces willingness to ally.
+          </p>
         </div>
-        
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="card-title mb-0">Diplomatic Relations</h5>
-                </div>
-                <div class="card-body">
-                    {% if relations %}
-                        <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Dynasty</th>
-                                        <th>Status</th>
-                                        <th>Score</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for relation in relations %}
-                                        <tr>
-                                            <td>{{ relation.dynasty.name }}</td>
-                                            <td>
-                                                {% if relation.status == "Allied" %}
-                                                    <span class="badge bg-success">{{ relation.status }}</span>
-                                                {% elif relation.status == "Friendly" %}
-                                                    <span class="badge bg-info">{{ relation.status }}</span>
-                                                {% elif relation.status == "Cordial" %}
-                                                    <span class="badge bg-primary">{{ relation.status }}</span>
-                                                {% elif relation.status == "Neutral" %}
-                                                    <span class="badge bg-secondary">{{ relation.status }}</span>
-                                                {% elif relation.status == "Unfriendly" %}
-                                                    <span class="badge bg-warning">{{ relation.status }}</span>
-                                                {% elif relation.status == "Hostile" %}
-                                                    <span class="badge bg-danger">{{ relation.status }}</span>
-                                                {% elif relation.status == "Nemesis" %}
-                                                    <span class="badge bg-dark">{{ relation.status }}</span>
-                                                {% else %}
-                                                    <span class="badge bg-secondary">{{ relation.status }}</span>
-                                                {% endif %}
-                                            </td>
-                                            <td>{{ relation.score }}</td>
-                                            <td>
-                                                <div class="dropdown">
-                                                    <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" id="actionDropdown{{ loop.index }}" data-bs-toggle="dropdown" aria-expanded="false">
-                                                        Actions
-                                                    </button>
-                                                    <ul class="dropdown-menu" aria-labelledby="actionDropdown{{ loop.index }}">
-                                                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#diplomaticActionModal" data-dynasty-id="{{ relation.dynasty.id }}" data-dynasty-name="{{ relation.dynasty.name }}" data-action="send_envoy">Send Envoy</a></li>
-                                                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#diplomaticActionModal" data-dynasty-id="{{ relation.dynasty.id }}" data-dynasty-name="{{ relation.dynasty.name }}" data-action="gift">Send Gift</a></li>
-                                                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#diplomaticActionModal" data-dynasty-id="{{ relation.dynasty.id }}" data-dynasty-name="{{ relation.dynasty.name }}" data-action="insult">Insult</a></li>
-                                                        <li><hr class="dropdown-divider"></li>
-                                                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#createTreatyModal" data-dynasty-id="{{ relation.dynasty.id }}" data-dynasty-name="{{ relation.dynasty.name }}">Propose Treaty</a></li>
-                                                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#declareWarModal" data-dynasty-id="{{ relation.dynasty.id }}" data-dynasty-name="{{ relation.dynasty.name }}">Declare War</a></li>
-                                                    </ul>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+      </div>
+    </div>
+
+    <!-- Diplomatic Relations table -->
+    <div class="col-md-8 mb-3">
+      <div class="card h-100">
+        <div class="card-header">Diplomatic Relations</div>
+        <div class="card-body">
+          {% if relations %}
+            <div class="table-responsive">
+              <table class="table table-striped table-hover mb-0">
+                <thead>
+                  <tr>
+                    <th>Dynasty</th>
+                    <th>Status</th>
+                    <th>Score</th>
+                    <th style="min-width:110px;">Trend</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for relation in relations %}
+                    <tr>
+                      <td style="font-family:'Cinzel',serif; font-size:0.88rem;">{{ relation.dynasty.name }}</td>
+                      <td>
+                        {% if relation.status == "Allied" %}
+                          <span class="badge badge-success">{{ relation.status }}</span>
+                        {% elif relation.status == "Friendly" %}
+                          <span class="badge badge-info">{{ relation.status }}</span>
+                        {% elif relation.status == "Cordial" %}
+                          <span class="badge badge-primary">{{ relation.status }}</span>
+                        {% elif relation.status == "Neutral" %}
+                          <span class="badge badge-secondary">{{ relation.status }}</span>
+                        {% elif relation.status == "Unfriendly" %}
+                          <span class="badge badge-warning" style="color:var(--ink);">{{ relation.status }}</span>
+                        {% elif relation.status == "Hostile" %}
+                          <span class="badge badge-danger">{{ relation.status }}</span>
+                        {% elif relation.status == "Nemesis" %}
+                          <span class="badge" style="background:var(--midnight); color:var(--blood-red); border:1px solid var(--blood-red);">{{ relation.status }}</span>
+                        {% else %}
+                          <span class="badge badge-secondary">{{ relation.status }}</span>
+                        {% endif %}
+                      </td>
+                      <td>
+                        {% if relation.score > 50 %}
+                          <span style="color:#6ab46a; font-weight:600;">{{ relation.score }}</span>
+                        {% elif relation.score >= 0 %}
+                          <span style="color:var(--gold);">{{ relation.score }}</span>
+                        {% else %}
+                          <span style="color:#d46a6a; font-weight:600;">{{ relation.score }}</span>
+                        {% endif %}
+                      </td>
+                      <td>
+                        <!-- Relation score bar: scale -100…+100 → 0…100% width -->
+                        {% set bar_pct = ((relation.score + 100) / 200 * 100) | int %}
+                        {% if bar_pct < 0 %}{% set bar_pct = 0 %}{% endif %}
+                        {% if bar_pct > 100 %}{% set bar_pct = 100 %}{% endif %}
+                        {% if relation.score > 50 %}
+                          {% set bar_color = 'bg-success' %}
+                        {% elif relation.score >= 0 %}
+                          {% set bar_color = 'bg-warning' %}
+                        {% else %}
+                          {% set bar_color = 'bg-danger' %}
+                        {% endif %}
+                        <div class="progress" style="height:8px; background:var(--dark-border);" title="{{ relation.score }}">
+                          <div class="progress-bar {{ bar_color }}" role="progressbar"
+                               style="width:{{ bar_pct }}%;"
+                               aria-valuenow="{{ relation.score }}" aria-valuemin="-100" aria-valuemax="100"></div>
                         </div>
-                    {% else %}
-                        <p>No diplomatic relations found.</p>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="card-title mb-0">Active Treaties</h5>
-                </div>
-                <div class="card-body">
-                    {% if active_treaties %}
-                        <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Dynasty</th>
-                                        <th>Treaty Type</th>
-                                        <th>Start Year</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for treaty in active_treaties %}
-                                        <tr>
-                                            <td>{{ treaty.other_dynasty.name }}</td>
-                                            <td>{{ treaty.treaty_type }}</td>
-                                            <td>{{ treaty.start_year }}</td>
-                                            <td>
-                                                <form action="{{ url_for('break_treaty', dynasty_id=dynasty.id, treaty_id=treaty.treaty.id) }}" method="post" onsubmit="return confirm('Are you sure you want to break this treaty? This will damage your reputation.');">
-                                                    <button type="submit" class="btn btn-sm btn-danger">Break Treaty</button>
-                                                </form>
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+                      </td>
+                      <td>
+                        <div class="dropdown">
+                          <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button"
+                                  id="actionDropdown{{ loop.index }}"
+                                  data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                            Actions
+                          </button>
+                          <div class="dropdown-menu dropdown-menu-right" aria-labelledby="actionDropdown{{ loop.index }}">
+                            <a class="dropdown-item" href="#"
+                               data-toggle="modal" data-target="#diplomaticActionModal"
+                               data-dynasty-id="{{ relation.dynasty.id }}"
+                               data-dynasty-name="{{ relation.dynasty.name }}"
+                               data-action="send_envoy">Send Envoy</a>
+                            <a class="dropdown-item" href="#"
+                               data-toggle="modal" data-target="#diplomaticActionModal"
+                               data-dynasty-id="{{ relation.dynasty.id }}"
+                               data-dynasty-name="{{ relation.dynasty.name }}"
+                               data-action="gift">Send Gift</a>
+                            <a class="dropdown-item" href="#"
+                               data-toggle="modal" data-target="#diplomaticActionModal"
+                               data-dynasty-id="{{ relation.dynasty.id }}"
+                               data-dynasty-name="{{ relation.dynasty.name }}"
+                               data-action="insult">Insult</a>
+                            <div class="dropdown-divider"></div>
+                            <a class="dropdown-item" href="#"
+                               data-toggle="modal" data-target="#createTreatyModal"
+                               data-dynasty-id="{{ relation.dynasty.id }}"
+                               data-dynasty-name="{{ relation.dynasty.name }}">&#10022; Propose Treaty</a>
+                            <a class="dropdown-item text-danger" href="#"
+                               data-toggle="modal" data-target="#declareWarModal"
+                               data-dynasty-id="{{ relation.dynasty.id }}"
+                               data-dynasty-name="{{ relation.dynasty.name }}">&#9876; Declare War</a>
+                          </div>
                         </div>
-                    {% else %}
-                        <p>No active treaties found.</p>
-                    {% endif %}
-                </div>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
             </div>
+          {% else %}
+            <p class="text-muted" style="font-family:'Crimson Text',serif; font-style:italic;">
+              No diplomatic relations established yet.
+            </p>
+          {% endif %}
         </div>
-        
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="card-title mb-0">Active Wars</h5>
-                </div>
-                <div class="card-body">
-                    {% if active_wars %}
-                        <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Dynasty</th>
-                                        <th>War Goal</th>
-                                        <th>Start Year</th>
-                                        <th>War Score</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for war in active_wars %}
-                                        <tr>
-                                            <td>
-                                                {% if war.is_attacker %}
-                                                    <span class="text-danger">vs</span> {{ war.other_dynasty.name }}
-                                                {% else %}
-                                                    <span class="text-danger">vs</span> {{ war.other_dynasty.name }}
-                                                {% endif %}
-                                            </td>
-                                            <td>{{ war.war_goal }}</td>
-                                            <td>{{ war.start_year }}</td>
-                                            <td>{{ war.war_score }}</td>
-                                            <td>
-                                                <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#negotiatePeaceModal" data-war-id="{{ war.war.id }}" data-dynasty-id="{{ war.other_dynasty.id }}" data-dynasty-name="{{ war.other_dynasty.name }}" data-is-attacker="{{ war.is_attacker|lower }}">Negotiate Peace</button>
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <p>No active wars found.</p>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
+      </div>
     </div>
-    
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="card-title mb-0">Diplomatic Relations Network</h5>
-                </div>
-                <div class="card-body text-center">
-                    {% if relations_image %}
-                        <img src="data:image/png;base64,{{ relations_image }}" class="img-fluid" alt="Diplomatic Relations Network">
-                    {% else %}
-                        <p>No diplomatic relations visualization available.</p>
-                    {% endif %}
-                </div>
-            </div>
+  </div>
+
+  <!-- ── Active Wars + Active Treaties ── -->
+  <div class="row mb-4">
+
+    <!-- Active Wars -->
+    <div class="col-md-6 mb-3">
+      <div class="card h-100" style="border-top-color: var(--blood-red) !important;">
+        <div class="card-header" style="border-top-color: var(--blood-red) !important;">
+          &#9876; Active Wars
         </div>
+        <div class="card-body">
+          {% if active_wars %}
+            <div class="table-responsive">
+              <table class="table table-striped table-hover mb-0">
+                <thead>
+                  <tr>
+                    <th>Opponent</th>
+                    <th>War Goal</th>
+                    <th>Year</th>
+                    <th>Score</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for war in active_wars %}
+                    <tr>
+                      <td>
+                        <span style="color:var(--blood-red);">&#9876;</span>
+                        {{ war.other_dynasty.name }}
+                      </td>
+                      <td><span class="badge badge-danger">{{ war.war_goal }}</span></td>
+                      <td>{{ war.start_year }}</td>
+                      <td>
+                        {% if war.war_score > 0 %}
+                          <span style="color:#6ab46a; font-weight:600;">+{{ war.war_score }}</span>
+                        {% elif war.war_score < 0 %}
+                          <span style="color:#d46a6a; font-weight:600;">{{ war.war_score }}</span>
+                        {% else %}
+                          <span style="color:var(--text-muted);">{{ war.war_score }}</span>
+                        {% endif %}
+                      </td>
+                      <td>
+                        <button class="btn btn-sm btn-success"
+                                data-toggle="modal" data-target="#negotiatePeaceModal"
+                                data-war-id="{{ war.war.id }}"
+                                data-dynasty-id="{{ war.other_dynasty.id }}"
+                                data-dynasty-name="{{ war.other_dynasty.name }}"
+                                data-is-attacker="{{ war.is_attacker|lower }}">
+                          Negotiate Peace
+                        </button>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <p class="text-muted" style="font-family:'Crimson Text',serif; font-style:italic;">
+              Your realm is at peace — for now.
+            </p>
+          {% endif %}
+        </div>
+      </div>
     </div>
-    
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="card-title mb-0">Treaty Network</h5>
-                </div>
-                <div class="card-body text-center">
-                    {% if treaty_image %}
-                        <img src="data:image/png;base64,{{ treaty_image }}" class="img-fluid" alt="Treaty Network">
-                    {% else %}
-                        <p>No treaty network visualization available.</p>
-                    {% endif %}
-                </div>
+
+    <!-- Active Treaties -->
+    <div class="col-md-6 mb-3">
+      <div class="card h-100">
+        <div class="card-header">&#10022; Active Treaties</div>
+        <div class="card-body">
+          {% if active_treaties %}
+            <div class="table-responsive">
+              <table class="table table-striped table-hover mb-0">
+                <thead>
+                  <tr>
+                    <th>Dynasty</th>
+                    <th>Type</th>
+                    <th>Since</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for treaty in active_treaties %}
+                    <tr>
+                      <td>{{ treaty.other_dynasty.name }}</td>
+                      <td>
+                        <span class="badge badge-info">{{ treaty.treaty_type }}</span>
+                      </td>
+                      <td>{{ treaty.start_year }}</td>
+                      <td>
+                        <form action="{{ url_for('diplomacy.break_treaty', dynasty_id=dynasty.id, treaty_id=treaty.treaty.id) }}"
+                              method="post"
+                              onsubmit="return confirm('Break this treaty? Your reputation will suffer.');">
+                          <button type="submit" class="btn btn-sm btn-danger">Break</button>
+                        </form>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
             </div>
+          {% else %}
+            <p class="text-muted" style="font-family:'Crimson Text',serif; font-style:italic;">
+              No active treaties — the quill awaits your seal.
+            </p>
+          {% endif %}
         </div>
-        
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="card-title mb-0">Diplomatic History</h5>
-                </div>
-                <div class="card-body text-center">
-                    {% if history_image %}
-                        <img src="data:image/png;base64,{{ history_image }}" class="img-fluid" alt="Diplomatic History">
-                    {% else %}
-                        <p>No diplomatic history visualization available.</p>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
+      </div>
     </div>
+  </div>
+
+  <!-- ── Visualizations ── -->
+  <div class="row mb-4">
+    <div class="col-12 mb-3">
+      <div class="card">
+        <div class="card-header">Diplomatic Relations Network</div>
+        <div class="card-body text-center">
+          {% if relations_image %}
+            <img src="data:image/png;base64,{{ relations_image }}" class="img-fluid" alt="Diplomatic Relations Network">
+          {% else %}
+            <p class="text-muted" style="font-family:'Crimson Text',serif; font-style:italic;">
+              No relations map available.
+            </p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6 mb-3">
+      <div class="card">
+        <div class="card-header">Treaty Network</div>
+        <div class="card-body text-center">
+          {% if treaty_image %}
+            <img src="data:image/png;base64,{{ treaty_image }}" class="img-fluid" alt="Treaty Network">
+          {% else %}
+            <p class="text-muted" style="font-family:'Crimson Text',serif; font-style:italic;">
+              No treaty network visualization available.
+            </p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6 mb-3">
+      <div class="card">
+        <div class="card-header">Diplomatic History</div>
+        <div class="card-body text-center">
+          {% if history_image %}
+            <img src="data:image/png;base64,{{ history_image }}" class="img-fluid" alt="Diplomatic History">
+          {% else %}
+            <p class="text-muted" style="font-family:'Crimson Text',serif; font-style:italic;">
+              No diplomatic history visualization available.
+            </p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<!-- ── Diplomatic Action Modal ── -->
+<div class="modal fade" id="diplomaticActionModal" tabindex="-1"
+     aria-labelledby="diplomaticActionModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="diplomaticActionModalLabel">Diplomatic Action</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <form action="{{ url_for('diplomacy.perform_diplomatic_action', dynasty_id=dynasty.id) }}" method="post">
+        <div class="modal-body">
+          <input type="hidden" name="target_dynasty_id" id="targetDynastyId">
+          <input type="hidden" name="action_type" id="actionType">
+          <p>You are about to perform a diplomatic action with
+            <span id="targetDynastyName" style="color:var(--gold); font-family:'Cinzel',serif;"></span>.
+          </p>
+          <p id="actionDescription" class="text-muted" style="font-family:'Crimson Text',serif; font-style:italic;"></p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Confirm</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
 
-<!-- Diplomatic Action Modal -->
-<div class="modal fade" id="diplomaticActionModal" tabindex="-1" aria-labelledby="diplomaticActionModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="diplomaticActionModalLabel">Diplomatic Action</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form action="{{ url_for('perform_diplomatic_action', dynasty_id=dynasty.id) }}" method="post">
-                <div class="modal-body">
-                    <input type="hidden" name="target_dynasty_id" id="targetDynastyId">
-                    <input type="hidden" name="action_type" id="actionType">
-                    
-                    <p>You are about to perform a diplomatic action with <span id="targetDynastyName" class="fw-bold"></span>.</p>
-                    <p id="actionDescription"></p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Confirm</button>
-                </div>
-            </form>
+<!-- ── Create Treaty Modal ── -->
+<div class="modal fade" id="createTreatyModal" tabindex="-1"
+     aria-labelledby="createTreatyModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="createTreatyModalLabel">&#10022; Propose Treaty</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <form action="{{ url_for('diplomacy.create_treaty', dynasty_id=dynasty.id) }}" method="post">
+        <div class="modal-body">
+          <input type="hidden" name="target_dynasty_id" id="treatyTargetDynastyId">
+          <p>You are about to propose a treaty with
+            <span id="treatyTargetDynastyName" style="color:var(--gold); font-family:'Cinzel',serif;"></span>.
+          </p>
+          <div class="form-group">
+            <label for="treatyType" class="form-label">Treaty Type</label>
+            <select class="form-control" id="treatyType" name="treaty_type" required>
+              <option value="NON_AGGRESSION">Non-Aggression Pact</option>
+              <option value="DEFENSIVE_ALLIANCE">Defensive Alliance</option>
+              <option value="MILITARY_ALLIANCE">Military Alliance</option>
+              <option value="TRADE_AGREEMENT">Trade Agreement</option>
+              <option value="MARKET_ACCESS">Market Access</option>
+              <option value="RESOURCE_EXCHANGE">Resource Exchange</option>
+              <option value="CULTURAL_EXCHANGE">Cultural Exchange</option>
+              <option value="ROYAL_MARRIAGE">Royal Marriage</option>
+            </select>
+          </div>
+          <div class="form-group mb-0">
+            <label for="duration" class="form-label">Duration (years — leave empty for permanent)</label>
+            <input type="number" class="form-control" id="duration" name="duration" min="1">
+          </div>
         </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">&#10022; Propose Treaty</button>
+        </div>
+      </form>
     </div>
+  </div>
 </div>
 
-<!-- Create Treaty Modal -->
-<div class="modal fade" id="createTreatyModal" tabindex="-1" aria-labelledby="createTreatyModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="createTreatyModalLabel">Propose Treaty</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form action="{{ url_for('create_treaty', dynasty_id=dynasty.id) }}" method="post">
-                <div class="modal-body">
-                    <input type="hidden" name="target_dynasty_id" id="treatyTargetDynastyId">
-                    
-                    <p>You are about to propose a treaty with <span id="treatyTargetDynastyName" class="fw-bold"></span>.</p>
-                    
-                    <div class="mb-3">
-                        <label for="treatyType" class="form-label">Treaty Type</label>
-                        <select class="form-select" id="treatyType" name="treaty_type" required>
-                            <option value="NON_AGGRESSION">Non-Aggression Pact</option>
-                            <option value="DEFENSIVE_ALLIANCE">Defensive Alliance</option>
-                            <option value="MILITARY_ALLIANCE">Military Alliance</option>
-                            <option value="TRADE_AGREEMENT">Trade Agreement</option>
-                            <option value="MARKET_ACCESS">Market Access</option>
-                            <option value="RESOURCE_EXCHANGE">Resource Exchange</option>
-                            <option value="CULTURAL_EXCHANGE">Cultural Exchange</option>
-                            <option value="ROYAL_MARRIAGE">Royal Marriage</option>
-                        </select>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="duration" class="form-label">Duration (years, leave empty for permanent)</label>
-                        <input type="number" class="form-control" id="duration" name="duration" min="1">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Propose Treaty</button>
-                </div>
-            </form>
+<!-- ── Declare War Modal ── -->
+<div class="modal fade" id="declareWarModal" tabindex="-1"
+     aria-labelledby="declareWarModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="border-top-color: var(--blood-red) !important;">
+        <h5 class="modal-title" id="declareWarModalLabel">&#9876; Declare War</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <form action="{{ url_for('diplomacy.declare_war', dynasty_id=dynasty.id) }}" method="post">
+        <div class="modal-body">
+          <input type="hidden" name="target_dynasty_id" id="warTargetDynastyId">
+          <div class="alert alert-danger">
+            <strong>&#9888; Warning:</strong> You are about to declare war on
+            <span id="warTargetDynastyName" style="font-family:'Cinzel',serif;"></span>.
+            This will damage your relations and increase your infamy.
+          </div>
+          <div class="form-group">
+            <label for="warGoal" class="form-label">War Goal</label>
+            <select class="form-control" id="warGoal" name="war_goal" required>
+              <option value="CONQUEST">Conquest</option>
+              <option value="VASSALIZE">Vassalize</option>
+              <option value="TRIBUTE">Tribute</option>
+              <option value="HUMILIATE">Humiliate</option>
+            </select>
+          </div>
+          <div class="form-group mb-0" id="targetTerritoryDiv">
+            <label for="targetTerritory" class="form-label">Target Territory (for Conquest)</label>
+            <select class="form-control" id="targetTerritory" name="target_territory_id">
+              <option value="">Select Territory</option>
+            </select>
+          </div>
         </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger">&#9876; Declare War</button>
+        </div>
+      </form>
     </div>
+  </div>
 </div>
 
-<!-- Declare War Modal -->
-<div class="modal fade" id="declareWarModal" tabindex="-1" aria-labelledby="declareWarModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="declareWarModalLabel">Declare War</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form action="{{ url_for('declare_war', dynasty_id=dynasty.id) }}" method="post">
-                <div class="modal-body">
-                    <input type="hidden" name="target_dynasty_id" id="warTargetDynastyId">
-                    
-                    <div class="alert alert-danger">
-                        <p><strong>Warning:</strong> You are about to declare war on <span id="warTargetDynastyName" class="fw-bold"></span>.</p>
-                        <p>This will damage your relations and increase your infamy. Make sure you are prepared for war.</p>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="warGoal" class="form-label">War Goal</label>
-                        <select class="form-select" id="warGoal" name="war_goal" required>
-                            <option value="CONQUEST">Conquest</option>
-                            <option value="VASSALIZE">Vassalize</option>
-                            <option value="TRIBUTE">Tribute</option>
-                            <option value="HUMILIATE">Humiliate</option>
-                        </select>
-                    </div>
-                    
-                    <div class="mb-3" id="targetTerritoryDiv">
-                        <label for="targetTerritory" class="form-label">Target Territory (for Conquest)</label>
-                        <select class="form-select" id="targetTerritory" name="target_territory_id">
-                            <option value="">Select Territory</option>
-                            <!-- This would be populated with JavaScript based on the target dynasty's territories -->
-                        </select>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-danger">Declare War</button>
-                </div>
-            </form>
+<!-- ── Negotiate Peace Modal ── -->
+<div class="modal fade" id="negotiatePeaceModal" tabindex="-1"
+     aria-labelledby="negotiatePeaceModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="negotiatePeaceModalLabel">Negotiate Peace</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <form id="negotiatePeaceForm" method="post">
+        <div class="modal-body">
+          <p>You are negotiating peace with
+            <span id="peaceTargetDynastyName" style="color:var(--gold); font-family:'Cinzel',serif;"></span>.
+          </p>
+          <div class="form-group">
+            <label for="territoryId" class="form-label">Territory Transfer</label>
+            <select class="form-control" id="territoryId" name="territory_id">
+              <option value="">None</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="goldPayment" class="form-label">Gold Payment</label>
+            <input type="number" class="form-control" id="goldPayment" name="gold_payment" min="0" value="0">
+          </div>
+          <div class="form-group mb-0 form-check">
+            <input type="checkbox" class="form-check-input" id="vassalize" name="vassalize">
+            <label class="form-check-label" for="vassalize">Vassalize</label>
+          </div>
         </div>
-    </div>
-</div>
-
-<!-- Negotiate Peace Modal -->
-<div class="modal fade" id="negotiatePeaceModal" tabindex="-1" aria-labelledby="negotiatePeaceModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="negotiatePeaceModalLabel">Negotiate Peace</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form id="negotiatePeaceForm" method="post">
-                <div class="modal-body">
-                    <p>You are negotiating peace with <span id="peaceTargetDynastyName" class="fw-bold"></span>.</p>
-                    
-                    <div class="mb-3">
-                        <label for="territoryId" class="form-label">Territory Transfer</label>
-                        <select class="form-select" id="territoryId" name="territory_id">
-                            <option value="">None</option>
-                            <!-- This would be populated with JavaScript based on the territories -->
-                        </select>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="goldPayment" class="form-label">Gold Payment</label>
-                        <input type="number" class="form-control" id="goldPayment" name="gold_payment" min="0" value="0">
-                    </div>
-                    
-                    <div class="mb-3 form-check">
-                        <input type="checkbox" class="form-check-input" id="vassalize" name="vassalize">
-                        <label class="form-check-label" for="vassalize">Vassalize</label>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-success">Negotiate Peace</button>
-                </div>
-            </form>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-success">Negotiate Peace</button>
         </div>
+      </form>
     </div>
+  </div>
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Diplomatic Action Modal
-        var diplomaticActionModal = document.getElementById('diplomaticActionModal');
-        diplomaticActionModal.addEventListener('show.bs.modal', function(event) {
-            var button = event.relatedTarget;
-            var dynastyId = button.getAttribute('data-dynasty-id');
-            var dynastyName = button.getAttribute('data-dynasty-name');
-            var action = button.getAttribute('data-action');
-            
-            var targetDynastyIdInput = document.getElementById('targetDynastyId');
-            var targetDynastyNameSpan = document.getElementById('targetDynastyName');
-            var actionTypeInput = document.getElementById('actionType');
-            var actionDescriptionP = document.getElementById('actionDescription');
-            
-            targetDynastyIdInput.value = dynastyId;
-            targetDynastyNameSpan.textContent = dynastyName;
-            actionTypeInput.value = action;
-            
-            // Set action description
-            var descriptions = {
-                'send_envoy': 'Sending an envoy will improve relations slightly.',
-                'gift': 'Sending a gift will improve relations moderately.',
-                'insult': 'Insulting will worsen relations moderately.',
-                'arrange_marriage': 'Arranging a marriage will significantly improve relations and create a family bond.',
-                'declare_rivalry': 'Declaring rivalry will significantly worsen relations and may lead to conflict.'
-            };
-            
-            actionDescriptionP.textContent = descriptions[action] || 'This action will affect your diplomatic relations.';
-        });
-        
-        // Create Treaty Modal
-        var createTreatyModal = document.getElementById('createTreatyModal');
-        createTreatyModal.addEventListener('show.bs.modal', function(event) {
-            var button = event.relatedTarget;
-            var dynastyId = button.getAttribute('data-dynasty-id');
-            var dynastyName = button.getAttribute('data-dynasty-name');
-            
-            var targetDynastyIdInput = document.getElementById('treatyTargetDynastyId');
-            var targetDynastyNameSpan = document.getElementById('treatyTargetDynastyName');
-            
-            targetDynastyIdInput.value = dynastyId;
-            targetDynastyNameSpan.textContent = dynastyName;
-        });
-        
-        // Declare War Modal
-        var declareWarModal = document.getElementById('declareWarModal');
-        declareWarModal.addEventListener('show.bs.modal', function(event) {
-            var button = event.relatedTarget;
-            var dynastyId = button.getAttribute('data-dynasty-id');
-            var dynastyName = button.getAttribute('data-dynasty-name');
-            
-            var targetDynastyIdInput = document.getElementById('warTargetDynastyId');
-            var targetDynastyNameSpan = document.getElementById('warTargetDynastyName');
-            
-            targetDynastyIdInput.value = dynastyId;
-            targetDynastyNameSpan.textContent = dynastyName;
-            
-            // Show/hide target territory select based on war goal
-            var warGoalSelect = document.getElementById('warGoal');
-            var targetTerritoryDiv = document.getElementById('targetTerritoryDiv');
-            
-            warGoalSelect.addEventListener('change', function() {
-                if (this.value === 'CONQUEST') {
-                    targetTerritoryDiv.style.display = 'block';
-                } else {
-                    targetTerritoryDiv.style.display = 'none';
-                }
-            });
-            
-            // Trigger change event to set initial state
-            warGoalSelect.dispatchEvent(new Event('change'));
-        });
-        
-        // Negotiate Peace Modal
-        var negotiatePeaceModal = document.getElementById('negotiatePeaceModal');
-        negotiatePeaceModal.addEventListener('show.bs.modal', function(event) {
-            var button = event.relatedTarget;
-            var warId = button.getAttribute('data-war-id');
-            var dynastyId = button.getAttribute('data-dynasty-id');
-            var dynastyName = button.getAttribute('data-dynasty-name');
-            var isAttacker = button.getAttribute('data-is-attacker') === 'true';
-            
-            var targetDynastyNameSpan = document.getElementById('peaceTargetDynastyName');
-            var negotiatePeaceForm = document.getElementById('negotiatePeaceForm');
-            
-            targetDynastyNameSpan.textContent = dynastyName;
-            negotiatePeaceForm.action = "{{ url_for('negotiate_peace', dynasty_id=dynasty.id, war_id=0) }}".replace('/0', '/') + warId;
-        });
+  document.addEventListener('DOMContentLoaded', function() {
+
+    // ── Diplomatic Action Modal ──
+    var diplomaticActionModal = document.getElementById('diplomaticActionModal');
+    diplomaticActionModal.addEventListener('show.bs.modal', function(event) {
+      var button = event.relatedTarget;
+      document.getElementById('targetDynastyId').value    = button.getAttribute('data-dynasty-id');
+      document.getElementById('targetDynastyName').textContent = button.getAttribute('data-dynasty-name');
+      document.getElementById('actionType').value         = button.getAttribute('data-action');
+      var descriptions = {
+        'send_envoy': 'Sending an envoy will improve relations slightly.',
+        'gift':       'Sending a gift will improve relations moderately.',
+        'insult':     'Insulting will worsen relations moderately.',
+        'arrange_marriage': 'Arranging a marriage will significantly improve relations and create a family bond.',
+        'declare_rivalry':  'Declaring rivalry will significantly worsen relations and may lead to conflict.'
+      };
+      var action = button.getAttribute('data-action');
+      document.getElementById('actionDescription').textContent =
+        descriptions[action] || 'This action will affect your diplomatic relations.';
     });
+
+    // ── Create Treaty Modal ──
+    var createTreatyModal = document.getElementById('createTreatyModal');
+    createTreatyModal.addEventListener('show.bs.modal', function(event) {
+      var button = event.relatedTarget;
+      document.getElementById('treatyTargetDynastyId').value        = button.getAttribute('data-dynasty-id');
+      document.getElementById('treatyTargetDynastyName').textContent = button.getAttribute('data-dynasty-name');
+    });
+
+    // ── Declare War Modal ──
+    var declareWarModal = document.getElementById('declareWarModal');
+    declareWarModal.addEventListener('show.bs.modal', function(event) {
+      var button = event.relatedTarget;
+      document.getElementById('warTargetDynastyId').value        = button.getAttribute('data-dynasty-id');
+      document.getElementById('warTargetDynastyName').textContent = button.getAttribute('data-dynasty-name');
+
+      var warGoalSelect    = document.getElementById('warGoal');
+      var targetTerrDiv    = document.getElementById('targetTerritoryDiv');
+      function toggleTerritory() {
+        targetTerrDiv.style.display = warGoalSelect.value === 'CONQUEST' ? 'block' : 'none';
+      }
+      warGoalSelect.removeEventListener('change', toggleTerritory);
+      warGoalSelect.addEventListener('change', toggleTerritory);
+      toggleTerritory();
+    });
+
+    // ── Negotiate Peace Modal ──
+    var negotiatePeaceModal = document.getElementById('negotiatePeaceModal');
+    negotiatePeaceModal.addEventListener('show.bs.modal', function(event) {
+      var button = event.relatedTarget;
+      var warId  = button.getAttribute('data-war-id');
+      document.getElementById('peaceTargetDynastyName').textContent = button.getAttribute('data-dynasty-name');
+      document.getElementById('negotiatePeaceForm').action =
+        "{{ url_for('diplomacy.negotiate_peace', dynasty_id=dynasty.id, war_id=0) }}".replace('/0', '/') + warId;
+    });
+
+    // Bootstrap 4 uses jQuery for modal events — wire data-toggle fallback if needed
+    // (Bootstrap 4 is jQuery-based; the above show.bs.modal events work via jQuery too)
+  });
 </script>
 {% endblock %}

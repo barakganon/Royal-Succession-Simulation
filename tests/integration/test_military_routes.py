@@ -68,7 +68,7 @@ class TestMilitaryAuthGuards:
 
     def test_military_view_unauthenticated_goes_to_login(self, plain_client):
         response = plain_client.get('/dynasty/1/military', follow_redirects=True)
-        assert b'Log In' in response.data
+        assert b'Enter the Realm' in response.data
 
     def test_military_gameplay_unauthenticated_redirects(self, plain_client):
         response = plain_client.get('/dynasty/1/military_gameplay', follow_redirects=False)

@@ -33,7 +33,7 @@
               <a class="nav-link" href="{{ url_for('auth.dashboard') }}">Dashboard</a>
             </li>
             <li class="nav-item {% if request.endpoint == 'create_dynasty_placeholder' or request.endpoint == 'create_dynasty' %}active{% endif %}">
-              <a class="nav-link" href="{{ url_for('create_dynasty_placeholder') }}">New Dynasty</a>
+              <a class="nav-link" href="{{ url_for('map.create_dynasty_placeholder') }}">New Dynasty</a>
             </li>
           {% endif %}
         </ul>
