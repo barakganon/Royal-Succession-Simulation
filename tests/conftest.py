@@ -7,6 +7,10 @@ import pytest
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 
+# Force the non-interactive Agg backend so that plt.show() is a no-op in tests.
+# This must happen before any matplotlib import elsewhere in the process.
+os.environ.setdefault('MPLBACKEND', 'Agg')
+
 # Add the project root directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 

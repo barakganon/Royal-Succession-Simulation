@@ -1,270 +1,254 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - {{ current_user.username }}{% endblock %}
+{% block title %}Dashboard — {{ current_user.username }}{% endblock %}
 
 {% block content %}
-  <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">Royal Succession Simulation Dashboard</h1>
-    <div class="btn-toolbar mb-2 mb-md-0">
-      <div>
-        <a href="{{ url_for('create_dynasty') }}" class="btn btn-sm btn-outline-success mr-2">
-          <span data-feather="plus-circle"></span>
-          Start New Dynasty
-        </a>
-        <a href="{{ url_for('world_map') }}" class="btn btn-sm btn-outline-primary mr-2">
-          <span data-feather="globe"></span>
-          World Map
-        </a>
-        <a href="{{ url_for('world_economy_view') }}" class="btn btn-sm btn-outline-info">
-          <span data-feather="dollar-sign"></span>
-          World Economy
-        </a>
+<!-- ── Page header ─────────────────────────────────────────── -->
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+  <h1 class="h2">Royal Succession — Dashboard</h1>
+  <div class="btn-toolbar mb-2 mb-md-0">
+    <a href="{{ url_for('create_dynasty') }}" class="btn btn-sm btn-outline-success mr-2">
+      <span data-feather="plus-circle"></span> Start New Dynasty
+    </a>
+    <a href="{{ url_for('world_map') }}" class="btn btn-sm btn-outline-primary mr-2">
+      <span data-feather="globe"></span> World Map
+    </a>
+    <a href="{{ url_for('world_economy_view') }}" class="btn btn-sm btn-outline-info">
+      <span data-feather="dollar-sign"></span> World Economy
+    </a>
+  </div>
+</div>
+
+<!-- ── Quick-stats row ─────────────────────────────────────── -->
+<div class="row mb-4">
+  <div class="col-md-3 col-6 mb-3">
+    <div class="card quick-stat-card text-white bg-primary">
+      <div class="card-body">
+        <div class="stat-value">{{ game_stats.total_dynasties }}</div>
+        <div class="stat-label">Dynasties</div>
       </div>
     </div>
   </div>
-
-  <!-- Game Statistics Overview -->
-  <div class="row mb-4">
-    <div class="col-md-3">
-      <div class="card text-white bg-primary">
-        <div class="card-body">
-          <h5 class="card-title">Dynasties</h5>
-          <p class="card-text display-4">{{ game_stats.total_dynasties }}</p>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card text-white bg-success">
-        <div class="card-body">
-          <h5 class="card-title">Territories</h5>
-          <p class="card-text display-4">{{ game_stats.total_territories }}</p>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card text-white bg-danger">
-        <div class="card-body">
-          <h5 class="card-title">Battles</h5>
-          <p class="card-text display-4">{{ game_stats.total_battles }}</p>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card text-white bg-info">
-        <div class="card-body">
-          <h5 class="card-title">Treaties</h5>
-          <p class="card-text display-4">{{ game_stats.total_treaties }}</p>
-        </div>
+  <div class="col-md-3 col-6 mb-3">
+    <div class="card quick-stat-card text-white bg-success">
+      <div class="card-body">
+        <div class="stat-value">{{ game_stats.total_territories }}</div>
+        <div class="stat-label">Territories</div>
       </div>
     </div>
   </div>
-
-  <!-- AI Advisor Panel -->
-  {% for dynasties in dynasties %}
-  <div id="advisor-panel-{{ dynasties.id }}" class="card mb-3 border-warning" style="display:none;">
-    <div class="card-header d-flex justify-content-between align-items-center bg-warning bg-opacity-10">
-      <strong>&#9876; Hand of the King &mdash; Counsel for {{ dynasties.name }}</strong>
-      <button type="button" class="btn-close" onclick="document.getElementById('advisor-panel-{{ dynasties.id }}').style.display='none'"></button>
-    </div>
-    <div class="card-body" id="advisor-suggestions-{{ dynasties.id }}">
-      <p class="text-muted">Loading counsel...</p>
+  <div class="col-md-3 col-6 mb-3">
+    <div class="card quick-stat-card text-white bg-danger">
+      <div class="card-body">
+        <div class="stat-value">{{ game_stats.total_battles }}</div>
+        <div class="stat-label">Battles Fought</div>
+      </div>
     </div>
   </div>
-  <script>
-  (function() {
-    var dynastyId = {{ dynasties.id }};
-    var panel = document.getElementById('advisor-panel-' + dynastyId);
-    var container = document.getElementById('advisor-suggestions-' + dynastyId);
-    fetch('/game/' + dynastyId + '/advisor')
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        if (data.suggestions && data.suggestions.length) {
-          var html = '<ol>';
-          data.suggestions.forEach(function(s) { html += '<li>' + s + '</li>'; });
-          html += '</ol>';
-          container.innerHTML = html;
-          panel.style.display = '';
-        }
-      })
-      .catch(function() { /* silently hide on error */ });
-  })();
-  </script>
-  {% endfor %}
+  <div class="col-md-3 col-6 mb-3">
+    <div class="card quick-stat-card text-white bg-info">
+      <div class="card-body">
+        <div class="stat-value">{{ game_stats.total_treaties }}</div>
+        <div class="stat-label">Treaties</div>
+      </div>
+    </div>
+  </div>
+</div>
 
-  <!-- Your Dynasties Section -->
-  <div class="row mb-4">
-    <div class="col-md-8">
-      <div class="card">
-        <div class="card-header bg-dark text-white">
-          <h4 class="mb-0">Your Active Dynasties</h4>
-        </div>
-        <div class="card-body">
-          {% if dynasties %}
-            <div class="list-group">
-              {% for dynasties in dynasties %}
-                <div class="list-group-item list-group-item-action">
-                  <div class="d-flex w-100 justify-content-between">
-                    <h5 class="mb-1">
-                      {% if dynasties.coat_of_arms_svg %}
-                      <div class="coat-of-arms-small d-inline-block me-2" style="width:40px;height:48px;vertical-align:middle;">
-                        {{ dynasties.coat_of_arms_svg | safe }}
-                      </div>
-                      {% endif %}
-                      {{ dynasties.name }}
-                    </h5>
-                    <small>Year: {{ dynasties.current_simulation_year }}</small>
-                  </div>
-                  <p class="mb-1">Wealth: {{ dynasties.current_wealth }} | Prestige: {{ dynasties.prestige }} | Honor: {{ dynasties.honor }}</p>
-                  <small>Last played: {{ dynasties.last_played_at.strftime('%Y-%m-%d %H:%M') if dynasties.last_played_at else 'Never' }}</small>
-                  
-                  <div class="mt-3">
-                    <div class="row">
-                      <div class="col-12 mb-2">
-                        <a href="{{ url_for('view_dynasty', dynasty_id=dynasties.id) }}" class="btn btn-primary btn-sm">
-                          <i data-feather="eye"></i> View
-                        </a>
-                        <a href="{{ url_for('military_view', dynasty_id=dynasties.id) }}" class="btn btn-danger btn-sm">
-                          <i data-feather="shield"></i> Military
-                        </a>
-                        <a href="{{ url_for('military_gameplay', dynasty_id=dynasties.id) }}" class="btn btn-warning btn-sm">
-                          <i data-feather="target"></i> Military Operations
-                        </a>
-                      </div>
-                      <div class="col-12">
-                        <a href="{{ url_for('diplomacy_view', dynasty_id=dynasties.id) }}" class="btn btn-info btn-sm">
-                          <i data-feather="users"></i> Diplomacy
-                        </a>
-                        <a href="{{ url_for('dynasty_economy', dynasty_id=dynasties.id) }}" class="btn btn-success btn-sm">
-                          <i data-feather="dollar-sign"></i> Economy
-                        </a>
-                        <a href="{{ url_for('time_view', dynasty_id=dynasties.id) }}" class="btn btn-secondary btn-sm">
-                          <i data-feather="clock"></i> Time
-                        </a>
-                    </div>
-                      <div class="col-12 mt-2">
-                        <a href="{{ url_for('advance_turn', dynasty_id=dynasties.id) }}" class="btn btn-warning btn-sm">
-                          <i data-feather="skip-forward"></i> Advance Turn
-                        </a>
-                        <a href="{{ url_for('delete_dynasty', dynasty_id=dynasties.id) }}" class="btn btn-outline-danger btn-sm">
-                          <i data-feather="trash-2"></i> Delete
-                        </a>
-                      </div>
-                    </div>
-                  </div>
+<!-- ── AI Advisor panels (one per dynasty, loaded via fetch) ── -->
+{% for dynasty_item in dynasties.items %}
+<div id="advisor-panel-{{ dynasty_item.id }}" class="advisor-panel mb-3" style="display:none;">
+  <div class="advisor-header">
+    <span>&#9878; Hand of the King &mdash; Counsel for {{ dynasty_item.name }}</span>
+    <button class="advisor-dismiss-btn" onclick="document.getElementById('advisor-panel-{{ dynasty_item.id }}').style.display='none'" title="Dismiss">&times;</button>
+  </div>
+  <div class="advisor-body" id="advisor-suggestions-{{ dynasty_item.id }}">
+    <p class="text-muted">Loading counsel…</p>
+  </div>
+</div>
+<script>
+(function() {
+  var dynastyId = {{ dynasty_item.id }};
+  var panel  = document.getElementById('advisor-panel-'       + dynastyId);
+  var container = document.getElementById('advisor-suggestions-' + dynastyId);
+  if (!panel || !container) return;
+  fetch('/game/' + dynastyId + '/advisor')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.suggestions && data.suggestions.length) {
+        var iconMap = { 0: '⚔', 1: '💰', 2: '🕊' };
+        var html = '<ol>';
+        data.suggestions.forEach(function(s, i) {
+          html += '<li>' + (iconMap[i] || '⚜') + ' ' + s + '</li>';
+        });
+        html += '</ol>';
+        container.innerHTML = html;
+        panel.style.display = '';
+      }
+    })
+    .catch(function() { /* hide on error */ });
+})();
+</script>
+{% endfor %}
+
+<!-- ── Main content row ────────────────────────────────────── -->
+<div class="row mb-4">
+
+  <!-- Dynasty cards column -->
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header bg-dark text-white">
+        <h4 class="mb-0">Your Active Dynasties</h4>
+      </div>
+      <div class="card-body p-2">
+        {% if dynasties.items %}
+          {% for dynasty_item in dynasties.items %}
+          <div class="dynasty-card card mb-3">
+            <div class="card-body d-flex align-items-center py-2 px-3">
+
+              <!-- Coat of arms thumbnail -->
+              {% if dynasty_item.coat_of_arms_svg %}
+              <div class="coa-thumb mr-3 flex-shrink-0" style="width:60px;height:70px;">
+                {{ dynasty_item.coat_of_arms_svg | safe }}
+              </div>
+              {% else %}
+              <div class="mr-3 flex-shrink-0 text-center" style="width:60px;font-size:2rem;line-height:70px;">⚜</div>
+              {% endif %}
+
+              <!-- Dynasty info -->
+              <div class="flex-grow-1 mr-3">
+                <div class="dynasty-name">{{ dynasty_item.name }}</div>
+                <small class="text-muted">
+                  Year {{ dynasty_item.current_simulation_year }}
+                  {% if dynasty_item.theme_identifier_or_json %}
+                  &nbsp;·&nbsp; {{ dynasty_item.theme_identifier_or_json[:24] }}…
+                  {% endif %}
+                </small>
+                <div class="mt-1">
+                  <span class="badge badge-warning mr-1">&#9878; {{ dynasty_item.current_wealth }} wealth</span>
+                  <span class="badge badge-secondary mr-1">&#9733; {{ dynasty_item.prestige }} prestige</span>
+                  <span class="badge badge-info">&#9812; {{ dynasty_item.honor }} honor</span>
                 </div>
-              {% endfor %}
-            </div>
-          {% else %}
-            <div class="alert alert-info" role="alert">
-              You haven't started any dynasties yet. Time to forge your legacy!
-            </div>
-          {% endif %}
-          <a href="{{ url_for('generate_initial_map') }}" class="btn btn-primary">Generate Initial Map</a>
-        </div>
-      </div>
-    </div>
+                <small class="text-muted d-block mt-1">
+                  Last played: {{ dynasty_item.last_played_at.strftime('%Y-%m-%d %H:%M') if dynasty_item.last_played_at else 'Never' }}
+                </small>
+              </div>
 
-    <!-- Active Players Section -->
-    <div class="col-md-4">
-      <div class="card">
-        <div class="card-header bg-dark text-white">
-          <h4 class="mb-0">Active Players</h4>
-        </div>
-        <div class="card-body">
-          {% if active_players %}
-            <ul class="list-group">
-              {% for player in active_players %}
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                  {{ player.username }}
-                  <span class="badge badge-primary badge-pill">{{ player.dynasty_name }}</span>
-                </li>
-              {% endfor %}
+              <!-- Action buttons column -->
+              <div class="d-flex flex-column flex-shrink-0" style="gap:.3rem;min-width:120px;">
+                <a href="{{ url_for('view_dynasty', dynasty_id=dynasty_item.id) }}"
+                   class="btn btn-sm btn-primary">
+                  <span data-feather="eye" style="width:13px;height:13px;"></span> View
+                </a>
+                <a href="{{ url_for('advance_turn', dynasty_id=dynasty_item.id) }}"
+                   class="btn btn-sm btn-success">
+                  &#9654; Advance Turn
+                </a>
+                <div class="d-flex" style="gap:.3rem;">
+                  <a href="{{ url_for('military_view', dynasty_id=dynasty_item.id) }}"
+                     class="btn btn-sm btn-danger flex-fill" title="Military">&#9876;</a>
+                  <a href="{{ url_for('dynasty_economy', dynasty_id=dynasty_item.id) }}"
+                     class="btn btn-sm btn-warning flex-fill" title="Economy">&#128176;</a>
+                  <a href="{{ url_for('diplomacy_view', dynasty_id=dynasty_item.id) }}"
+                     class="btn btn-sm btn-info flex-fill" title="Diplomacy">&#128506;</a>
+                </div>
+                <a href="{{ url_for('military_gameplay', dynasty_id=dynasty_item.id) }}"
+                   class="btn btn-sm btn-secondary">
+                  <span data-feather="target" style="width:13px;height:13px;"></span> Operations
+                </a>
+                <div class="d-flex" style="gap:.3rem;">
+                  <a href="{{ url_for('time_view', dynasty_id=dynasty_item.id) }}"
+                     class="btn btn-sm btn-secondary flex-fill" title="Time">&#128336;</a>
+                  <a href="{{ url_for('delete_dynasty', dynasty_id=dynasty_item.id) }}"
+                     class="btn btn-sm btn-outline-danger flex-fill" title="Delete">&#128465;</a>
+                </div>
+              </div>
+
+            </div>
+          </div>
+          {% endfor %}
+
+          {% if dynasties.pages > 1 %}
+          <nav class="mt-3">
+            <ul class="pagination pagination-sm justify-content-center">
+              {% if dynasties.has_prev %}
+              <li class="page-item"><a class="page-link" href="?page={{ dynasties.prev_num }}">«</a></li>
+              {% endif %}
+              <li class="page-item disabled">
+                <span class="page-link">Page {{ dynasties.page }} of {{ dynasties.pages }}</span>
+              </li>
+              {% if dynasties.has_next %}
+              <li class="page-item"><a class="page-link" href="?page={{ dynasties.next_num }}">»</a></li>
+              {% endif %}
             </ul>
-          {% else %}
-            <div class="alert alert-info" role="alert">
-              No other players are currently active.
-            </div>
+          </nav>
           {% endif %}
+
+        {% else %}
+          <div class="alert alert-info m-2">
+            You haven't started any dynasties yet. Time to forge your legacy!
+          </div>
+        {% endif %}
+
+        <div class="mt-2 px-1">
+          <a href="{{ url_for('generate_initial_map') }}" class="btn btn-primary btn-sm">
+            <span data-feather="map" style="width:13px;height:13px;"></span> Generate Initial Map
+          </a>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Recent Events Section -->
-  <div class="row">
-    <div class="col-md-12">
-      <div class="card">
-        <div class="card-header bg-dark text-white">
-          <h4 class="mb-0">Recent Global Events</h4>
-        </div>
-        <div class="card-body">
-          {% if recent_global_events %}
-            <div class="timeline">
-              {% for event in recent_global_events %}
-                <div class="timeline-item">
-                  <div class="timeline-marker"></div>
-                  <div class="timeline-content">
-                    <h3 class="timeline-title">Year {{ event.year }}</h3>
-                    <p>{{ event.event_string }}</p>
-                  </div>
-                </div>
-              {% endfor %}
-            </div>
-          {% else %}
-            <div class="alert alert-info" role="alert">
-              No recent events to display.
-            </div>
-          {% endif %}
-        </div>
+  <!-- Active Players column -->
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-header bg-dark text-white">
+        <h4 class="mb-0">Active Players</h4>
+      </div>
+      <div class="card-body">
+        {% if active_players %}
+          <ul class="list-group">
+            {% for player in active_players %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+              {{ player.username }}
+              <span class="badge badge-primary badge-pill">{{ player.dynasty_name }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div class="alert alert-info">No other players are currently active.</div>
+        {% endif %}
       </div>
     </div>
   </div>
 
-  <!-- Custom CSS for Timeline -->
-  <style>
-    .timeline {
-      position: relative;
-      padding: 20px 0;
-    }
-    .timeline:before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 18px;
-      height: 100%;
-      width: 4px;
-      background: #ddd;
-    }
-    .timeline-item {
-      position: relative;
-      margin-bottom: 30px;
-    }
-    .timeline-marker {
-      position: absolute;
-      top: 0;
-      left: 15px;
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: #007bff;
-      border: 2px solid #fff;
-    }
-    .timeline-content {
-      margin-left: 40px;
-      background: #f8f9fa;
-      padding: 15px;
-      border-radius: 5px;
-    }
-    .timeline-title {
-      margin-top: 0;
-      font-size: 1rem;
-      font-weight: bold;
-    }
-  </style>
+</div><!-- /.row -->
 
-  <!-- Feather Icons Script -->
-  <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
-  <script>
-    feather.replace()
-  </script>
+<!-- ── Recent Global Events ───────────────────────────────── -->
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header bg-dark text-white">
+        <h4 class="mb-0">Recent Global Events</h4>
+      </div>
+      <div class="card-body">
+        {% if recent_global_events %}
+          <div class="timeline">
+            {% for event in recent_global_events %}
+            <div class="timeline-item">
+              <div class="timeline-marker"></div>
+              <div class="timeline-content">
+                <h3 class="timeline-title">Year {{ event.year }}</h3>
+                <p>{{ event.event_string }}</p>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="alert alert-info">No recent events to display.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

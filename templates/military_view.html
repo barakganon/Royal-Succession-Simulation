@@ -1,10 +1,31 @@
 {% extends "base.html" %}
 
-{% block title %}{{ dynasty.name }} - Military{% endblock %}
+{% block title %}{{ dynasty.name }} — Military{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
-    <h1 class="mt-4 mb-3">{{ dynasty.name }} - Military Management</h1>
+
+  <!-- Breadcrumb -->
+  <nav aria-label="breadcrumb" class="mt-1">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('auth.dashboard') }}">Dashboard</a></li>
+      <li class="breadcrumb-item"><a href="{{ url_for('view_dynasty', dynasty_id=dynasty.id) }}">{{ dynasty.name }}</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Military</li>
+    </ol>
+  </nav>
+
+  <!-- Page header bar -->
+  <div class="page-header-bar">
+    {% if dynasty.coat_of_arms_svg %}
+    <div class="dynasty-coa">{{ dynasty.coat_of_arms_svg | safe }}</div>
+    {% endif %}
+    <h1 class="page-title">&#9876; {{ dynasty.name }} — Military</h1>
+    <div class="ml-auto d-flex" style="gap:.4rem;">
+      <a href="{{ url_for('view_dynasty', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-secondary">&#8592; Dynasty</a>
+      <a href="{{ url_for('advance_turn', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-success">&#9654; Advance Turn</a>
+      <a href="{{ url_for('military_gameplay', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-warning">&#127919; Operations</a>
+    </div>
+  </div>
     
     <div class="row">
         <!-- Military Controls -->

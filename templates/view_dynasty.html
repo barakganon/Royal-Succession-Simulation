@@ -1,205 +1,262 @@
-ç{% extends "base.html" %}
+{% extends "base.html" %}
 
-{% block title %}{{ dynasty.name }} - Dynasty Saga{% endblock %}
+{% block title %}{{ dynasty.name }} — Dynasty Saga{% endblock %}
 
 {% block content %}
 <div class="container">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>{{ dynasty.name }}</h1>
-        <div>
-            <a href="{{ url_for('auth.dashboard') }}" class="btn btn-outline-secondary mr-2">
-                <i class="fas fa-arrow-left"></i> Back to Dashboard
-            </a>
-            <a href="{{ url_for('advance_turn', dynasty_id=dynasty.id) }}" class="btn btn-success mr-2">
-                <i class="fas fa-forward"></i> Advance Turn
-            </a>
-            <a href="{{ url_for('dynasty_economy', dynasty_id=dynasty.id) }}" class="btn btn-primary mr-2">
-                <i class="fas fa-chart-line"></i> Economy
-            </a>
-            <a href="{{ url_for('delete_dynasty', dynasty_id=dynasty.id) }}" class="btn btn-outline-danger">
-                <i class="fas fa-trash"></i> Delete Dynasty
-            </a>
+
+  <!-- ── Breadcrumb / back nav ──────────────────────────────── -->
+  <nav aria-label="breadcrumb" class="mt-1 mb-2">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('auth.dashboard') }}">Dashboard</a></li>
+      <li class="breadcrumb-item active" aria-current="page">{{ dynasty.name }}</li>
+    </ol>
+  </nav>
+
+  <!-- ── Page header with dynasty name & CoA ───────────────── -->
+  <div class="page-header-bar">
+    {% if dynasty.coat_of_arms_svg %}
+    <div class="dynasty-coa">{{ dynasty.coat_of_arms_svg | safe }}</div>
+    {% endif %}
+    <h1 class="page-title mb-0">{{ dynasty.name }}</h1>
+    <span class="badge badge-secondary ml-2">Year {{ dynasty.current_simulation_year }}</span>
+  </div>
+
+  <!-- ── Action bar ────────────────────────────────────────── -->
+  <div class="action-bar">
+    <a href="{{ url_for('auth.dashboard') }}" class="btn btn-sm btn-secondary">
+      &#8592; Dashboard
+    </a>
+    <a href="{{ url_for('advance_turn', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-success">
+      &#9654; Advance Turn
+    </a>
+    <a href="{{ url_for('military_view', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-primary">
+      &#9876; Military
+    </a>
+    <a href="{{ url_for('dynasty_economy', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-warning">
+      &#128176; Economy
+    </a>
+    <a href="{{ url_for('diplomacy_view', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-info">
+      &#128506; Diplomacy
+    </a>
+    <a href="{{ url_for('world_map') }}" class="btn btn-sm btn-secondary">
+      &#128507; World Map
+    </a>
+    <a href="{{ url_for('delete_dynasty', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-outline-danger ml-auto">
+      &#128465; Delete Dynasty
+    </a>
+  </div>
+
+  <!-- ── Top row: Ruler card + Dynasty overview ─────────────── -->
+  <div class="row">
+
+    <!-- Current Ruler -->
+    <div class="col-md-8 mb-4">
+      <div class="card ruler-card">
+        <div class="card-header">
+          <h4 class="mb-0">&#128081; Current Ruler</h4>
         </div>
+        <div class="card-body">
+          {% if current_monarch %}
+          <div class="d-flex align-items-start">
+
+            <!-- Portrait -->
+            <div class="mr-4 flex-shrink-0 text-center">
+              {% if current_monarch.portrait_svg %}
+              <div class="character-portrait" style="width:90px;height:112px;display:inline-block;">
+                {{ current_monarch.portrait_svg | safe }}
+              </div>
+              {% else %}
+              <div style="font-size:72px;line-height:1;color:var(--gold);">&#128081;</div>
+              {% endif %}
+            </div>
+
+            <!-- Stats -->
+            <div class="flex-grow-1">
+              <div class="ruler-name">{{ current_monarch.name }} {{ current_monarch.surname }}</div>
+              {% if current_monarch.get_titles() %}
+              <div class="ruler-title">{{ current_monarch.get_titles() | join(', ') }}</div>
+              {% endif %}
+
+              <div class="d-flex flex-wrap mb-2" style="gap:.4rem;">
+                <span class="badge badge-secondary">Age {{ current_monarch_age }}</span>
+                <span class="badge badge-secondary">
+                  Reign {{ current_monarch.reign_start_year }} — Present
+                  ({{ current_year - current_monarch.reign_start_year }} yr)
+                </span>
+              </div>
+
+              <!-- Trait badges -->
+              {% if current_monarch.get_traits() %}
+              <div class="d-flex flex-wrap" style="gap:.3rem;">
+                {% for trait in current_monarch.get_traits() %}
+                <span class="badge trait-{{ trait | lower | replace(' ', '-') }} trait-default">{{ trait }}</span>
+                {% endfor %}
+              </div>
+              {% endif %}
+            </div>
+
+          </div>
+          {% else %}
+          <div class="alert alert-warning">
+            <strong>No current ruler.</strong> Your dynasty is in crisis!
+          </div>
+          {% endif %}
+        </div>
+      </div>
     </div>
 
-    <div class="row">
-        <!-- Dynasty Overview Card -->
-        <div class="col-md-4 mb-4">
-            <div class="card">
-                <div class="card-header bg-dark text-white">
-                    <h4 class="mb-0">Dynasty Overview</h4>
-                </div>
-                <div class="card-body">
-                    <p><strong>Current Year:</strong> {{ dynasty.current_simulation_year }}</p>
-                    <p><strong>Wealth:</strong> {{ dynasty.current_wealth }} {{ theme_config.currency_name|default('coins') }}</p>
-                    <p><strong>Theme:</strong> {{ theme_description }}</p>
-                    <p><strong>Location:</strong> {{ theme_config.location_flavor|default('Unknown Lands') }}</p>
-                    <p><strong>Founded:</strong> {{ dynasty.start_year }}</p>
-                    <p><strong>Last Played:</strong> {{ dynasty.last_played_at.strftime('%Y-%m-%d %H:%M') if dynasty.last_played_at else 'Never' }}</p>
-                </div>
-            </div>
+    <!-- Dynasty overview -->
+    <div class="col-md-4 mb-4">
+      <div class="card">
+        <div class="card-header">
+          <h4 class="mb-0">&#127981; Dynasty Overview</h4>
         </div>
-
-        <!-- Current Monarch Card -->
-        <div class="col-md-8 mb-4">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0">Current Ruler</h4>
-                </div>
-                <div class="card-body">
-                    {% if current_monarch %}
-                        <div class="row">
-                            <div class="col-md-8">
-                                <h3>{{ current_monarch.name }} {{ current_monarch.surname }}</h3>
-                                <p class="lead">{{ current_monarch.get_titles()|join(', ') }}</p>
-                                <p><strong>Age:</strong> {{ current_monarch_age }} years</p>
-                                <p><strong>Reign:</strong> {{ current_monarch.reign_start_year }} - Present ({{ current_year - current_monarch.reign_start_year }} years)</p>
-                                <p><strong>Traits:</strong> {{ current_monarch.get_traits()|join(', ') }}</p>
-                            </div>
-                            <div class="col-md-4 text-center">
-                                {% if current_monarch.portrait_svg %}
-                                <div class="character-portrait" style="width:80px;height:100px;display:inline-block;">
-                                    {{ current_monarch.portrait_svg | safe }}
-                                </div>
-                                {% else %}
-                                <div style="font-size: 64px; color: goldenrod;">👑</div>
-                                {% endif %}
-                            </div>
-                        </div>
-                    {% else %}
-                        <div class="alert alert-warning">
-                            <p>No current ruler. Your dynasty is in crisis!</p>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
+        <div class="card-body">
+          <p class="mb-1"><strong>Founded:</strong> {{ dynasty.start_year }}</p>
+          <p class="mb-1"><strong>Current Year:</strong> {{ dynasty.current_simulation_year }}</p>
+          <p class="mb-1">
+            <strong>Wealth:</strong>
+            {{ dynasty.current_wealth }} {{ theme_config.currency_name | default('coins') }}
+          </p>
+          <p class="mb-1"><strong>Theme:</strong> {{ theme_description }}</p>
+          <p class="mb-1">
+            <strong>Location:</strong>
+            {{ theme_config.location_flavor | default('Unknown Lands') }}
+          </p>
+          <p class="mb-0">
+            <strong>Last Played:</strong>
+            {{ dynasty.last_played_at.strftime('%Y-%m-%d %H:%M') if dynasty.last_played_at else 'Never' }}
+          </p>
         </div>
+      </div>
     </div>
 
-    <div class="row">
-        <!-- Family Members Card -->
-        <div class="col-md-6 mb-4">
-            <div class="card">
-                <div class="card-header bg-info text-white">
-                    <h4 class="mb-0">Notable Family Members</h4>
-                </div>
-                <div class="card-body">
-                    {% if living_nobles %}
-                        <div class="list-group">
-                            {% for person in living_nobles %}
-                                <div class="list-group-item d-flex align-items-center">
-                                    {% if person.portrait_svg %}
-                                    <div class="character-portrait mr-3 flex-shrink-0" style="width:48px;height:60px;">
-                                        {{ person.portrait_svg | safe }}
-                                    </div>
-                                    {% endif %}
-                                    <div>
-                                        <div class="d-flex w-100 justify-content-between">
-                                            <h5 class="mb-1">{{ person.name }} {{ person.surname }}</h5>
-                                            <small>Age: {{ person_ages[person.id] }}</small>
-                                        </div>
-                                        <p class="mb-1">{{ person.get_titles()|join(', ') }}</p>
-                                        <small>Traits: {{ person.get_traits()|join(', ') }}</small>
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <p>No notable living family members.</p>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
+  </div><!-- /.row -->
 
-        <!-- Recent Events Card -->
-        <div class="col-md-6 mb-4">
-            <div class="card">
-                <div class="card-header bg-secondary text-white">
-                    <h4 class="mb-0">Recent Events</h4>
-                </div>
-                <div class="card-body">
-                    {% if recent_events %}
-                        <div class="timeline">
-                            {% for event in recent_events %}
-                                <div class="timeline-item">
-                                    <div class="timeline-year">
-                                        {% if event.year %}
-                                            Year {{ event.year }}
-                                        {% else %}
-                                            System Event
-                                        {% endif %}
-                                    </div>
-                                    <div class="timeline-content">
-                                        <p>{{ event.event_string }}</p>
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <p>No recent events recorded.</p>
-                    {% endif %}
-                </div>
-            </div>
+  <!-- ── Family members grid ────────────────────────────────── -->
+  <div class="row">
+    <div class="col-12 mb-4">
+      <div class="card">
+        <div class="card-header">
+          <h4 class="mb-0">&#128106; Notable Family Members</h4>
         </div>
+        <div class="card-body">
+          {% if living_nobles %}
+          <div class="row">
+            {% for person in living_nobles %}
+            <div class="col-md-4 col-sm-6 mb-3">
+              <div class="card character-card h-100">
+                <div class="card-body text-center py-3 px-2">
+
+                  <!-- Portrait or placeholder -->
+                  {% if person.portrait_svg %}
+                  <div style="width:72px;height:90px;margin:0 auto 8px;">
+                    {{ person.portrait_svg | safe }}
+                  </div>
+                  {% else %}
+                  <div style="font-size:2.4rem;margin-bottom:6px;line-height:1;">
+                    {% if person.gender == 'F' or person.gender == 'female' %}&#128105;{% else %}&#128104;{% endif %}
+                  </div>
+                  {% endif %}
+
+                  <h6 class="mb-0" style="font-family:'Cinzel',serif;font-size:.88rem;color:var(--gold);">
+                    {{ person.name }} {{ person.surname }}
+                  </h6>
+                  <small class="text-muted d-block mb-1">Age {{ person_ages[person.id] }}</small>
+
+                  {% if person.get_titles() %}
+                  <small class="d-block text-muted mb-1" style="font-style:italic;">
+                    {{ person.get_titles() | join(', ') }}
+                  </small>
+                  {% endif %}
+
+                  {% if person.get_traits() %}
+                  <div class="d-flex flex-wrap justify-content-center" style="gap:.25rem;margin-top:.3rem;">
+                    {% for trait in person.get_traits() %}
+                    <span class="badge badge-sm trait-{{ trait | lower | replace(' ', '-') }} trait-default"
+                          style="font-size:.65rem;">{{ trait }}</span>
+                    {% endfor %}
+                  </div>
+                  {% endif %}
+
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="text-muted">No notable living family members.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Recent Events + Family Tree ───────────────────────── -->
+  <div class="row">
+
+    <!-- Recent Events (styled timeline) -->
+    <div class="col-md-6 mb-4">
+      <div class="card">
+        <div class="card-header">
+          <h4 class="mb-0">&#128240; Recent Events</h4>
+        </div>
+        <div class="card-body" style="max-height:340px;overflow-y:auto;">
+          {% if recent_events %}
+          <div class="event-timeline">
+            {% for event in recent_events %}
+            {% set es = event.event_string | lower %}
+            {% if 'birth' in es or 'born' in es %}
+              {% set icon = '&#128118;' %}
+            {% elif 'death' in es or 'died' in es or 'dead' in es %}
+              {% set icon = '&#9760;' %}
+            {% elif 'battle' in es or 'war' in es or 'attack' in es %}
+              {% set icon = '&#9876;' %}
+            {% elif 'succession' in es or 'ascend' in es or 'ruler' in es %}
+              {% set icon = '&#128081;' %}
+            {% elif 'marriage' in es or 'wed' in es or 'spouse' in es %}
+              {% set icon = '&#128141;' %}
+            {% elif 'treaty' in es or 'peace' in es or 'alliance' in es %}
+              {% set icon = '&#9991;' %}
+            {% else %}
+              {% set icon = '&#8226;' %}
+            {% endif %}
+            <div class="event-item">
+              <span class="event-icon">{{ icon | safe }}</span>
+              <div class="event-year">
+                {% if event.year %}Year {{ event.year }}{% else %}Event{% endif %}
+              </div>
+              <div class="event-text">{{ event.event_string }}</div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="text-muted">No recent events recorded.</p>
+          {% endif %}
+        </div>
+      </div>
     </div>
 
-    <!-- Family Tree Visualization -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header bg-dark text-white">
-                    <h4 class="mb-0">Family Tree</h4>
-                </div>
-                <div class="card-body text-center">
-                    {% if family_tree_image %}
-                        <img src="{{ family_tree_image }}" class="img-fluid" alt="Family Tree">
-                    {% else %}
-                        <div class="alert alert-info">
-                            <p>Family tree visualization will be generated after your first turn.</p>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
+    <!-- Family Tree visualization -->
+    <div class="col-md-6 mb-4">
+      <div class="card">
+        <div class="card-header">
+          <h4 class="mb-0">&#127968; Family Tree</h4>
         </div>
+        <div class="card-body text-center">
+          {% if family_tree_image %}
+          <img src="{{ family_tree_image }}" class="img-fluid" alt="Family Tree">
+          {% else %}
+          <div class="alert alert-info">
+            Family tree visualization will be generated after your first turn.
+          </div>
+          {% endif %}
+        </div>
+      </div>
     </div>
-</div>
 
-<style>
-    .timeline {
-        position: relative;
-        max-height: 300px;
-        overflow-y: auto;
-        padding-left: 20px;
-    }
-    
-    .timeline-item {
-        position: relative;
-        padding-bottom: 15px;
-        padding-left: 15px;
-        border-left: 2px solid #dee2e6;
-    }
-    
-    .timeline-year {
-        font-weight: bold;
-        margin-bottom: 5px;
-    }
-    
-    .timeline-content {
-        padding-left: 10px;
-    }
-    
-    .timeline-item:before {
-        content: '';
-        position: absolute;
-        left: -8px;
-        top: 0;
-        width: 14px;
-        height: 14px;
-        border-radius: 50%;
-        background-color: #6c757d;
-    }
-</style>
+  </div><!-- /.row -->
 
-<!-- Font Awesome for icons -->
-<script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+</div><!-- /.container -->
 {% endblock %}

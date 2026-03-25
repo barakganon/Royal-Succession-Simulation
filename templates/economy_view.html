@@ -1,11 +1,31 @@
 {% extends "base.html" %}
 
-{% block title %}{{ dynasty.name }} - Economy{% endblock %}
+{% block title %}{{ dynasty.name }} — Economy{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
-    <h1>{{ dynasty.name }} - Economy</h1>
-    <p class="lead">Year: {{ dynasty.current_simulation_year }}</p>
+
+  <!-- Breadcrumb -->
+  <nav aria-label="breadcrumb" class="mt-1">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('auth.dashboard') }}">Dashboard</a></li>
+      <li class="breadcrumb-item"><a href="{{ url_for('view_dynasty', dynasty_id=dynasty.id) }}">{{ dynasty.name }}</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Economy</li>
+    </ol>
+  </nav>
+
+  <!-- Page header bar -->
+  <div class="page-header-bar">
+    {% if dynasty.coat_of_arms_svg %}
+    <div class="dynasty-coa">{{ dynasty.coat_of_arms_svg | safe }}</div>
+    {% endif %}
+    <h1 class="page-title">&#128176; {{ dynasty.name }} — Economy</h1>
+    <span class="badge badge-secondary ml-2">Year {{ dynasty.current_simulation_year }}</span>
+    <div class="ml-auto d-flex" style="gap:.4rem;">
+      <a href="{{ url_for('view_dynasty', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-secondary">&#8592; Dynasty</a>
+      <a href="{{ url_for('advance_turn', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-success">&#9654; Advance Turn</a>
+    </div>
+  </div>
     
     <div class="row mb-4">
         <div class="col-md-4">

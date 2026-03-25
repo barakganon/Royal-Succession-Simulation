@@ -121,35 +121,32 @@ Royal-Succession-Simulation/
 
 ---
 
-## What's Broken / Incomplete
+## What's Broken / Incomplete (Current)
 
 ### Critical
-- **AI player logic is absent.** `GameManager` has `self.ai_controllers = {}` but no decision-making code. A game cannot be played without a human opponent. → See Roadmap P1.
-- **SQLAlchemy backref conflicts.** Some `PersonDB` relationships define duplicate backref names, which raises `SAWarning` on startup and can cause query errors.
+- **`AIController` wiring unverified** — the class exists but it's unclear whether `decide_*` methods are called on every `advance_turn` for non-human dynasties. → Sprint 5A.
 
 ### High Priority
-- **`main_flask_app.py` is a monolith (~3300 lines).** It must be split into Flask Blueprints (`auth`, `military`, `diplomacy`, `economy`, `map`, `dynasty`).
-- **Naval combat** — `UnitType` enum includes naval units but no combat mechanics exist for them.
-- **Turn enforcement** — players can submit actions out of turn; no server-side turn-order lock.
-- **Error handling is inconsistent** — some routes use `flash()`, others return bare 500s or silently swallow exceptions.
+- **`main_flask_app.py` is still a monolith (~3300 lines).** Auth Blueprint extracted; 5 more remain (military, economy, diplomacy, map, dynasty). → Sprint 7.
+- **Turn enforcement missing** — players can submit actions out of turn; no server-side turn-order lock. → Sprint 5C.
+- **7 legacy test failures** — `test_flask_app.py` + `test_game_flow.py` use wrong expected strings/URLs from before auth Blueprint refactor. → Sprint 5B.
 
 ### Medium Priority
-- **Test coverage is thin** — infrastructure (conftest, fixtures) is solid but most routes and subsystems lack tests.
-- **No pagination** — list endpoints load all DB rows; will degrade with large game states.
-- **Debug `print()` statements** scattered through production code — replace with `logger.debug()`.
-- **CSS is minimal** — `static/style.css` is ~100 lines; UI is functional but rough.
+- **`chronicle_entry` table** — may not be created on all deployments; needs explicit migration. → Sprint 5D.
+- **No pagination** — list endpoints load all DB rows; will degrade at scale. → Sprint 5D / Sprint 7.
+- **CSS is minimal** — `static/style.css` is ~100 lines; UI is functional but rough. → Sprint 6.
+- **Circular FK cycle** on dynasty/person_db/territory DROP — needs `use_alter=True` on FKs. → Sprint 7.
 
 ### Low Priority
-- **Banking / loans** — referenced in economy design docs but not implemented.
-- **Espionage / spy networks** — diplomacy design exists, code does not.
-- **Court / faction politics** — documented but not implemented.
-- **Terrain-specific production tuning** — terrain types exist but production multipliers are uniform.
+- **`print()` statements** remain in some model files — replace with `logger.debug()`. → Sprint 7.
+- **Banking / loans, espionage, court politics** — not implemented. → Sprint 8.
+- **Terrain-specific production tuning** — terrain types exist but multipliers are uniform.
 
 ---
 
-## Roadmap — Planned Features
+## Original Roadmap — P1–P5 (All Complete ✅)
 
-Features are ordered by priority. Agents should work in this order.
+> These are preserved for historical reference. See "Active Roadmap — Sprints 5–8" above for current work.
 
 ### P1 — Personality-driven AI dynasties (`models/ai_controller.py`)
 **Why first:** fixes the critical "no AI player" blocker while making it interesting rather than purely rule-based.
@@ -307,18 +304,80 @@ export GOOGLE_API_KEY="your_key_here"   # enables LLM features
 
 ---
 
-## Current Development Priorities
+## Completed Features (Sprints 1–4)
 
-1. **Fix SQLAlchemy backref conflicts** — stability blocker. Use `back_populates` throughout.
-2. **Implement personality-driven AI player** (`models/ai_controller.py`) — critical; makes the game playable and interesting.
-3. **Refactor `main_flask_app.py`** into Flask Blueprints — prerequisite for all further feature work.
-4. **Add turn-order enforcement** — prevent out-of-order actions server-side.
-5. **Living chronicle** (`models/chronicle.py`) — LLM turn narration, stored and displayed.
-6. **In-game AI advisor** — LLM-powered strategic counsel each turn.
-7. **Expand test coverage** — cover all Flask routes with integration tests.
-8. **Replace `print()` with `logger.debug()`** across the codebase.
-9. **Coat of arms generator** (`visualization/heraldry_renderer.py`) — SVG, no dependencies.
-10. **Character portrait generator** (`visualization/portrait_renderer.py`) — SVG, trait-driven.
-11. **Naval combat mechanics** — units exist; wire up combat resolution.
-12. **Real-time battle ticker** — Flask-SocketIO + LLM round commentary.
-13. **Interactive canvas map** — replace Matplotlib PNGs with browser-rendered canvas.
+All original roadmap items are done. See `STATUS.md` for full details.
+
+- ✅ SQLAlchemy backref conflicts fixed (`back_populates` throughout)
+- ✅ Auth Blueprint (`blueprints/auth.py`)
+- ✅ Integration tests (143 passing)
+- ✅ `AIController` — 4-phase personality-driven AI dynasties
+- ✅ Living chronicle (`ChronicleEntryDB`, `/game/<id>/chronicle`)
+- ✅ AI advisor (`/game/<id>/advisor`, dashboard panel)
+- ✅ SVG coat of arms (`visualization/heraldry_renderer.py`)
+- ✅ SVG character portraits (`visualization/portrait_renderer.py`)
+- ✅ Naval combat + blockade (`/dynasty/<id>/naval_battle`)
+- ✅ Real-time battle ticker (Flask-SocketIO + LLM commentary)
+- ✅ Interactive HTML5 canvas map (replaces Matplotlib PNG)
+
+---
+
+## Active Roadmap — Sprints 5–8
+
+### Sprint 5 — Playability (Current)
+
+Make the game actually playable end-to-end before anything else.
+
+| Task | Description | Priority |
+|------|-------------|----------|
+| 5A | **Audit + wire `AIController` into the turn loop** — verify `decide_diplomacy/military/economy/character` are called on every `advance_turn` for non-human dynasties. Fix any gaps. | Critical |
+| 5B | **Fix 7 legacy test failures** + write full game-loop integration tests (create dynasty → advance turns → battle → succession) | High |
+| 5C | **Turn-order enforcement** — server-side lock so players cannot submit actions out of turn | High |
+| 5D | **`chronicle_entry` DB migration** — ensure table is created on startup; add pagination to all list endpoints | Medium |
+
+### Sprint 6 — UI Overhaul
+
+The CSS is ~100 lines and the interface is rough. This sprint makes the game look and feel like a real medieval strategy game.
+
+| Task | Description |
+|------|-------------|
+| 6A | **Dark medieval CSS redesign** — full stylesheet rewrite using `frontend-design` + `ui-ux-pro-max` skills. Parchment textures, gothic fonts, dark sidebar nav. |
+| 6B | **Game-specific UI panels** — character cards with portrait + traits, territory HUD with resource bars, diplomacy relation wheel, live battle screen layout. |
+| 6C | **Art layer** — improve procedural SVGs (richer coat of arms charges, more portrait detail). Optionally wire `pixel-art-sprites` / `ai-game-art-generation` skills for AI-generated territory icons and unit tokens. |
+
+### Sprint 7 — Blueprint Refactor
+
+Extract the remaining 5 blueprints from `main_flask_app.py` one at a time. Run the full test suite after each extraction before moving to the next. Do NOT batch these.
+
+| Order | Blueprint | Routes to extract |
+|-------|-----------|-------------------|
+| 1 | `blueprints/dynasty.py` | `/dynasty/create`, `/dynasty/<id>/view`, `/dynasty/<id>/advance_turn`, `/dynasty/<id>/delete` |
+| 2 | `blueprints/military.py` | `/dynasty/<id>/military`, `/recruit_unit`, `/form_army`, `/army/<id>/battle`, `/dynasty/<id>/naval_battle` |
+| 3 | `blueprints/economy.py` | `/dynasty/<id>/economy`, `/build`, `/upgrade`, `/repair`, `/develop_territory` |
+| 4 | `blueprints/diplomacy.py` | `/dynasty/<id>/diplomacy`, `/diplomatic_action`, `/declare_war`, `/negotiate_peace` |
+| 5 | `blueprints/map.py` | `/world/map`, `/game/<id>/map.geojson`, `/generate_initial_map` |
+
+After all blueprints are extracted: add pagination to remaining list endpoints, replace any remaining `print()` with `logger.debug()`, fix circular FK cycle with `use_alter=True`.
+
+### Sprint 8 — Audio & Advanced Features (Optional / Paid APIs)
+
+These features require external API keys and incur per-call costs. Treat as an optional enhancement layer.
+
+| Task | Requires | Description |
+|------|----------|-------------|
+| 8A | ElevenLabs API key | NPC narrator voice for chronicle entries and battle results (`elevenlabs-tts` skill) |
+| 8B | ElevenLabs API key | Ambient medieval background music (`elevenlabs-music` skill) |
+| 8C | — | Banking/loans system (economy depth) |
+| 8D | — | Espionage / spy networks (diplomacy depth) |
+| 8E | — | Court faction politics |
+
+---
+
+## Agent Instructions
+
+- Always run tasks in parallel with sub-agents where tasks are independent.
+- Always update `STATUS.md` after completing any task.
+- Blueprint extraction (Sprint 7): test after each blueprint, never batch.
+- LLM calls: guard with `if llm_model is None: return fallback`. Max tokens: chronicle 150, advisor 200, AI decision 100, battle commentary 60.
+- Never inline prompt strings — all prompts live in `utils/llm_prompts.py`.
+- Audio/art features (Sprint 8): check for API key before calling external service; degrade gracefully if absent.

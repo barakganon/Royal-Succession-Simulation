@@ -99,8 +99,9 @@ def logout():
 @login_required
 def dashboard():
     """User's main dashboard after login."""
-    # Query DynastyDB for the user's dynasties
-    user_dynasties = DynastyDB.query.filter_by(user_id=current_user.id).order_by(DynastyDB.name).all()
+    # Query DynastyDB for the user's dynasties (paginated)
+    page = request.args.get('page', 1, type=int)
+    user_dynasties = DynastyDB.query.filter_by(user_id=current_user.id).order_by(DynastyDB.name).paginate(page=page, per_page=20, error_out=False)
 
     # Initialize game systems
     game_manager = GameManager(db.session)

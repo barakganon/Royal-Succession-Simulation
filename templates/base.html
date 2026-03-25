@@ -3,23 +3,27 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <!-- Google Fonts: Cinzel (headings) + Crimson Text (body) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    <!-- Bootstrap 4 -->
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-    <!-- Link to your custom CSS if you create one in static/style.css -->
+    <!-- Medieval dark theme -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <title>{% block title %}Dynasty Saga{% endblock %}</title>
-    <style>
-        body { padding-top: 56px; /* Adjust if navbar height changes */ }
-        .footer { padding: 1rem; background-color: #f8f9fa; text-align: center; font-size: 0.9em; }
-    </style>
   </head>
   <body>
+
+    <!-- ── Navigation ── -->
     <nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
-      <a class="navbar-brand" href="{{ url_for('index') }}">📜 Dynasty Saga</a>
-      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarsExampleDefault" aria-controls="navbarsExampleDefault" aria-expanded="false" aria-label="Toggle navigation">
+      <a class="navbar-brand" href="{{ url_for('index') }}">&#9876; Dynasty Saga</a>
+      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarsMain"
+              aria-controls="navbarsMain" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
       </button>
 
-      <div class="collapse navbar-collapse" id="navbarsExampleDefault">
+      <div class="collapse navbar-collapse" id="navbarsMain">
         <ul class="navbar-nav mr-auto">
           <li class="nav-item {% if request.endpoint == 'index' %}active{% endif %}">
             <a class="nav-link" href="{{ url_for('index') }}">Home</a>
@@ -28,53 +32,63 @@
             <li class="nav-item {% if request.endpoint == 'auth.dashboard' %}active{% endif %}">
               <a class="nav-link" href="{{ url_for('auth.dashboard') }}">Dashboard</a>
             </li>
-             <li class="nav-item {% if request.endpoint == 'create_dynasty_placeholder' or request.endpoint == 'create_dynasty' %}active{% endif %}">
-                <a class="nav-link" href="{{ url_for('create_dynasty_placeholder') }}">New Dynasty</a>
+            <li class="nav-item {% if request.endpoint == 'create_dynasty_placeholder' or request.endpoint == 'create_dynasty' %}active{% endif %}">
+              <a class="nav-link" href="{{ url_for('create_dynasty_placeholder') }}">New Dynasty</a>
             </li>
           {% endif %}
         </ul>
+
         <ul class="navbar-nav ml-auto">
-            {% if current_user.is_authenticated %}
-                <li class="nav-item">
-                    <span class="navbar-text mr-3">Welcome, {{ current_user.username }}!</span>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link btn btn-outline-warning btn-sm" href="{{ url_for('auth.logout') }}">Logout</a>
-                </li>
-            {% else %}
-                <li class="nav-item {% if request.endpoint == 'auth.login' %}active{% endif %}">
-                    <a class="nav-link" href="{{ url_for('auth.login') }}">Login</a>
-                </li>
-                <li class="nav-item {% if request.endpoint == 'auth.register' %}active{% endif %}">
-                    <a class="nav-link" href="{{ url_for('auth.register') }}">Register</a>
-                </li>
-            {% endif %}
+          {% if current_user.is_authenticated %}
+            <li class="nav-item">
+              <span class="navbar-text mr-3">Hail, {{ current_user.username }}!</span>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link btn btn-outline-warning btn-sm px-3" href="{{ url_for('auth.logout') }}">Logout</a>
+            </li>
+          {% else %}
+            <li class="nav-item {% if request.endpoint == 'auth.login' %}active{% endif %}">
+              <a class="nav-link" href="{{ url_for('auth.login') }}">Login</a>
+            </li>
+            <li class="nav-item {% if request.endpoint == 'auth.register' %}active{% endif %}">
+              <a class="nav-link" href="{{ url_for('auth.register') }}">Register</a>
+            </li>
+          {% endif %}
         </ul>
       </div>
     </nav>
 
-    <main role="main" class="container mt-4">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                        {{ message }}
-                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                            <span aria-hidden="true">×</span>
-                        </button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-        {% block content %}{% endblock %}
+    <!-- ── Main content ── -->
+    <main role="main" class="container mt-4 flex-grow-1">
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+              </button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      {% block content %}{% endblock %}
+
     </main>
 
-    <footer class="footer mt-auto py-3 bg-light">
-        <div class="container text-center">
-            <span class="text-muted">Dynasty Saga Game © {{ SCRIPT_CURRENT_YEAR if SCRIPT_CURRENT_YEAR else 2024 }}</span>
-        </div>
+    <!-- ── Footer ── -->
+    <footer class="footer mt-auto py-3">
+      <div class="container text-center">
+        <span>&#9876; Dynasty Saga &mdash; A Chronicle of Power
+          &nbsp;&bull;&nbsp;
+          &copy; {{ SCRIPT_CURRENT_YEAR if SCRIPT_CURRENT_YEAR else 2024 }}
+        </span>
+      </div>
     </footer>
 
+    <!-- ── Scripts ── -->
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
@@ -82,5 +96,8 @@
     <script>
       feather.replace();
     </script>
+
+    {% block extra_scripts %}{% endblock %}
+
   </body>
 </html>

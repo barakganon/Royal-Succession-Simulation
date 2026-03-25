@@ -12,6 +12,7 @@ import signal
 import sys
 import logging
 import atexit
+from functools import wraps
 
 # Configure logging
 logging.basicConfig(
@@ -140,6 +141,26 @@ atexit.register(cleanup)
 def load_user(user_id: str) -> User | None:
     """Flask-Login user loader callback."""
     return User.query.get(int(user_id))
+
+
+# --- Helper Decorators ---
+
+def block_if_turn_processing(f):
+    """Decorator: blocks the route if the dynasty's turn is currently being processed.
+
+    Prevents double-submission and concurrent turn advancement.  The decorated
+    route must receive ``dynasty_id`` as a URL keyword argument.
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        dynasty_id = kwargs.get('dynasty_id')
+        if dynasty_id:
+            dynasty = DynastyDB.query.get(dynasty_id)
+            if dynasty and dynasty.is_turn_processing:
+                flash("A turn is already in progress. Please wait until it completes.", "warning")
+                return redirect(url_for('view_dynasty', dynasty_id=dynasty_id))
+        return f(*args, **kwargs)
+    return decorated
 
 
 # --- Routes ---
@@ -278,12 +299,12 @@ def view_dynasty(dynasty_id):
         current_monarch = monarch_query
         current_monarch_age = dynasty.current_simulation_year - current_monarch.birth_year
     
-    # Get living nobles
+    # Get living nobles (capped at 50 to prevent large-game performance issues)
     living_nobles = PersonDB.query.filter_by(
         dynasty_id=dynasty.id,
         is_noble=True,
         death_year=None
-    ).order_by(PersonDB.birth_year).all()
+    ).order_by(PersonDB.birth_year).limit(50).all()
     
     # Calculate ages for all living nobles
     person_ages = {}
@@ -343,31 +364,86 @@ def generate_initial_map():
 # Advance turn route
 @app.route('/dynasty/<int:dynasty_id>/advance_turn')
 @login_required
+@block_if_turn_processing
 def advance_turn(dynasty_id):
-    """Advance the simulation by one turn (5 years by default)."""
+    """Advance the simulation by one turn (5 years by default).
+
+    After processing the human player's dynasty, all AI-controlled dynasties
+    belonging to the same user are processed via :class:`~models.game_manager.GameManager`
+    so that every turn AI dynasties make personality-driven decisions.
+
+    Turn-order enforcement: ``is_turn_processing`` is set to True at the start
+    and cleared in a finally block to prevent double-submission or concurrent
+    processing.
+    """
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
-    
-    # Number of years to advance per turn
-    years_per_turn = 5
-    
-    # Process the turn advancement
-    success, message = process_dynasty_turn(dynasty.id, years_per_turn)
-    
-    if success:
-        flash(message, 'success')
-    else:
-        flash(f"Error advancing turn: {message}", 'danger')
-    
-    # Update last played timestamp
-    dynasty.last_played_at = datetime.datetime.utcnow()
+
+    # Mark turn as in-progress to block concurrent submissions
+    dynasty.is_turn_processing = True
     try:
         db.session.commit()
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Error updating last_played_at for dynasty {dynasty.id}: {e}")
+        logger.error(f"Failed to set is_turn_processing for dynasty {dynasty.id}: {e}")
+        flash("Could not start turn processing. Please try again.", "danger")
+        return redirect(url_for('view_dynasty', dynasty_id=dynasty.id))
+
+    # Number of years to advance per turn
+    years_per_turn = 5
+
+    try:
+        # Process the human dynasty's turn
+        try:
+            success, message = process_dynasty_turn(dynasty.id, years_per_turn)
+        except Exception as e:
+            logger.error(f"Unhandled error in advance_turn for dynasty {dynasty.id}: {e}", exc_info=True)
+            db.session.rollback()
+            flash(f"An unexpected error occurred while advancing the turn: {type(e).__name__}: {e}", 'danger')
+            return redirect(url_for('view_dynasty', dynasty_id=dynasty.id))
+
+        if success:
+            flash(message, 'success')
+        else:
+            flash(f"Error advancing turn: {message}", 'danger')
+
+        # Process all AI-controlled dynasties for the current user so that AI
+        # dynasties make decisions every turn via AIController (LLM or rule-based
+        # fallback).  process_ai_turns internally calls register_ai_dynasties, so
+        # controllers are auto-created on first run.  A fresh GameManager is created
+        # with the current db.session so it shares the same transaction context.
+        try:
+            game_manager = GameManager(db.session)
+            ai_success, ai_message = game_manager.process_ai_turns(user_id=current_user.id)
+            if not ai_success:
+                logger.warning(
+                    f"advance_turn: process_ai_turns returned failure for user "
+                    f"{current_user.id}: {ai_message}"
+                )
+            else:
+                logger.info(
+                    f"advance_turn: AI turns complete for user {current_user.id}"
+                )
+        except Exception as e:
+            # AI turn failure must not abort the human player's turn result
+            logger.error(
+                f"advance_turn: error processing AI turns for user {current_user.id}: {e}",
+                exc_info=True,
+            )
+
+        # Update last played timestamp
+        dynasty.last_played_at = datetime.datetime.utcnow()
+
+    finally:
+        # Always release the processing lock, even if an exception propagated
+        dynasty.is_turn_processing = False
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error releasing is_turn_processing lock for dynasty {dynasty.id}: {e}")
 
     return redirect(url_for('view_dynasty', dynasty_id=dynasty.id))
 
@@ -2696,33 +2772,37 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
     end_year = start_year + years_to_advance
     
     for current_year in range(start_year, end_year):
-        # Process world events
-        process_world_events(dynasty, current_year, theme_config)
-        
-        # Process each person's yearly events
-        for person in living_persons:
-            # Skip if person died in a previous year of this turn
-            if person.death_year is not None:
-                continue
-                
-            # Process death check
-            if process_death_check(person, current_year, theme_config):
-                # Person died, check if they were the monarch
-                if person.is_monarch:
-                    process_succession(dynasty, person, current_year, theme_config)
-                continue
-            
-            # Process marriage for unmarried nobles
-            if person.is_noble and person.spouse_sim_id is None:
-                process_marriage_check(dynasty, person, current_year, theme_config)
-            
-            # Process childbirth for married women
-            if person.gender == "FEMALE" and person.spouse_sim_id is not None:
-                process_childbirth_check(dynasty, person, current_year, theme_config)
-        
-        # Update living persons list (remove those who died)
-        living_persons = [p for p in living_persons if p.death_year is None]
-        
+        try:
+            # Process world events
+            process_world_events(dynasty, current_year, theme_config)
+
+            # Process each person's yearly events
+            for person in living_persons:
+                # Skip if person died in a previous year of this turn
+                if person.death_year is not None:
+                    continue
+
+                # Process death check
+                if process_death_check(person, current_year, theme_config):
+                    # Person died, check if they were the monarch
+                    if person.is_monarch:
+                        process_succession(dynasty, person, current_year, theme_config)
+                    continue
+
+                # Process marriage for unmarried nobles
+                if person.is_noble and person.spouse_sim_id is None:
+                    process_marriage_check(dynasty, person, current_year, theme_config)
+
+                # Process childbirth for married women
+                if person.gender == "FEMALE" and person.spouse_sim_id is not None:
+                    process_childbirth_check(dynasty, person, current_year, theme_config)
+
+            # Update living persons list (remove those who died)
+            living_persons = [p for p in living_persons if p.death_year is None]
+        except Exception as year_exc:
+            logger.error(f"Error processing year {current_year} for dynasty {dynasty_id}: {year_exc}", exc_info=True)
+            # Continue to next year rather than aborting entire turn
+
         # Update dynasty's current year
         dynasty.current_simulation_year = current_year + 1
     

@@ -16,7 +16,7 @@ from models.db_models import (
     db, User, DynastyDB, PersonDB, HistoryLogEntryDB, Territory, Region, Province,
     MilitaryUnit, UnitType, Army, Battle, Siege, War, DiplomaticRelation, Treaty, TreatyType,
     Resource, ResourceType, TerritoryResource, Building, BuildingType, Settlement,
-    TradeRoute
+    TradeRoute, ChronicleEntryDB
 )
 
 class DatabaseInitializer:
@@ -127,14 +127,19 @@ class DatabaseInitializer:
                 
                 if missing_tables:
                     self.logger.info(f"Creating {len(missing_tables)} missing tables: {', '.join(missing_tables)}")
-                    
+
                     # Create only the missing tables
                     for table_name in missing_tables:
                         if table_name in db.metadata.tables:
                             db.metadata.tables[table_name].create(db.engine)
-                    
+
                     self.logger.info("Missing tables created successfully")
-        
+
+                # Ensure chronicle_entry table exists (may be missing on older deployments)
+                if 'chronicle_entry' not in inspector.get_table_names():
+                    ChronicleEntryDB.__table__.create(db.engine)
+                    self.logger.info("Created chronicle_entry table.")
+
         except Exception as e:
             self.logger.error(f"Error creating tables: {str(e)}")
             raise
@@ -455,7 +460,7 @@ class DatabaseInitializer:
             dynasty_columns = [col['name'] for col in inspector.get_columns('dynasty')]
             
             # If any of the required columns are missing, force a migration by returning 0
-            required_columns = ['prestige', 'infamy', 'honor', 'piety', 'capital_territory_id', 'last_updated_at']
+            required_columns = ['prestige', 'infamy', 'honor', 'piety', 'capital_territory_id', 'last_updated_at', 'is_turn_processing']
             for col in required_columns:
                 if col not in dynasty_columns:
                     self.logger.info(f"Column '{col}' missing from dynasty table. Forcing migration.")
@@ -562,6 +567,11 @@ class DatabaseInitializer:
                     # Use a constant string value for the default instead of CURRENT_TIMESTAMP
                     current_time = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
                     conn.execute(text(f"ALTER TABLE dynasty ADD COLUMN last_updated_at TIMESTAMP DEFAULT '{current_time}'"))
+
+                # Add is_turn_processing column if it doesn't exist (Sprint 5C: turn-order enforcement)
+                if 'is_turn_processing' not in dynasty_columns:
+                    self.logger.info("Adding 'is_turn_processing' column to dynasty table")
+                    conn.execute(text("ALTER TABLE dynasty ADD COLUMN is_turn_processing BOOLEAN DEFAULT 0 NOT NULL"))
                 
                 # Check which columns already exist in the person_db table
                 person_columns = [col['name'] for col in inspector.get_columns('person_db')]
