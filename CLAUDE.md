@@ -297,3 +297,184 @@ Logs location: `logs/` (performance logs per session)
 - Do not change `main_flask_app.py` beyond app setup and blueprint registration
 - Do not break existing tests
 
+
+---
+
+## Git Workflow — Mandatory for All Agents
+
+> This section is enforced. A task is NOT done until the branch is pushed and STATUS.md is updated.
+> Claude Code agents must follow this workflow exactly — no exceptions.
+
+---
+
+### Branch naming convention
+
+```
+feature/<short-description>     # new feature
+fix/<short-description>         # bug fix
+infra/<short-description>       # infrastructure, Docker, config
+refactor/<short-description>    # code cleanup, no behavior change
+test/<short-description>        # adding or fixing tests
+chore/<short-description>       # deps, config, docs, CLAUDE.md updates
+```
+
+Examples:
+```
+feature/action-phase-ui
+feature/hex-map-travian-style
+fix/circular-fk-use-alter
+test/fix-skipped-gamemanager-tests
+chore/update-sprint8-status
+refactor/blueprint-map-cleanup
+```
+
+---
+
+### Workflow every agent MUST follow
+
+#### 1. Before starting any work
+```bash
+cd /Users/barakganon/personal_projects/Royal-Succession-Simulation
+git checkout main
+git pull origin main
+git checkout -b <branch-name>
+# Example: git checkout -b feature/action-phase-ui
+```
+
+#### 2. Commit frequently — after every logical unit of work
+Do NOT batch everything into one commit at the end.
+Each of these warrants its own commit:
+- New route created and working
+- New template created
+- Existing template redesigned
+- Tests added and passing
+- Bug fixed
+- CSS changes for a specific component
+
+```bash
+git add <specific-files>   # never: git add .  — always be explicit
+git commit -m "<type>(<scope>): <what and why>"
+```
+
+#### 3. Commit message format (Conventional Commits)
+```
+<type>(<scope>): <imperative description>
+
+[optional body: why this change, what problem it solves]
+```
+
+Types: `feat`, `fix`, `refactor`, `test`, `chore`, `docs`, `infra`
+
+Good examples:
+```
+feat(action-phase): add action_phase route with 3 AP spending UI
+feat(map): replace polygon GeoJSON with hex grid rendering
+feat(map): add hover tooltip with territory details
+fix(fk): add use_alter=True to fix dynasty/person circular FK cycle
+test(gamemanager): rewrite skipped tests against create_new_game() API
+refactor(map): remove dead placeholder routes from blueprints/map.py
+chore(css): add game-viewport layout classes for full-screen map
+docs(claude): mark Sprint 8A and 8B complete in STATUS.md
+```
+
+Bad examples (do not use):
+```
+update stuff        ← too vague
+fix                 ← which fix?
+wip                 ← never commit WIP
+changes             ← meaningless
+```
+
+#### 4. Push branch after each meaningful milestone
+```bash
+git push origin <branch-name>
+```
+
+After pushing, append to STATUS.md:
+```
+Branch: feature/action-phase-ui → pushed to origin ✅
+```
+
+#### 5. When fully complete: merge to main
+```bash
+git checkout main
+git pull origin main
+git merge --no-ff <branch-name> -m "Merge branch '<branch-name>': <one-line summary>"
+git push origin main
+git branch -d <branch-name>
+```
+
+Always use `--no-ff` — this preserves branch history in the graph.
+Always run `pytest` before merging. Must stay at 163 passed, 0 failed.
+
+---
+
+### Commit frequency targets
+
+| Task type | Minimum commits |
+|-----------|----------------|
+| New route + template | 1 commit each (2 total minimum) |
+| CSS changes | 1 commit per component/section |
+| New blueprint extraction | 1 commit (route file + test update) |
+| Test file | 1 commit when tests pass |
+| Bug fix | 1 commit with description of root cause |
+| Multi-task sprint | Minimum 1 commit per sprint task |
+
+Target: **at least 10–20 commits per sprint**. Sprint 8 has 10 tasks — that means minimum 10 commits, ideally 15–20.
+
+---
+
+### Sprint 8 branch map
+
+Each Sprint 8 task should be on its own branch or grouped logically:
+
+```
+main
+  ├── feature/action-phase          ← Tasks 8A + 8B (action_phase route + submit_actions)
+  ├── feature/action-phase-template ← Task 8C (action_phase.html)
+  ├── fix/advance-turn-flow         ← Task 8D (wire button to action_phase)
+  ├── feature/hex-map               ← Tasks 8E + 8F (world_map.html + hex geojson)
+  ├── feature/map-resource-bar      ← Task 8G (resource bar data in map route)
+  ├── chore/game-viewport-css       ← Task 8H (game-viewport CSS)
+  └── chore/base-body-class         ← Task 8I (body_class block in base.html)
+```
+
+Merge order: 8I → 8H → 8G → 8F → 8E → 8D → 8C → 8B → 8A
+(infrastructure first, then features that depend on it)
+
+---
+
+### What NOT to do with git
+
+- Never `git add .` — always stage specific files
+- Never commit `.env` or `instance/dynastysim.db`
+- Never force push to main
+- Never commit `__pycache__/`, `*.pyc`, `logs/`, `visualizations/`
+- Never merge without running `pytest` first
+- Never finish a task without pushing the branch
+- Never commit with a vague message
+
+---
+
+### Quick reference
+
+```bash
+# Start new task
+git checkout main && git pull origin main
+git checkout -b feature/my-feature
+
+# Save progress (do this after each working piece)
+git add blueprints/dynasty.py templates/action_phase.html
+git commit -m "feat(action-phase): add action_phase route with AP spending logic"
+
+# Push branch
+git push origin feature/my-feature
+
+# Merge when done (run pytest first!)
+pytest  # must be 163 passed, 0 failed
+git checkout main && git pull origin main
+git merge --no-ff feature/my-feature -m "Merge branch 'feature/my-feature': add action phase"
+git push origin main
+git branch -d feature/my-feature
+```
+

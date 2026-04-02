@@ -139,6 +139,15 @@ class DatabaseInitializer:
                 if 'chronicle_entry' not in inspector.get_table_names():
                     ChronicleEntryDB.__table__.create(db.engine, checkfirst=True)
                     self.logger.info("Created chronicle_entry table.")
+                # --- Column migrations for existing deployments ---
+                # Add epic_story_text column to dynasty table if missing
+                if 'dynasty' in inspector.get_table_names():
+                    dynasty_cols = [c['name'] for c in inspector.get_columns('dynasty')]
+                    if 'epic_story_text' not in dynasty_cols:
+                        with db.engine.connect() as conn:
+                            conn.execute(text("ALTER TABLE dynasty ADD COLUMN epic_story_text TEXT DEFAULT ''"))
+                            conn.commit()
+                        self.logger.info("Added epic_story_text column to dynasty table.")
 
         except Exception as e:
             self.logger.error(f"Error creating tables: {str(e)}")

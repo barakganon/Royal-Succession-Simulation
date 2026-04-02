@@ -6,6 +6,7 @@
 # (from integration/conftest.py) that drops and recreates all tables, then
 # rebuild any needed data inside the same app_context.
 
+import json
 import pytest
 from models.db_models import User, DynastyDB
 
@@ -267,13 +268,6 @@ class TestDeleteDynastyPage:
         response = dynasty_client.get(f'/dynasty/{dynasty_id}/delete')
         assert b'House Ironwood' in response.data
 
-    @pytest.mark.skip(
-        reason=(
-            "Delete is broken: SQLAlchemy circular FK dependency (dynasty/person_db) "
-            "causes an integrity error on DELETE — known issue tracked in CLAUDE.md "
-            "under 'SQLAlchemy backref conflicts'."
-        )
-    )
     def test_delete_post_removes_dynasty(self, dynasty_client, app, db):
         dynasty_id = _get_dynasty_id(app, db, username="dyn_user")
         response = dynasty_client.post(
@@ -303,3 +297,86 @@ class TestDynastyTerritories:
     def test_territories_unauthenticated_redirects(self, plain_client):
         response = plain_client.get('/dynasty/1/territories', follow_redirects=False)
         assert response.status_code == 302
+
+
+# ---------------------------------------------------------------------------
+# GET /dynasty/<id>/action_phase  &  POST /dynasty/<id>/submit_actions
+# ---------------------------------------------------------------------------
+
+class TestActionPhase:
+    def test_action_phase_unauthenticated_redirects(self, plain_client):
+        """GET /dynasty/<id>/action_phase without login redirects (302)."""
+        response = plain_client.get('/dynasty/1/action_phase', follow_redirects=False)
+        assert response.status_code == 302
+
+    def test_action_phase_unauthenticated_goes_to_login(self, plain_client):
+        """GET /dynasty/<id>/action_phase without login ends at the login page."""
+        response = plain_client.get('/dynasty/1/action_phase', follow_redirects=True)
+        assert b'Enter the Realm' in response.data
+
+    def test_action_phase_authenticated_returns_200(self, dynasty_client, app, db):
+        """GET /dynasty/<id>/action_phase for own dynasty returns 200."""
+        dynasty_id = _get_dynasty_id(app, db, username="dyn_user")
+        assert dynasty_id is not None
+        response = dynasty_client.get(f'/dynasty/{dynasty_id}/action_phase')
+        assert response.status_code == 200
+
+    def test_action_phase_shows_dynasty_name(self, dynasty_client, app, db):
+        """The action phase screen includes the dynasty name."""
+        dynasty_id = _get_dynasty_id(app, db, username="dyn_user")
+        response = dynasty_client.get(f'/dynasty/{dynasty_id}/action_phase')
+        assert b'House Ironwood' in response.data
+
+    def test_action_phase_wrong_owner_forbidden(self, app, db, session):
+        """A second user cannot access another user's action_phase — gets redirect/403."""
+        with app.app_context():
+            owner = User(username="ap_owner", email="ap_owner@ex.com")
+            owner.set_password("ownerpass")
+            intruder = User(username="ap_intruder", email="ap_intruder@ex.com")
+            intruder.set_password("intruderpass")
+            db.session.add_all([owner, intruder])
+            db.session.commit()
+            dynasty = DynastyDB(
+                user_id=owner.id,
+                name="House ActionOwner",
+                theme_identifier_or_json="MEDIEVAL_EUROPEAN",
+                current_wealth=200,
+                start_year=1100,
+                current_simulation_year=1100,
+            )
+            db.session.add(dynasty)
+            db.session.commit()
+            dynasty_id = dynasty.id
+
+        with app.test_client() as c:
+            c.post('/login', data={'username': 'ap_intruder', 'password': 'intruderpass'})
+            response = c.get(
+                f'/dynasty/{dynasty_id}/action_phase', follow_redirects=True
+            )
+            # Route flashes "Not authorized." and redirects to dashboard
+            assert b'Not authorized' in response.data
+
+    def test_submit_actions_unauthenticated_redirects(self, plain_client):
+        """POST /dynasty/<id>/submit_actions without login redirects (302)."""
+        response = plain_client.post(
+            '/dynasty/1/submit_actions',
+            data=json.dumps([]),
+            content_type='application/json',
+            follow_redirects=False,
+        )
+        assert response.status_code == 302
+
+    def test_submit_actions_empty_queue_advances_turn(self, dynasty_client, app, db):
+        """POST /dynasty/<id>/submit_actions with an empty action list runs the turn."""
+        dynasty_id = _get_dynasty_id(app, db, username="dyn_user")
+        assert dynasty_id is not None
+        response = dynasty_client.post(
+            f'/dynasty/{dynasty_id}/submit_actions',
+            data=json.dumps([]),
+            content_type='application/json',
+            follow_redirects=True,
+        )
+        # After turn processing the server redirects to turn_report or view_dynasty.
+        # Either way the final response must be 200 and mention the dynasty.
+        assert response.status_code == 200
+        assert b'House Ironwood' in response.data

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Victory — {{ dynasty.name }}{% endblock %}
+
+{% block content %}
+<div class="container py-5 text-center">
+
+  <!-- Coat of arms (pulsing animation) -->
+  {% if dynasty.coat_of_arms_svg %}
+  <div class="victory-coa mx-auto mb-4" style="width:120px;height:140px;">
+    {{ dynasty.coat_of_arms_svg | safe }}
+  </div>
+  {% else %}
+  <div class="victory-coa-placeholder mx-auto mb-4" style="font-size:5rem;line-height:1;">&#9812;</div>
+  {% endif %}
+
+  <!-- Victory title -->
+  <h1 class="victory-title mb-2">{{ victory.title }}</h1>
+
+  <!-- Condition badge -->
+  {% if victory.condition == 'legacy' %}
+  <span class="badge badge-pill px-3 py-2 mb-4" style="background:var(--gold);color:var(--ink);font-family:'Cinzel',serif;font-size:.9rem;">
+    &#9719; Dynasty Legacy
+  </span>
+  {% elif victory.condition == 'wealth' %}
+  <span class="badge badge-pill px-3 py-2 mb-4" style="background:var(--gold);color:var(--ink);font-family:'Cinzel',serif;font-size:.9rem;">
+    &#128176; Great Wealth
+  </span>
+  {% elif victory.condition == 'dynasty' %}
+  <span class="badge badge-pill px-3 py-2 mb-4" style="background:var(--gold);color:var(--ink);font-family:'Cinzel',serif;font-size:.9rem;">
+    &#128106; Great Dynasty
+  </span>
+  {% elif victory.condition == 'conquest' %}
+  <span class="badge badge-pill px-3 py-2 mb-4" style="background:var(--gold);color:var(--ink);font-family:'Cinzel',serif;font-size:.9rem;">
+    &#9876; Territorial Dominion
+  </span>
+  {% endif %}
+
+  <!-- Description -->
+  <p class="victory-desc mb-4 mx-auto" style="max-width:520px;">
+    {{ victory.description }}
+  </p>
+
+  <!-- Year achieved -->
+  <p class="text-muted mb-5" style="font-family:'Cinzel',serif;font-size:.85rem;letter-spacing:.06em;">
+    Year {{ current_year }}
+  </p>
+
+  <!-- Action buttons -->
+  <div class="d-flex justify-content-center" style="gap:1rem;">
+    <a href="{{ url_for('dynasty.view_dynasty', dynasty_id=dynasty.id) }}"
+       class="btn btn-success btn-lg px-4">
+      &#9812; Continue Ruling
+    </a>
+    <a href="{{ url_for('auth.dashboard') }}"
+       class="btn btn-secondary btn-lg px-4">
+      &#127968; Return to Dashboard
+    </a>
+  </div>
+
+</div>
+{% endblock %}

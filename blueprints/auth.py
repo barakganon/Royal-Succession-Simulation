@@ -3,7 +3,9 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, login_required, current_user
 
-from models.db_models import db, User, DynastyDB, HistoryLogEntryDB, Territory, Battle, Treaty
+import datetime
+
+from models.db_models import db, User, DynastyDB, PersonDB, HistoryLogEntryDB, Territory, Battle, Treaty
 from models.game_manager import GameManager
 from utils.logging_config import setup_logger
 
@@ -122,9 +124,47 @@ def dashboard():
         HistoryLogEntryDB.year.desc(), HistoryLogEntryDB.id.desc()
     ).limit(10).all()
 
+    # Compute victory-progress milestones for the most recently played dynasty
+    milestones = []
+    if user_dynasties.items:
+        most_active = max(
+            user_dynasties.items,
+            key=lambda d: d.last_played_at or datetime.datetime.min
+        )
+        age = most_active.current_simulation_year - most_active.start_year
+        living = PersonDB.query.filter_by(dynasty_id=most_active.id, death_year=None).count()
+        territories = Territory.query.filter_by(controller_dynasty_id=most_active.id).count()
+        milestones = [
+            {
+                'label': 'Survive 200 years',
+                'current': age,
+                'target': 200,
+                'done': age >= 200,
+            },
+            {
+                'label': 'Amass 10,000 gold',
+                'current': most_active.current_wealth,
+                'target': 10000,
+                'done': most_active.current_wealth >= 10000,
+            },
+            {
+                'label': '20 living members',
+                'current': living,
+                'target': 20,
+                'done': living >= 20,
+            },
+            {
+                'label': 'Control 10 territories',
+                'current': territories,
+                'target': 10,
+                'done': territories >= 10,
+            },
+        ]
+
     return render_template('dashboard.html',
                            title='Dashboard',
                            dynasties=user_dynasties,
                            active_players=active_players,
                            game_stats=game_stats,
-                           recent_global_events=recent_global_events)
+                           recent_global_events=recent_global_events,
+                           milestones=milestones)

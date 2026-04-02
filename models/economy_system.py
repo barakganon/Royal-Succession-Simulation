@@ -458,6 +458,9 @@ class EconomySystem:
                 tax_income *= 1.5  # Cities provide 50% more tax
             elif settlement.settlement_type == "town":
                 tax_income *= 1.2  # Towns provide 20% more tax
+
+        return tax_income
+
     def calculate_dynasty_economy(self, dynasty_id: int) -> Dict[str, Any]:
         """
         Calculate the overall economy for a dynasty.

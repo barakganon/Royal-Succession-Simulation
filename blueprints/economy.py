@@ -83,7 +83,8 @@ def dynasty_economy(dynasty_id):
                            economy_data=economy_data,
                            production_chart_url=production_chart_url,
                            trade_chart_url=trade_chart_url,
-                           trends_chart_url=trends_chart_url)
+                           trends_chart_url=trends_chart_url,
+                           ResourceType=ResourceType)
 
 
 @economy_bp.route('/world/economy')

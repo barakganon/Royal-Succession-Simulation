@@ -123,3 +123,38 @@ def generate_advisor_fallback(treasury: float, active_wars: int, has_allies: boo
     while len(suggestions) < 2:
         suggestions.append("Govern wisely and your dynasty will endure beyond your years.")
     return suggestions[:3]
+
+
+def build_turn_story_prompt(dynasty_name, start_year, end_year, events, monarch_name, existing_story):
+    events_str = '; '.join(events[:8]) if events else 'quiet seasons of governance'
+    continuation_hint = (
+        'Continue the saga naturally from where it left off.'
+        if existing_story.strip()
+        else 'Begin the saga of this dynasty.'
+    )
+    prev = existing_story[-800:] if existing_story else '(none yet)'
+    return (
+        f'You are the immortal chronicler of a great dynasty, writing their epic saga.\n'
+        f'Dynasty: {dynasty_name}\n'
+        f'Current ruler: {monarch_name}\n'
+        f'Years {start_year} to {end_year} the following transpired: {events_str}\n\n'
+        f'Previous chronicle:\n{prev}\n\n'
+        f'{continuation_hint} Write exactly ONE paragraph (4-6 sentences) of vivid, '
+        f'high-fantasy prose that weaves these events into the living legend of {dynasty_name}. '
+        f'Use dramatic third-person narration. No bullet points, no headings, pure flowing prose only.'
+    )
+
+
+def generate_turn_story_fallback(dynasty_name, start_year, end_year, events, monarch_name):
+    if events:
+        key_event = events[0]
+        return (
+            f'In the years {start_year} through {end_year}, the annals of {dynasty_name} record '
+            f'the reign of {monarch_name}, under whose stewardship {key_event.lower()} '
+            f'The scribes of the realm set down these deeds in ink and candlelight, '
+            f'that the glory and the grief of this age might endure beyond the lives of those who lived it.'
+        )
+    return (
+        f'The years {start_year} to {end_year} passed like quiet water beneath the banner of {dynasty_name}. '
+        f'{monarch_name} ruled with measured hand, and the realm held its breath.'
+    )

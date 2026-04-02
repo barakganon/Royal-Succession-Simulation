@@ -637,10 +637,10 @@ class GameManager:
                 'name': f"{monarch.name} {monarch.surname}",
                 'age': dynasty.current_simulation_year - monarch.birth_year,
                 'gender': monarch.gender,
-                'diplomacy': monarch.diplomacy_skill,
+                'diplomacy': monarch.diplomatic_skill,
                 'stewardship': monarch.stewardship_skill,
-                'martial': monarch.martial_skill,
-                'intrigue': monarch.intrigue_skill
+                'martial': monarch.military_skill,
+                'intrigue': monarch.espionage_skill
             }
         
         # Get territories

@@ -185,8 +185,35 @@
           {% endif %}
 
         {% else %}
-          <div class="alert alert-info m-2">
-            You haven't started any dynasties yet. Time to forge your legacy!
+          <!-- Onboarding panel shown when the user has no dynasties -->
+          <div class="card mb-3" style="border: 2px solid var(--gold);">
+            <div class="card-header text-center" style="background: linear-gradient(135deg, #2b1a00 0%, #1a1200 100%);">
+              <h3 class="mb-0" style="font-family:'Cinzel',serif;color:var(--gold);">&#9876; Begin Your Legacy</h3>
+            </div>
+            <div class="card-body">
+              <div class="row text-center mb-3">
+                <div class="col-md-4 mb-3">
+                  <div style="font-size:2rem;">&#127984;</div>
+                  <h5>Found a Dynasty</h5>
+                  <p class="text-muted small">Choose a cultural theme and name your house.</p>
+                </div>
+                <div class="col-md-4 mb-3">
+                  <div style="font-size:2rem;">&#128081;</div>
+                  <h5>Rule Across Ages</h5>
+                  <p class="text-muted small">Take actions each turn — recruit, build, conquer.</p>
+                </div>
+                <div class="col-md-4 mb-3">
+                  <div style="font-size:2rem;">&#127942;</div>
+                  <h5>Achieve Victory</h5>
+                  <p class="text-muted small">Survive 200 years, amass 10,000 gold, or control 10 territories.</p>
+                </div>
+              </div>
+              <div class="text-center mt-2">
+                <a href="{{ url_for('dynasty.create_dynasty') }}" class="btn btn-success btn-lg px-5">
+                  &#9876; Found Your First Dynasty
+                </a>
+              </div>
+            </div>
           </div>
         {% endif %}
 
@@ -199,8 +226,30 @@
     </div>
   </div>
 
-  <!-- Active Players column -->
+  <!-- Sidebar: Victory Progress + Active Players -->
   <div class="col-md-4">
+
+    {% if milestones %}
+    <div class="card mb-4">
+      <div class="card-header"><h5 class="mb-0">&#127942; Victory Progress</h5></div>
+      <div class="card-body py-2">
+        {% for m in milestones %}
+        {% set display_current = m.current if m.current <= m.target else m.target %}
+        {% set pct = (m.current / m.target * 100) | int %}
+        {% set pct = pct if pct <= 100 else 100 %}
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <small>{{ '&#9989;' if m.done else '&#11036;' }} {{ m.label }}</small>
+          <small class="text-muted">{{ display_current }} / {{ m.target }}</small>
+        </div>
+        <div class="progress mb-2" style="height:4px;">
+          <div class="progress-bar {{ 'bg-success' if m.done else 'bg-warning' }}"
+               style="width:{{ pct }}%"></div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
     <div class="card">
       <div class="card-header bg-dark text-white">
         <h4 class="mb-0">Active Players</h4>

@@ -21,6 +21,7 @@ from models.economy_system import EconomySystem
 from models.military_system import MilitarySystem
 from models.diplomacy_system import DiplomacySystem
 from utils.theme_manager import get_all_theme_names, generate_theme_from_story_llm, get_theme
+from utils.llm_prompts import build_turn_story_prompt, generate_turn_story_fallback
 from visualization.heraldry_renderer import generate_coat_of_arms
 
 logger = logging.getLogger('royal_succession.dynasty')
@@ -316,6 +317,11 @@ def advance_turn(dynasty_id):
             logger.error(f"Error releasing is_turn_processing lock for dynasty {dynasty.id}: {e}")
 
     if success and turn_summary:
+        # Check victory conditions before redirecting to turn report
+        victory_data = check_victory_conditions(dynasty, dynasty.current_simulation_year)
+        if victory_data:
+            flask_session['victory'] = victory_data
+            return redirect(url_for('dynasty.victory', dynasty_id=dynasty.id))
         flask_session['last_turn_summary'] = turn_summary
         flask_session['last_turn_dynasty_id'] = dynasty.id
         return redirect(url_for('dynasty.turn_report', dynasty_id=dynasty.id))
@@ -458,13 +464,20 @@ def action_phase(dynasty_id):
     try:
         es = EconomySystem(db.session)
         economy = es.calculate_dynasty_economy(dynasty_id)
+        # Normalise keys so the template can always use economy.gold etc.
+        if economy and 'gold' not in economy:
+            economy['gold'] = economy.get('current_treasury', dynasty.current_wealth)
+            economy['food'] = 0
+            economy['iron'] = dynasty.current_iron if hasattr(dynasty, 'current_iron') else 0
+            economy['timber'] = dynasty.current_timber if hasattr(dynasty, 'current_timber') else 0
+            economy['manpower'] = 0
     except Exception as e:
         logger.warning(f"action_phase: economy calculation failed for dynasty {dynasty_id}: {e}")
         economy = {
             'gold': dynasty.current_wealth,
             'food': 0,
-            'iron': 0,
-            'timber': 0,
+            'iron': dynasty.current_iron if hasattr(dynasty, 'current_iron') else 0,
+            'timber': dynasty.current_timber if hasattr(dynasty, 'current_timber') else 0,
             'manpower': 0,
         }
 
@@ -590,11 +603,91 @@ def submit_actions(dynasty_id):
             logger.error(f"submit_actions: error releasing lock for dynasty {dynasty_id}: {e}")
 
     if success and turn_summary:
+        # Check victory conditions before redirecting to turn report
+        victory_data = check_victory_conditions(dynasty, dynasty.current_simulation_year)
+        if victory_data:
+            flask_session['victory'] = victory_data
+            return redirect(url_for('dynasty.victory', dynasty_id=dynasty_id))
         flask_session['last_turn_summary'] = turn_summary
         flask_session['last_turn_dynasty_id'] = dynasty_id
         return redirect(url_for('dynasty.turn_report', dynasty_id=dynasty_id))
 
     return redirect(url_for('dynasty.view_dynasty', dynasty_id=dynasty_id))
+
+
+def check_victory_conditions(dynasty, current_year):
+    """Check if the dynasty has achieved a victory condition.
+
+    Returns None if no victory has been achieved, or a dict with keys:
+    ``condition``, ``title``, ``description``.
+    """
+    age = current_year - dynasty.start_year
+
+    # 1. Dynasty Legacy — survived 200+ years
+    if age >= 200:
+        return {
+            'condition': 'legacy',
+            'title': 'An Enduring Legacy',
+            'description': (
+                f'House {dynasty.name} has endured for {age} years, '
+                f'outlasting empires and catastrophes alike.'
+            ),
+        }
+
+    # 2. Great Wealth — treasury >= 10,000
+    if dynasty.current_wealth >= 10000:
+        return {
+            'condition': 'wealth',
+            'title': 'Lords of Coin',
+            'description': (
+                f'The coffers of House {dynasty.name} overflow with '
+                f'{dynasty.current_wealth} gold — the envy of all realms.'
+            ),
+        }
+
+    # 3. Populous Dynasty — 20+ living members
+    living_count = PersonDB.query.filter_by(dynasty_id=dynasty.id, death_year=None).count()
+    if living_count >= 20:
+        return {
+            'condition': 'dynasty',
+            'title': 'A Great House',
+            'description': (
+                f'House {dynasty.name} now counts {living_count} living souls '
+                f'— a dynasty that shall never be forgotten.'
+            ),
+        }
+
+    # 4. Territorial Dominion — controls 10+ territories
+    territory_count = Territory.query.filter_by(controller_dynasty_id=dynasty.id).count()
+    if territory_count >= 10:
+        return {
+            'condition': 'conquest',
+            'title': 'Masters of the Realm',
+            'description': (
+                f'House {dynasty.name} rules over {territory_count} territories, '
+                f'their banners flying across the land.'
+            ),
+        }
+
+    return None
+
+
+@dynasty_bp.route('/dynasty/<int:dynasty_id>/victory')
+@login_required
+def victory(dynasty_id):
+    """Display the victory screen for a dynasty that has achieved a win condition."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        return redirect(url_for('auth.dashboard'))
+    victory_data = flask_session.pop('victory', None)
+    if not victory_data:
+        return redirect(url_for('dynasty.view_dynasty', dynasty_id=dynasty_id))
+    return render_template(
+        'victory.html',
+        dynasty=dynasty,
+        victory=victory_data,
+        current_year=dynasty.current_simulation_year,
+    )
 
 
 @dynasty_bp.route('/dynasty/<int:dynasty_id>/delete', methods=['GET', 'POST'])
@@ -647,7 +740,22 @@ def delete_dynasty(dynasty_id):
                 {"controller_dynasty_id": None}, synchronize_session=False
             )
 
-            # 5. Delete the dynasty - this will cascade to persons and history logs
+            # 5. Null out the founder FK and self-referential person FKs to break circular dependencies
+            if dynasty.founder_person_db_id is not None:
+                logger.debug(f"Nullifying founder FK for dynasty {dynasty_id}")
+                dynasty.founder_person_db_id = None
+                db.session.flush()
+
+            # Null out PersonDB self-referential FKs (spouse, mother, father) for all dynasty persons
+            # to break the circular dependency that causes CircularDependencyError on cascade delete
+            logger.debug(f"Nullifying self-referential person FKs for dynasty {dynasty_id}")
+            PersonDB.query.filter_by(dynasty_id=dynasty_id).update(
+                {"spouse_sim_id": None, "mother_sim_id": None, "father_sim_id": None},
+                synchronize_session=False
+            )
+            db.session.flush()
+
+            # 6. Delete the dynasty - this will cascade to persons and history logs
             # thanks to the cascade="all, delete-orphan" setting in the relationships
             logger.info(f"Deleting dynasty {dynasty_id} from database")
             db.session.delete(dynasty)
@@ -884,6 +992,52 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
         HistoryLogEntryDB.year < end_year
     ).order_by(HistoryLogEntryDB.year).all()
 
+    # --- Epic Story Generation (one paragraph per turn) ---
+    try:
+        event_texts = [e.event_string for e in new_events if e.event_string]
+        monarch_obj = PersonDB.query.filter_by(
+            dynasty_id=dynasty_id, is_monarch=True, death_year=None
+        ).first()
+        monarch_display = (
+            f"{monarch_obj.name} {monarch_obj.surname}" if monarch_obj else dynasty.name
+        )
+        existing_story = dynasty.epic_story_text or ""
+        llm_ok = _llm_available()
+        new_paragraph = ""
+        if llm_ok:
+            try:
+                import google.generativeai as genai
+                from flask import current_app
+                api_key = current_app.config.get("FLASK_APP_GOOGLE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+                if api_key:
+                    genai.configure(api_key=api_key)
+                    model = genai.GenerativeModel("gemini-1.5-flash")
+                    prompt = build_turn_story_prompt(
+                        dynasty_name=dynasty.name,
+                        start_year=start_year,
+                        end_year=end_year - 1,
+                        events=event_texts,
+                        monarch_name=monarch_display,
+                        existing_story=existing_story,
+                    )
+                    response = model.generate_content(
+                        prompt,
+                        generation_config={"max_output_tokens": 300, "temperature": 0.85},
+                    )
+                    new_paragraph = response.text.strip() if response.text else ""
+            except Exception:
+                new_paragraph = ""
+        if not new_paragraph:
+            new_paragraph = generate_turn_story_fallback(
+                dynasty.name, start_year, end_year - 1, event_texts, monarch_display
+            )
+        if new_paragraph:
+            separator = "\n\n" if existing_story.strip() else ""
+            dynasty.epic_story_text = existing_story + separator + new_paragraph
+            db.session.commit()
+    except Exception as story_err:
+        logger.error(f"Error generating turn story for dynasty {dynasty_id}: {story_err}", exc_info=True)
+
     living_count = PersonDB.query.filter_by(dynasty_id=dynasty_id, death_year=None).count()
     dynasty_obj = DynastyDB.query.get(dynasty_id)
     current_wealth = dynasty_obj.current_wealth if dynasty_obj else 0
@@ -902,6 +1056,7 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
         ],
         'living_count': living_count,
         'current_wealth': current_wealth,
+        'new_story_paragraph': new_paragraph if 'new_paragraph' in dir() else '',
     }
 
     return True, f"Advanced {years_to_advance} years from {start_year} to {end_year}.", turn_summary

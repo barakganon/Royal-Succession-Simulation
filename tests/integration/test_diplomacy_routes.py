@@ -8,12 +8,9 @@
 #   POST /dynasty/<id>/create_treaty
 #   POST /dynasty/<id>/declare_war
 #
-# Known broken behaviour:
-#   diplomacy_view.html contains `url_for('negotiate_peace', dynasty_id=dynasty.id)`
-#   which is missing the required `war_id` argument. When a dynasty has active wars
-#   AND the diplomacy_view route is rendered (including after a redirect), Werkzeug
-#   raises BuildError. Tests that would land on this page are marked with
-#   `@pytest.mark.skip` and a note explaining why.
+# Note: the url_for bug in diplomacy_view.html (missing war_id) was fixed in the
+# template — it now uses war_id=0 and replaces '/0' with '/' + warId dynamically.
+# All previously-skipped tests now run.
 
 import pytest
 from models.db_models import User, DynastyDB, War, WarGoal
@@ -102,27 +99,12 @@ class TestDiplomacyAuthGuards:
 # ---------------------------------------------------------------------------
 
 class TestDiplomacyView:
-    @pytest.mark.skip(
-        reason=(
-            "diplomacy_view.html has a broken url_for call on line 483: "
-            "`url_for('negotiate_peace', dynasty_id=dynasty.id)` is missing `war_id`. "
-            "This is unconditional JavaScript in the template so it crashes on every "
-            "render regardless of whether there are active wars. "
-            "Tracked as a known broken route in CLAUDE.md (inconsistent error handling)."
-        )
-    )
     def test_diplomacy_view_returns_200(self, diplo_client):
-        """diplomacy_view only works when no active wars (template bug: url_for missing war_id)."""
+        """diplomacy_view renders correctly when the dynasty has no active wars."""
         client, dynasty_id = diplo_client
         response = client.get(f'/dynasty/{dynasty_id}/diplomacy')
         assert response.status_code == 200
 
-    @pytest.mark.skip(
-        reason=(
-            "diplomacy_view.html is broken — url_for('negotiate_peace', dynasty_id=...) "
-            "missing war_id argument causes a BuildError on every render."
-        )
-    )
     def test_diplomacy_view_shows_dynasty_name(self, diplo_client):
         client, dynasty_id = diplo_client
         response = client.get(f'/dynasty/{dynasty_id}/diplomacy')
@@ -169,13 +151,6 @@ class TestTreatyView:
 # ---------------------------------------------------------------------------
 
 class TestDiplomaticAction:
-    @pytest.mark.skip(
-        reason=(
-            "diplomatic_action flashes an error then redirects to diplomacy_view, "
-            "which crashes with BuildError when active wars exist (missing war_id "
-            "in url_for call inside diplomacy_view.html — known template bug)."
-        )
-    )
     def test_diplomatic_action_missing_params(self, diplo_client):
         client, dynasty_id = diplo_client
         response = client.post(
@@ -204,13 +179,6 @@ class TestDiplomaticAction:
         )
         assert response.status_code == 302
 
-    @pytest.mark.skip(
-        reason=(
-            "diplomatic_action redirects to diplomacy_view after processing, "
-            "and diplomacy_view.html has a url_for bug (missing war_id) that "
-            "crashes the template renderer when active wars exist."
-        )
-    )
     def test_diplomatic_action_with_target(self, two_dynasty_client):
         client, did_a, did_b = two_dynasty_client
         response = client.post(
@@ -226,13 +194,6 @@ class TestDiplomaticAction:
 # ---------------------------------------------------------------------------
 
 class TestCreateTreaty:
-    @pytest.mark.skip(
-        reason=(
-            "create_treaty redirects to diplomacy_view on error, and the template "
-            "has a broken url_for call (missing war_id) that crashes when active "
-            "wars exist. Skipped pending template fix."
-        )
-    )
     def test_create_treaty_missing_params(self, diplo_client):
         client, dynasty_id = diplo_client
         response = client.post(
@@ -253,12 +214,6 @@ class TestCreateTreaty:
         )
         assert response.status_code == 302
 
-    @pytest.mark.skip(
-        reason=(
-            "create_treaty redirects to diplomacy_view on invalid treaty type, "
-            "and the template has a broken url_for call (missing war_id)."
-        )
-    )
     def test_create_treaty_invalid_type(self, two_dynasty_client):
         client, did_a, did_b = two_dynasty_client
         response = client.post(
@@ -307,12 +262,6 @@ class TestDeclareWar:
         )
         assert response.status_code == 302
 
-    @pytest.mark.skip(
-        reason=(
-            "declare_war redirects to diplomacy_view when params are missing or invalid, "
-            "and diplomacy_view.html has the broken url_for (missing war_id) bug."
-        )
-    )
     def test_declare_war_missing_params(self, diplo_client):
         client, dynasty_id = diplo_client
         response = client.post(

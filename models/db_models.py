@@ -56,7 +56,8 @@ class DynastyDB(db.Model):
     current_simulation_year = db.Column(db.Integer, nullable=False)
 
     # This will link to the PersonDB record of the founder
-    founder_person_db_id = db.Column(db.Integer, db.ForeignKey('person_db.id'), nullable=True)
+    # use_alter=True breaks the circular FK cycle: DynastyDB→PersonDB←DynastyDB.persons(cascade)
+    founder_person_db_id = db.Column(db.Integer, db.ForeignKey('person_db.id', use_alter=True, name='fk_dynasty_founder_person'), nullable=True)
     founder = db.relationship('PersonDB', foreign_keys=[founder_person_db_id], backref=db.backref('founded_this_dynasty', uselist=False))
 
     # New fields for multi-agent game
@@ -79,6 +80,8 @@ class DynastyDB(db.Model):
 
     # Turn-order enforcement: prevents concurrent or double-submission of advance_turn
     is_turn_processing = db.Column(db.Boolean, default=False, nullable=False)
+    # Cumulative epic fantasy story — one paragraph appended per turn
+    epic_story_text = db.Column(db.Text, default='', nullable=True)
 
     # Relationships to related simulation data for this dynasty
     # 'dynamic' allows for querying, e.g., dynasty.persons.filter_by(...).all()
@@ -617,31 +620,47 @@ class Building(db.Model):
 
 
 class TradeRoute(db.Model):
-    """Model for trade routes between territories."""
+    """Model for trade routes between dynasties (and optionally territories)."""
     __tablename__ = 'trade_route'
-    
+
     id = db.Column(db.Integer, primary_key=True)
-    source_territory_id = db.Column(db.Integer, db.ForeignKey('territory.id'), nullable=False, index=True)
-    destination_territory_id = db.Column(db.Integer, db.ForeignKey('territory.id'), nullable=False, index=True)
-    
+
+    # Dynasty-level endpoints (used by EconomySystem)
+    source_dynasty_id = db.Column(db.Integer, db.ForeignKey('dynasty.id'), nullable=True, index=True)
+    target_dynasty_id = db.Column(db.Integer, db.ForeignKey('dynasty.id'), nullable=True, index=True)
+
+    # Territory-level endpoints (optional, for map display)
+    source_territory_id = db.Column(db.Integer, db.ForeignKey('territory.id'), nullable=True, index=True)
+    destination_territory_id = db.Column(db.Integer, db.ForeignKey('territory.id'), nullable=True, index=True)
+
+    # Resource being traded
+    resource_type = db.Column(db.Enum(ResourceType), nullable=True)
+    resource_amount = db.Column(db.Integer, default=0)
+
+    # Financial data
+    base_price = db.Column(db.Float, default=0.0)
+    profit_source = db.Column(db.Float, default=0.0)
+    profit_target = db.Column(db.Float, default=0.0)
+
     # Trade route properties
-    trade_volume = db.Column(db.Integer, default=10)  # Base trade volume
-    efficiency = db.Column(db.Float, default=1.0)  # Efficiency multiplier (0.5-1.5)
-    risk = db.Column(db.Float, default=0.1)  # Risk of disruption (0.0-1.0)
-    
+    trade_volume = db.Column(db.Integer, default=10)
+    efficiency = db.Column(db.Float, default=1.0)
+    risk = db.Column(db.Float, default=0.1)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+
     # Relationships
     source_territory = db.relationship('Territory', foreign_keys=[source_territory_id],
-                                      backref='outgoing_trade_routes')
+                                       backref='outgoing_trade_routes')
     destination_territory = db.relationship('Territory', foreign_keys=[destination_territory_id],
-                                           backref='incoming_trade_routes')
-    
+                                            backref='incoming_trade_routes')
+
     # Metadata
-    established_year = db.Column(db.Integer, nullable=False)
+    established_year = db.Column(db.Integer, nullable=False, default=1000)
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     last_updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
-    
+
     def __repr__(self):
-        return f"<TradeRoute (Source: {self.source_territory_id}, Destination: {self.destination_territory_id})>"
+        return f"<TradeRoute (Src dynasty: {self.source_dynasty_id}, Dst dynasty: {self.target_dynasty_id})>"
 
 
 class UnitType(enum.Enum):
