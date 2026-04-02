@@ -258,5 +258,28 @@
 
   </div><!-- /.row -->
 
+  <!-- ── Chronicles (Epic Story) ─────────────────────────────────── -->
+  {% if dynasty.epic_story_text %}
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span>📜 The Chronicles of {{ dynasty.name }}</span>
+          <small class="text-muted font-italic">A living saga — one chapter per turn</small>
+        </div>
+        <div class="card-body" style="max-height:320px;overflow-y:auto;">
+          {% for paragraph in dynasty.epic_story_text.strip().split('\n\n') %}
+            {% if paragraph.strip() %}
+            <p class="mb-3" style="font-family:'Crimson Text',serif;font-size:1.05rem;line-height:1.7;color:var(--text-primary);">
+              {{ paragraph.strip() }}
+            </p>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
 </div><!-- /.container -->
 {% endblock %}
