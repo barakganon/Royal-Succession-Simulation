@@ -1,221 +1,485 @@
 {% extends "base.html" %}
-{% block title %}World Map{% endblock %}
+{% block title %}World Map — Dynasty Saga{% endblock %}
+{% block body_class %}game-page{% endblock %}
+{% block main_wrapper_class %}{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-  <h2 class="mt-3 mb-2">World Map</h2>
-  <div class="row">
-    <!-- Map canvas -->
-    <div class="col-md-9">
-      <div style="position:relative;border:1px solid #444;border-radius:4px;background:#1a2a3a;">
-        <canvas id="worldMap" width="900" height="600" style="display:block;cursor:pointer;"></canvas>
+<div class="game-viewport">
+
+  <!-- ══════════════════════════════ TOP BAR ══════════════════════════════ -->
+  <div class="game-topbar">
+
+    <!-- Coat of arms + dynasty name -->
+    {% if dynasty and dynasty.coat_of_arms_svg %}
+      <div style="width:32px;height:38px;flex-shrink:0;">{{ dynasty.coat_of_arms_svg | safe }}</div>
+    {% else %}
+      <span style="font-size:1.4rem;">&#9876;</span>
+    {% endif %}
+    <span style="font-family:'Cinzel',serif;font-weight:700;color:var(--gold);font-size:.95rem;white-space:nowrap;">
+      {{ dynasty.name if dynasty else 'No Dynasty' }}
+    </span>
+
+    <div style="flex:1;"></div>
+
+    <!-- Resource pills -->
+    <div class="resource-pill">&#x1F4B0; <span class="res-val" id="res-gold">{{ gold }}</span></div>
+    <div class="resource-pill">&#x1F33E; <span class="res-val" id="res-food">—</span></div>
+    <div class="resource-pill">&#9881; <span class="res-val" id="res-iron">{{ dynasty.current_iron if dynasty else 0 }}</span></div>
+    <div class="resource-pill">&#x1FA77; <span class="res-val" id="res-timber">{{ dynasty.current_timber if dynasty else 0 }}</span></div>
+    <div class="resource-pill">&#9876; <span class="res-val" id="res-manpower">—</span></div>
+
+    <div style="flex:1;"></div>
+
+    <!-- Year -->
+    <span style="font-family:'Cinzel',serif;font-size:.88rem;color:var(--text-muted);white-space:nowrap;">
+      Year {{ dynasty.current_simulation_year if dynasty else '—' }}
+    </span>
+
+    <!-- End Turn button -->
+    {% if dynasty_id %}
+      <a href="{{ url_for('dynasty.advance_turn', dynasty_id=dynasty_id) }}"
+         class="btn btn-warning btn-sm ml-2" style="font-size:.75rem;white-space:nowrap;">
+        &#x231B; End Turn
+      </a>
+    {% endif %}
+  </div><!-- /game-topbar -->
+
+  <!-- ══════════════════════════════ MAIN ROW ══════════════════════════════ -->
+  <div class="game-main">
+
+    <!-- ─────────── MAP PANEL ─────────── -->
+    <div class="game-map-panel" id="map-panel">
+
+      <!-- Map overlay mode buttons -->
+      <div class="map-overlay-btns">
+        <button class="btn btn-secondary action-btn-sm active" id="btn-terrain" onclick="setOverlay('terrain')">Terrain</button>
+        <button class="btn btn-secondary action-btn-sm" id="btn-armies" onclick="setOverlay('armies')">Armies</button>
+        <button class="btn btn-secondary action-btn-sm" id="btn-economy" onclick="setOverlay('economy')">Economy</button>
       </div>
-      <small class="text-muted">Click a territory for details. Colours = dynasty ownership.</small>
+
+      <!-- Canvas -->
+      <canvas id="hexCanvas"></canvas>
+
+      <!-- Hover tooltip -->
+      <div class="hex-tooltip" id="hex-tooltip"></div>
     </div>
-    <!-- Sidebar -->
-    <div class="col-md-3">
-      <div class="card" id="territory-info">
-        <div class="card-header"><strong>Territory Details</strong></div>
-        <div class="card-body" id="territory-detail">
-          <p class="text-muted">Click a territory on the map.</p>
+
+    <!-- ─────────── SIDE PANEL ─────────── -->
+    <div class="game-side-panel">
+
+      <!-- Ruler mini-card -->
+      {% if current_monarch %}
+      <div style="border:1px solid var(--gold);border-radius:4px;padding:.5rem;background:rgba(0,0,0,.3);">
+        <div style="display:flex;align-items:center;gap:.5rem;">
+          {% if current_monarch.portrait_svg %}
+            <div style="width:36px;height:36px;flex-shrink:0;">{{ current_monarch.portrait_svg | safe }}</div>
+          {% else %}
+            <div style="width:36px;height:36px;border-radius:50%;background:var(--dark-border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.2rem;">&#x1F451;</div>
+          {% endif %}
+          <div>
+            <div style="font-family:'Cinzel',serif;font-size:.8rem;color:var(--gold);">{{ current_monarch.name }} {{ current_monarch.surname }}</div>
+            <div style="font-size:.72rem;color:var(--text-muted);">Age {{ current_monarch.age }}</div>
+          </div>
         </div>
       </div>
-      <div class="card mt-3">
-        <div class="card-header"><strong>Legend</strong></div>
-        <div class="card-body" id="map-legend" style="font-size:0.85em;"></div>
+      {% else %}
+      <div style="font-size:.8rem;color:var(--text-muted);font-style:italic;">No ruler selected</div>
+      {% endif %}
+
+      <hr style="border-color:var(--dark-border);margin:.25rem 0;">
+
+      <!-- Action Points -->
+      <div>
+        <div style="font-family:'Cinzel',serif;font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem;">Action Points</div>
+        <div id="ap-display">
+          <span class="ap-dot" id="ap0"></span>
+          <span class="ap-dot" id="ap1"></span>
+          <span class="ap-dot" id="ap2"></span>
+        </div>
       </div>
-    </div>
+
+      <hr style="border-color:var(--dark-border);margin:.25rem 0;">
+
+      <!-- Action type selector -->
+      <div>
+        <div style="font-family:'Cinzel',serif;font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem;">Queue Action</div>
+        <div style="display:flex;flex-wrap:wrap;gap:.25rem;">
+          <button class="btn btn-secondary action-btn-sm" onclick="selectAction('Recruit')">Recruit</button>
+          <button class="btn btn-secondary action-btn-sm" onclick="selectAction('Build')">Build</button>
+          <button class="btn btn-secondary action-btn-sm" onclick="selectAction('Develop')">Develop</button>
+          <button class="btn btn-secondary action-btn-sm" onclick="selectAction('March')">March</button>
+          <button class="btn btn-danger action-btn-sm" onclick="selectAction('Declare War')">War</button>
+        </div>
+        <div id="pending-action" style="font-size:.75rem;color:var(--gold);margin-top:.3rem;min-height:1.2em;"></div>
+      </div>
+
+      <hr style="border-color:var(--dark-border);margin:.25rem 0;">
+
+      <!-- Action Queue -->
+      <div>
+        <div style="font-family:'Cinzel',serif;font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem;">Queued</div>
+        <ul id="action-queue" style="list-style:none;padding:0;margin:0;font-size:.78rem;"></ul>
+      </div>
+
+      <hr style="border-color:var(--dark-border);margin:.25rem 0;">
+
+      <!-- Chronicle feed -->
+      <div style="flex:1;overflow-y:auto;">
+        <div style="font-family:'Cinzel',serif;font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem;">Chronicle</div>
+        {% if recent_events %}
+          {% for ev in recent_events %}
+          <div style="margin-bottom:.5rem;padding:.3rem .4rem;border-left:2px solid var(--gold);background:rgba(0,0,0,.2);border-radius:0 3px 3px 0;">
+            {% if ev.year %}<span style="font-size:.68rem;color:var(--gold);font-family:'Cinzel',serif;">{{ ev.year }}</span><br>{% endif %}
+            <span style="font-size:.75rem;color:var(--text-light);">{{ ev.text }}</span>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div style="font-size:.75rem;color:var(--text-muted);font-style:italic;">No events recorded yet.</div>
+        {% endif %}
+      </div>
+
+    </div><!-- /game-side-panel -->
+
+  </div><!-- /game-main -->
+
+  <!-- ══════════════════════════════ BOTTOM BAR ══════════════════════════════ -->
+  <div class="game-botbar">
+    <span id="status-msg">Click a territory to see details.</span>
+    <span id="selected-info" style="color:var(--text-light);"></span>
   </div>
-</div>
 
+</div><!-- /game-viewport -->
+{% endblock %}
+
+{% block extra_scripts %}
 <script>
-(function() {
-  var canvas = document.getElementById('worldMap');
+(function () {
+  'use strict';
+
+  /* ── Config ── */
+  var R = 28;                       // hex radius in pixels
+  var sqrt3 = Math.sqrt(3);
+  var playerDynastyId = {{ player_dynasty_id | tojson }};
+
+  /* ── Canvas setup ── */
+  var panel = document.getElementById('map-panel');
+  var canvas = document.getElementById('hexCanvas');
   var ctx = canvas.getContext('2d');
+
+  function resizeCanvas() {
+    canvas.width  = panel.clientWidth;
+    canvas.height = panel.clientHeight;
+    drawAll();
+  }
+
+  /* ── Data ── */
   var features = [];
-  var selectedId = null;
+  var selectedTerritoryId = null;
+  var overlay = 'terrain';   // terrain | armies | economy
 
-  // Dynasty ID → deterministic hue
-  function dynastyHue(id) {
-    if (!id) return 220; // grey-blue for unowned
-    return (id * 137.508) % 360;
+  /* ── Action queue state ── */
+  var pendingActionType = null;
+  var actionQueue = [];         // [{type, territory_id, territory_name}]
+  var AP_TOTAL = 3;
+  var apUsed = 0;
+
+  /* ── Hex geometry ── */
+  function hexCenter(col, row) {
+    var x = R * sqrt3 * col + (row % 2) * R * sqrt3 / 2;
+    var y = R * 1.5 * row;
+    return { x: x, y: y };
   }
 
-  function dynastyColor(id, alpha) {
-    alpha = alpha || 1;
-    if (!id) return 'rgba(80,100,120,' + alpha + ')';
-    var h = dynastyHue(id);
-    return 'hsla(' + h + ',55%,45%,' + alpha + ')';
+  function hexPath(cx, cy) {
+    var pts = [];
+    for (var i = 0; i < 6; i++) {
+      var angle = Math.PI / 3 * i;   // flat-top
+      pts.push([cx + R * Math.cos(angle), cy + R * Math.sin(angle)]);
+    }
+    return pts;
   }
 
-  function drawMap() {
+  function drawHex(cx, cy, fillColor, strokeColor, strokeWidth) {
+    var pts = hexPath(cx, cy);
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+    ctx.closePath();
+    ctx.fillStyle = fillColor;
+    ctx.fill();
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = strokeWidth;
+    ctx.stroke();
+  }
+
+  /* ── Colour schemes ── */
+  var TERRAIN_COLORS = {
+    plains:    '#3a4a2a',
+    hills:     '#4a4a3a',
+    forest:    '#1a3a1a',
+    mountains: '#3a3a4a',
+    coastal:   '#1a2a4a',
+    river:     '#1a3a4a',
+    desert:    '#5a4a1a',
+    tundra:    '#3a3a4a',
+    lake:      '#1a2a4a',
+    swamp:     '#2a3a1a'
+  };
+
+  function terrainColor(terrain) {
+    return TERRAIN_COLORS[terrain] || '#2a3a2a';
+  }
+
+  function armyColor(p) {
+    if (!p.owner_dynasty_id) return '#444455';
+    if (p.owner_dynasty_id === playerDynastyId) return '#1a4a1a';
+    return '#4a1a1a';
+  }
+
+  function economyColor(devLevel) {
+    var lvl = (devLevel || 1);
+    var t = Math.min(1, lvl / 5);
+    var r = Math.round(10 + 60 * t);
+    var g = Math.round(20 + 100 * t);
+    var b = Math.round(10 + 40 * t);
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  }
+
+  function dynastyFillColor(p) {
+    if (!p.owner_dynasty_id) return 'rgba(60,70,90,0.7)';
+    var hue = p.owner_dynasty_hue !== undefined ? p.owner_dynasty_hue : (p.owner_dynasty_id % 12 * 30);
+    return 'hsla(' + hue + ',55%,35%,0.85)';
+  }
+
+  /* ── Offset for scrolling/panning ── */
+  var offsetX = 0, offsetY = 0;
+
+  function computeOffset() {
+    if (features.length === 0) return;
+    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    features.forEach(function (f) {
+      var p = f.properties;
+      var c = hexCenter(p.col || 0, p.row || 0);
+      if (c.x < minX) minX = c.x;
+      if (c.y < minY) minY = c.y;
+      if (c.x > maxX) maxX = c.x;
+      if (c.y > maxY) maxY = c.y;
+    });
+    var pad = R * 2;
+    offsetX = pad - minX;
+    offsetY = pad - minY;
+  }
+
+  /* ── Draw loop ── */
+  function drawAll() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#1a2a3a';
+    ctx.fillStyle = '#0a1520';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    features.forEach(function(f) {
-      if (!f.geometry || !f.geometry.coordinates) return;
-      var coords = f.geometry.coordinates[0];
-      var p = f.properties;
-      var isSelected = (p.territory_id === selectedId);
-
-      ctx.beginPath();
-      coords.forEach(function(pt, i) {
-        if (i === 0) ctx.moveTo(pt[0], pt[1]);
-        else ctx.lineTo(pt[0], pt[1]);
-      });
-      ctx.closePath();
-
-      ctx.fillStyle = dynastyColor(p.owner_dynasty_id, isSelected ? 1 : 0.75);
-      ctx.fill();
-      ctx.strokeStyle = isSelected ? '#FFD700' : '#2a3a4a';
-      ctx.lineWidth = isSelected ? 2 : 0.5;
-      ctx.stroke();
-
-      // Army token
-      if (p.army_count > 0 && p.centroid) {
-        ctx.beginPath();
-        ctx.arc(p.centroid[0], p.centroid[1], 5, 0, Math.PI * 2);
-        ctx.fillStyle = '#FFD700';
-        ctx.fill();
-      }
-
-      // Territory name (small)
-      if (p.centroid && p.name) {
-        ctx.fillStyle = 'rgba(255,255,255,0.8)';
-        ctx.font = '9px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(p.name.substring(0, 12), p.centroid[0], p.centroid[1] + 3);
-      }
-    });
-  }
-
-  function buildLegend() {
-    var seen = {};
-    var html = '';
-    features.forEach(function(f) {
-      var p = f.properties;
-      var key = p.owner_dynasty_id || 0;
-      if (!seen[key]) {
-        seen[key] = true;
-        var name = p.owner_dynasty_name || 'Unclaimed';
-        var color = dynastyColor(p.owner_dynasty_id, 1);
-        html += '<div class="d-flex align-items-center mb-1">' +
-          '<div style="width:16px;height:16px;background:' + color + ';border-radius:3px;margin-right:8px;flex-shrink:0;"></div>' +
-          '<small>' + name + '</small></div>';
-      }
-    });
-    document.getElementById('map-legend').innerHTML = html || '<small class="text-muted">No dynasties</small>';
-  }
-
-  function showDetail(props) {
-    var html = '<dl class="mb-0">';
-    html += '<dt>' + (props.name || 'Unknown') + '</dt>';
-    html += '<dd><small>Owner: ' + (props.owner_dynasty_name || 'Unclaimed') + '</small></dd>';
-    html += '<dd><small>Terrain: ' + (props.terrain_type || '&mdash;') + '</small></dd>';
-    html += '<dd><small>Population: ' + (props.population || 0) + '</small></dd>';
-    if (props.army_count > 0) html += '<dd><small>&#x2694; Armies: ' + props.army_count + '</small></dd>';
-    if (props.is_capital) html += '<dd><small>&#x2605; Capital</small></dd>';
-    html += '</dl>';
-    document.getElementById('territory-detail').innerHTML = html;
-  }
-
-  // Hit detection: point-in-polygon (ray casting)
-  function pointInPolygon(x, y, coords) {
-    var inside = false;
-    for (var i = 0, j = coords.length - 1; i < coords.length; j = i++) {
-      var xi = coords[i][0], yi = coords[i][1];
-      var xj = coords[j][0], yj = coords[j][1];
-      if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
-        inside = !inside;
-      }
+    if (features.length === 0) {
+      ctx.fillStyle = '#556';
+      ctx.font = '16px Cinzel, serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('No territory data available', canvas.width / 2, canvas.height / 2);
+      return;
     }
-    return inside;
+
+    features.forEach(function (f) {
+      var p = f.properties;
+      var col = p.col !== undefined ? p.col : 0;
+      var row = p.row !== undefined ? p.row : 0;
+      var c   = hexCenter(col, row);
+      var cx  = c.x + offsetX;
+      var cy  = c.y + offsetY;
+
+      // Fill color based on overlay
+      var fill;
+      if (overlay === 'terrain') {
+        fill = terrainColor(p.terrain_type);
+      } else if (overlay === 'armies') {
+        fill = armyColor(p);
+      } else {
+        fill = economyColor(p.development_level);
+      }
+
+      var isSelected = p.territory_id === selectedTerritoryId;
+      var stroke = isSelected ? '#FFD700' : 'rgba(0,0,0,0.5)';
+      var lw = isSelected ? 2.5 : 0.8;
+
+      drawHex(cx, cy, fill, stroke, lw);
+
+      // Capital marker — gold ring
+      if (p.is_capital) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, R * 0.35, 0, Math.PI * 2);
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      // Army token — red dot
+      if (p.army_count > 0) {
+        ctx.beginPath();
+        ctx.arc(cx + R * 0.4, cy - R * 0.35, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#cc2222';
+        ctx.fill();
+        ctx.strokeStyle = '#ff6666';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+
+      // Territory name (tiny text) — only if hex is large enough on screen
+      if (R >= 20 && p.name) {
+        ctx.fillStyle = 'rgba(232,213,163,0.7)';
+        ctx.font = '7px Crimson Text, serif';
+        ctx.textAlign = 'center';
+        var label = p.name.length > 10 ? p.name.substring(0, 9) + '…' : p.name;
+        ctx.fillText(label, cx, cy + 3);
+      }
+    });
   }
 
-  canvas.addEventListener('click', function(e) {
-    var rect = canvas.getBoundingClientRect();
-    var x = e.clientX - rect.left;
-    var y = e.clientY - rect.top;
-    var hit = null;
-    features.forEach(function(f) {
-      if (!f.geometry || !f.geometry.coordinates) return;
-      var coords = f.geometry.coordinates[0];
-      if (pointInPolygon(x, y, coords)) hit = f;
+  /* ── Tooltip / hover ── */
+  var tooltip = document.getElementById('hex-tooltip');
+
+  function nearestHex(mx, my) {
+    var best = null, bestDist = Infinity;
+    features.forEach(function (f) {
+      var p = f.properties;
+      var col = p.col !== undefined ? p.col : 0;
+      var row = p.row !== undefined ? p.row : 0;
+      var c = hexCenter(col, row);
+      var cx = c.x + offsetX;
+      var cy = c.y + offsetY;
+      var dx = mx - cx, dy = my - cy;
+      var dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < best) { best = dist; bestDist = dist; }
+      if (dist < bestDist) { bestDist = dist; best = f; }
     });
-    if (hit) {
-      selectedId = hit.properties.territory_id;
-      showDetail(hit.properties);
-      drawMap();
+    return (bestDist <= R) ? best : null;
+  }
+
+  canvas.addEventListener('mousemove', function (e) {
+    var rect = canvas.getBoundingClientRect();
+    var mx = e.clientX - rect.left;
+    var my = e.clientY - rect.top;
+    var f = nearestHex(mx, my);
+    if (f) {
+      var p = f.properties;
+      tooltip.innerHTML =
+        '<strong style="color:var(--gold);">' + p.name + '</strong><br>' +
+        '<small>' + (p.terrain_type || '—') + ' · ' + (p.owner_dynasty_name || 'Unclaimed') + '</small><br>' +
+        '<small>Pop: ' + (p.population || 0) + (p.army_count > 0 ? ' · &#9876; ' + p.army_count : '') + '</small>';
+      tooltip.style.left = (mx + 14) + 'px';
+      tooltip.style.top  = (my - 10) + 'px';
+      tooltip.style.display = 'block';
+    } else {
+      tooltip.style.display = 'none';
     }
   });
 
-  // Load GeoJSON for the current dynasty
-  var dynastyId = {{ dynasty_id if dynasty_id else 'null' }};
-  var url = dynastyId ? '/game/' + dynastyId + '/map.geojson' : null;
+  canvas.addEventListener('mouseleave', function () {
+    tooltip.style.display = 'none';
+  });
 
-  function loadAndDraw(dataUrl) {
-    if (!dataUrl) {
-      ctx.fillStyle = '#ccc';
-      ctx.font = '20px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('Select a dynasty to view the map', canvas.width / 2, canvas.height / 2);
-      return;
+  /* ── Click → select hex + action queue ── */
+  canvas.addEventListener('click', function (e) {
+    var rect = canvas.getBoundingClientRect();
+    var mx = e.clientX - rect.left;
+    var my = e.clientY - rect.top;
+    var f = nearestHex(mx, my);
+    if (!f) return;
+
+    var p = f.properties;
+    selectedTerritoryId = p.territory_id;
+    drawAll();
+
+    // Update botbar
+    document.getElementById('selected-info').textContent =
+      p.name + ' (' + (p.terrain_type || '?') + ') · Pop: ' + (p.population || 0) +
+      (p.is_capital ? ' ★ Capital' : '');
+
+    // If a pending action is selected, queue it
+    if (pendingActionType && apUsed < AP_TOTAL) {
+      actionQueue.push({ type: pendingActionType, territory_id: p.territory_id, territory_name: p.name });
+      apUsed++;
+      pendingActionType = null;
+      document.getElementById('pending-action').textContent = '';
+      renderQueue();
+      renderAP();
     }
-    fetch(dataUrl)
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        features = data.features || [];
-        if (features.length === 0) {
-          ctx.fillStyle = '#999';
-          ctx.font = '16px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('No territory data available', canvas.width / 2, canvas.height / 2);
-          return;
-        }
+  });
 
-        // Auto-scale: find bounding box and fit to canvas
-        var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        features.forEach(function(f) {
-          if (!f.geometry) return;
-          f.geometry.coordinates[0].forEach(function(pt) {
-            minX = Math.min(minX, pt[0]); minY = Math.min(minY, pt[1]);
-            maxX = Math.max(maxX, pt[0]); maxY = Math.max(maxY, pt[1]);
-          });
-        });
+  /* ── Overlay buttons ── */
+  window.setOverlay = function (mode) {
+    overlay = mode;
+    ['terrain','armies','economy'].forEach(function (m) {
+      document.getElementById('btn-' + m).classList.toggle('active', m === mode);
+    });
+    drawAll();
+  };
 
-        var padding = 40;
-        var scaleX = (canvas.width - 2 * padding) / (maxX - minX || 1);
-        var scaleY = (canvas.height - 2 * padding) / (maxY - minY || 1);
-        var scale = Math.min(scaleX, scaleY);
+  /* ── Action queue helpers ── */
+  window.selectAction = function (type) {
+    pendingActionType = type;
+    document.getElementById('pending-action').textContent = type + ': click a territory…';
+  };
 
-        // Transform all coordinates in-place
-        features.forEach(function(f) {
-          if (!f.geometry) return;
-          f.geometry.coordinates[0] = f.geometry.coordinates[0].map(function(pt) {
-            return [(pt[0] - minX) * scale + padding, (pt[1] - minY) * scale + padding];
-          });
-          if (f.properties.centroid) {
-            f.properties.centroid = [
-              (f.properties.centroid[0] - minX) * scale + padding,
-              (f.properties.centroid[1] - minY) * scale + padding
-            ];
-          }
-        });
-
-        drawMap();
-        buildLegend();
-      })
-      .catch(function(err) {
-        console.error('Map load error:', err);
-        ctx.fillStyle = '#c00';
-        ctx.font = '14px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('Failed to load map data', canvas.width / 2, canvas.height / 2);
-      });
+  function renderQueue() {
+    var ul = document.getElementById('action-queue');
+    ul.innerHTML = '';
+    actionQueue.forEach(function (a, i) {
+      var li = document.createElement('li');
+      li.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:.15rem 0;border-bottom:1px solid var(--dark-border);';
+      li.innerHTML =
+        '<span>' + a.type + ': ' + a.territory_name + '</span>' +
+        '<button onclick="removeAction(' + i + ')" style="background:none;border:none;color:#c55;cursor:pointer;font-size:.9rem;">&#x2715;</button>';
+      ul.appendChild(li);
+    });
   }
 
-  loadAndDraw(url);
+  window.removeAction = function (i) {
+    actionQueue.splice(i, 1);
+    apUsed = Math.max(0, apUsed - 1);
+    renderQueue();
+    renderAP();
+  };
+
+  function renderAP() {
+    for (var i = 0; i < 3; i++) {
+      var dot = document.getElementById('ap' + i);
+      if (dot) dot.className = 'ap-dot' + (i < (AP_TOTAL - apUsed) ? '' : ' used');
+    }
+  }
+
+  /* ── Load GeoJSON and render ── */
+  var dynastyId = {{ dynasty_id | tojson }};
+
+  if (dynastyId) {
+    fetch('/game/' + dynastyId + '/map.geojson?hex=true')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        features = data.features || [];
+        computeOffset();
+        resizeCanvas();
+      })
+      .catch(function (err) {
+        console.error('Map load error:', err);
+        document.getElementById('status-msg').textContent = 'Failed to load map data.';
+        resizeCanvas();
+      });
+  } else {
+    resizeCanvas();
+    ctx.fillStyle = '#778';
+    ctx.font = '16px Cinzel, serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Create a dynasty to explore the map.', canvas.width / 2, canvas.height / 2);
+  }
+
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+  renderAP();
+
 })();
 </script>
 {% endblock %}

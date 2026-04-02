@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <title>{% block title %}Dynasty Saga{% endblock %}</title>
   </head>
-  <body>
+  <body class="{% block body_class %}{% endblock %}">
 
     <!-- ── Navigation ── -->
     <nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
@@ -59,7 +59,7 @@
     </nav>
 
     <!-- ── Main content ── -->
-    <main role="main" class="container mt-4 flex-grow-1">
+    <main role="main" class="{% block main_wrapper_class %}container mt-4 flex-grow-1{% endblock %}">
 
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}

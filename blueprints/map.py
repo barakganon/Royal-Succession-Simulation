@@ -54,10 +54,15 @@ def generate_initial_map():
 @map_bp.route('/game/<int:dynasty_id>/map.geojson')
 @login_required
 def map_geojson(dynasty_id):
-    """Serve territory map data as GeoJSON for the canvas map."""
+    """Serve territory map data as GeoJSON for the canvas map.
+
+    Pass ``?hex=true`` to receive col/row grid properties suitable for the
+    full-viewport hex canvas renderer in world_map.html.
+    """
     from visualization.map_renderer import generate_geojson
+    hex_mode = request.args.get('hex', '').lower() in ('true', '1', 'yes')
     try:
-        data = generate_geojson(dynasty_id, db.session)
+        data = generate_geojson(dynasty_id, db.session, hex_mode=hex_mode)
         return jsonify(data)
     except Exception as e:
         logger.error(f"GeoJSON generation failed: {e}")
@@ -67,10 +72,84 @@ def map_geojson(dynasty_id):
 @map_bp.route('/world/map')
 @login_required
 def world_map():
-    """Display the interactive canvas world map."""
+    """Display the full-viewport interactive hex-canvas world map."""
+    from models.db_models import HistoryLogEntryDB, PersonDB
+
     dynasty = DynastyDB.query.filter_by(user_id=current_user.id).first()
     dynasty_id = dynasty.id if dynasty else None
-    return render_template('world_map.html', dynasty_id=dynasty_id)
+
+    # --- Recent chronicle events for the side-panel feed ---
+    recent_events = []
+    if dynasty_id:
+        try:
+            entries = (
+                HistoryLogEntryDB.query
+                .filter_by(dynasty_id=dynasty_id)
+                .order_by(HistoryLogEntryDB.id.desc())
+                .limit(5)
+                .all()
+            )
+            recent_events = [
+                {
+                    'year': e.year,
+                    'text': e.event_string,
+                    'event_type': e.event_type or 'general',
+                }
+                for e in entries
+            ]
+        except Exception as e:
+            logger.warning(f"Could not load recent events for dynasty {dynasty_id}: {e}")
+
+    # --- Economy snapshot ---
+    economy = {}
+    if dynasty_id:
+        try:
+            from models.economy_system import EconomySystem
+            eco = EconomySystem(db.session)
+            economy = eco.calculate_dynasty_economy(dynasty_id)
+            # Flatten ResourceType enum keys to strings for template serialisation
+            if economy:
+                simple = {}
+                for k, v in economy.items():
+                    simple[str(k)] = v
+                economy = simple
+        except Exception as e:
+            logger.warning(f"Could not load economy for dynasty {dynasty_id}: {e}")
+
+    # --- Current monarch mini-card ---
+    current_monarch = None
+    if dynasty_id:
+        try:
+            monarch = (
+                PersonDB.query
+                .filter_by(dynasty_id=dynasty_id, is_monarch=True, death_year=None)
+                .first()
+            )
+            if monarch:
+                current_year = dynasty.current_simulation_year if dynasty else 0
+                age = (current_year - monarch.birth_year) if monarch.birth_year else 0
+                current_monarch = {
+                    'name': monarch.name,
+                    'surname': monarch.surname,
+                    'age': age,
+                    'portrait_svg': monarch.portrait_svg or '',
+                }
+        except Exception as e:
+            logger.warning(f"Could not load monarch for dynasty {dynasty_id}: {e}")
+
+    # --- Dynasty wealth shortcut ---
+    gold = dynasty.current_wealth if dynasty else 0
+
+    return render_template(
+        'world_map.html',
+        dynasty=dynasty,
+        dynasty_id=dynasty_id,
+        player_dynasty_id=dynasty_id,
+        recent_events=recent_events,
+        economy=economy,
+        current_monarch=current_monarch,
+        gold=gold,
+    )
 
 
 @map_bp.route('/territory/<int:territory_id>')

@@ -1,383 +1,299 @@
 # CLAUDE.md — Royal Succession Simulation
-
-## Project Purpose
-
-A browser-based grand strategy / dynasty management game inspired by Crusader Kings. Players control a noble dynasty across generations, managing territory, armies, diplomacy, economy, and succession. Supports single-player (vs. AI) and multi-player sessions. An optional LLM integration generates narrative flavor text, custom cultural themes, in-game advisor counsel, and chronicle narration from game events.
+> Read this file at the start of every session. Update STATUS.md after completing any task.
 
 ---
 
-## Tech Stack
+## What This Project Is
 
-| Layer | Technology |
-|-------|-----------|
-| Web framework | Flask |
-| ORM | SQLAlchemy |
-| Database | SQLite (file: `instance/dynastysim.db`) |
-| Auth | Flask-Login + Werkzeug password hashing |
-| Visualizations | Matplotlib (server-side PNG) → being replaced by Canvas/SVG (see Roadmap) |
-| Real-time | Flask-SocketIO (planned for battle ticker) |
-| Graph algorithms | NetworkX (family tree traversal) |
-| Map / math | NumPy |
-| LLM (optional) | Google Generative AI (`google-generativeai`) |
-| Testing | pytest + pytest-cov |
-| Python version | 3.8+ |
+A browser-based grand strategy / dynasty management game inspired by Crusader Kings and Travian.
+Players control a noble dynasty across generations: manage territory on a hex map, recruit and
+march armies, build structures, arrange marriages, manage resources, and survive succession crises.
+
+**The core design goal:** every turn the player makes 3 meaningful decisions before clicking End Turn.
+The map is the main game screen — not a separate page. Actions happen in-context on the map.
 
 ---
 
-## File Structure
+## Current State (as of Sprint 7 complete)
 
+- **163 tests pass, 0 failures, 17 skipped**
+- All Flask routes extracted into 6 blueprints (`auth`, `dynasty`, `military`, `economy`, `diplomacy`, `map`)
+- `main_flask_app.py` is ~290 lines (app setup + blueprint registration only)
+- Medieval dark theme applied to all 27 templates (Cinzel/Crimson Text fonts, CSS variables)
+- AI controller wired into every `advance_turn`; LLM or rule-based fallback
+- SVG coat of arms + character portraits procedurally generated
+- Real-time battle ticker via Flask-SocketIO
+- Interactive HTML5 canvas map (hex grid, click to select, hover tooltip)
+
+**Known remaining issues:**
+- Circular FK cycle on dynasty/person_db DROP (`use_alter=True` needed)
+- 3 GameManager unit tests skipped (stale API)
+- 6 SimulationEngine unit tests skipped (stale API)
+- No victory conditions / endgame screen
+- No player tutorial / onboarding
+
+---
+
+## Active Sprint: Sprint 8 — Make It Feel Like a Game
+
+This is the most important sprint. The project has great systems but no player agency between turns.
+Two parallel tracks:
+
+### Track A — Action Phase (gameplay)
+Add a player decision screen between "click End Turn" and the simulation running.
+
+**New route:** `GET /dynasty/<id>/action_phase`
+- Renders `templates/action_phase.html`
+- Passes to template: territories (player-owned), armies, nobles (unmarried), current resources,
+  available building types, neighboring dynasties
+- Player has **3 Action Points** to spend across 5 action types
+
+**New route:** `POST /dynasty/<id>/submit_actions`
+- Receives JSON list of chosen actions
+- Executes them using existing system methods (see "Existing Systems" section below)
+- Then calls `process_dynasty_turn()` and redirects to turn report
+
+**Action types and their backing methods (all already implemented):**
+| Action | Cost | Method to call |
+|--------|------|----------------|
+| Recruit troops | 1 AP | `MilitarySystem.recruit_unit(dynasty_id, unit_type, size, territory_id)` |
+| Build structure | 1 AP | `EconomySystem.construct_building(territory_id, building_type)` |
+| Develop territory | 1 AP | `EconomySystem.develop_territory(territory_id)` |
+| March army | 1 AP | Move `Army.territory_id` to target territory_id |
+| Arrange marriage | 1 AP | Reuse `process_marriage_check()` logic from `blueprints/dynasty.py` |
+| Trade route | 1 AP | `EconomySystem.establish_trade_route(source_id, target_id, resource_type, amount)` |
+| Declare war | 1 AP | `DiplomacySystem.declare_war(attacker_id, defender_id, casus_belli)` |
+
+**Wire-up change in `blueprints/dynasty.py`:**
+- `advance_turn` route currently does everything in one click
+- Change: the "Advance Turn" button on `view_dynasty.html` now goes to `action_phase`
+- The "End Turn" button on `action_phase.html` POSTs to `submit_actions`
+- `submit_actions` executes queued actions, then calls `process_dynasty_turn()`, redirects to turn report
+
+**Resource bar data** for `action_phase.html` comes from:
+`EconomySystem(db.session).calculate_dynasty_economy(dynasty_id)` — already returns gold, food,
+iron, timber, manpower totals and net production rates.
+
+
+### Track B — Travian-Style Map UI
+
+Replace the current `world_map.html` with a full-viewport game screen.
+The mockup has been approved — implement it exactly.
+
+**Layout structure (no Bootstrap grid on this page):**
 ```
-Royal-Succession-Simulation/
-├── main_flask_app.py          # Flask app: all routes (40+), app config, LLM setup (~3300 lines)
-├── simulation_engine.py       # Standalone simulation runner; wraps GameManager + LLM narrative
-├── run_local_simulation.py    # CLI entry point for headless simulations
-├── check_dynasty.py           # Dev utility to inspect DB state
-│
-├── models/
-│   ├── db_models.py           # SQLAlchemy ORM: all DB tables and relationships
-│   ├── db_initialization.py   # Schema creation + seed data
-│   ├── game_manager.py        # Central coordinator: initialises all subsystems, high-level API
-│   ├── map_system.py          # Map generation, territory management, pathfinding, borders
-│   ├── military_system.py     # Unit recruitment, armies, battles, sieges, naval combat
-│   ├── diplomacy_system.py    # Relations, treaties, wars, casus belli, reputation
-│   ├── economy_system.py      # Resources, buildings, trade routes, production
-│   ├── time_system.py         # Turn engine, seasons, events, game phases
-│   ├── family_tree.py         # Succession rules, inheritance, family relationships
-│   ├── person.py              # Character modelling: traits, marriage, fertility
-│   ├── traits.py              # Trait definitions and stat effects
-│   ├── history.py             # Event logging
-│   ├── chronicle.py           # (planned) LLM-narrated dynasty history per turn
-│   └── ai_controller.py       # (planned) Personality-driven AI dynasty decision logic
-│
-├── visualization/
-│   ├── map_renderer.py        # World map PNG generation → to be replaced by canvas map
-│   ├── military_renderer.py   # Army / battle visualizations
-│   ├── diplomacy_renderer.py  # Diplomatic network graphs
-│   ├── economy_renderer.py    # Economic charts
-│   ├── time_renderer.py       # Timeline / event charts
-│   ├── plotter.py             # Family tree PNG generation
-│   ├── portrait_renderer.py   # (planned) SVG procedural character portraits
-│   └── heraldry_renderer.py   # (planned) SVG procedural coat of arms generator
-│
-├── blueprints/                # (planned) Flask Blueprints extracted from main_flask_app.py
-│   ├── auth.py
-│   ├── military.py
-│   ├── diplomacy.py
-│   ├── economy.py
-│   ├── map.py
-│   └── dynasty.py
-│
-├── templates/                 # 27 Jinja2 HTML templates
-│   ├── base.html              # Layout, nav
-│   ├── dashboard.html         # User's game hub
-│   ├── world_map.html         # Strategic map view → target for canvas map replacement
-│   ├── chronicle.html         # (planned) Scrollable LLM-narrated dynasty history
-│   ├── military_*.html        # Military management
-│   ├── diplomacy_view.html    # Diplomatic relations
-│   ├── economy_view.html      # Economy management
-│   ├── time_view.html         # Timeline
-│   └── dynasty_territories.html
-│
-├── static/
-│   ├── style.css              # Main stylesheet (~100 lines, minimal)
-│   ├── heraldry/              # (planned) SVG coat of arms assets per dynasty
-│   └── visualizations/        # Generated PNG output directory
-│
-├── utils/
-│   ├── theme_manager.py       # Load/generate cultural themes (JSON + LLM)
-│   ├── helpers.py             # Shared utilities; LLM global injection
-│   ├── llm_prompts.py         # (planned) Centralised LLM prompt templates
-│   └── logging_config.py      # Centralised logger setup
-│
-├── themes/
-│   └── cultural_themes.json   # Predefined cultural theme definitions
-│
-├── tests/
-│   ├── conftest.py            # pytest fixtures
-│   ├── unit/                  # Unit tests: db_models, game_manager, simulation_engine
-│   ├── integration/           # Integration tests: Flask app routes
-│   └── functional/            # Functional tests: full game flow
-│
-├── docs/                      # Design and technical docs (do not edit these as code)
-├── instance/                  # SQLite DB (git-ignored in prod)
-└── logs/                      # App and game logs
+┌─────────────────────────────────────────────────────────────┐
+│  TOPBAR: dynasty name │ gold food iron timber manpower │ year │ END TURN btn │
+├──────────────────────────────────────────┬──────────────────┤
+│                                          │  Ruler mini card  │
+│         HEX MAP CANVAS (flex: 1)         │  Action Points    │
+│                                          │  Action list      │
+│   hover → tooltip with territory info   │  Chronicle feed   │
+│   click → select territory              │                   │
+│   map-overlay buttons: Map/Armies/Econ  │                   │
+├──────────────────────────────────────────┴──────────────────┤
+│  BOTBAR: status message                    selected territory │
+└─────────────────────────────────────────────────────────────┘
 ```
 
----
+**Hex grid rendering** (replace current polygon GeoJSON approach):
+- Each territory is a hex cell, stored with `col` and `row` in the DB
+- `hexCenter(col, row)` → pixel center using flat-top hex math:
+  `x = R * sqrt(3) * col + (row%2 * R * sqrt(3)/2)`, `y = R * 1.5 * row`
+- Use `R = 28` pixels per hex
+- Hit detection: find closest hex center within R pixels of click
+- Terrain fills: plains `#3a4a2a`, hills `#4a4a3a`, forest `#1a3a1a`,
+  mountains `#3a3a4a`, coastal `#1a2a4a`, river `#1a3a4a`
+- Dynasty ownership overlay: `hsla(dynastyHue, 55%, 45%, 0.45)` clipped to hex
+- Selected hex: gold `#f0c040` stroke, 2.5px
+- Army token: red dot `#8b1a1a` with gold border at hex center + 8px offset
+- Capital: gold filled circle at hex center - 8px
 
-## What's Working
+**GeoJSON route update** (`blueprints/map.py` → `map_geojson`):
+Add `hex=true` query param mode that returns:
+```json
+{
+  "features": [{
+    "properties": {
+      "territory_id": 1, "col": 3, "row": 2,
+      "name": "Ironmoor", "terrain_type": "hills",
+      "owner_dynasty_id": 1, "owner_dynasty_name": "House Mortimer",
+      "population": 1240, "army_count": 1, "is_capital": false,
+      "development_level": 3, "base_tax": 12
+    }
+  }]
+}
+```
 
-- **Authentication** — register, login, logout (Flask-Login + hashed passwords)
-- **Dynasty creation** — name, start year, cultural theme selection or LLM-generated theme
-- **Character system** — traits, marriage, children, succession, family tree
-- **Military system** — 16 unit types, army creation, land battles, siege resolution
-- **Economy** — resource production (food/timber/stone/iron/gold), buildings, trade routes, seasonal modifiers
-- **Diplomacy** — relations scores, treaty types (alliance, NAP, vassalage, trade), war declaration
-- **Turn engine** — 6-phase turn cycle, 4 seasons, population growth, event processing
-- **World map** — territory ownership, pathfinding, border calculation
-- **Visualization pipeline** — all renderers produce PNGs served via Flask routes
-- **LLM theme generation** — optional; guarded with `FLASK_APP_LLM_MODEL is not None` checks
-- **Logging** — structured logging via `utils/logging_config.py`; module-level loggers named `royal_succession.<module>`
+**Resource bar** in topbar: call `EconomySystem.calculate_dynasty_economy(dynasty_id)` and
+pass `total_production`, `total_consumption`, `net_production`, `current_treasury` to template.
 
----
+**Action Point sidebar** on the map page:
+- Shows the same 5 action types as `action_phase.html`
+- Clicking an action + clicking a hex queues the action
+- "End Turn" button in topbar submits queued actions to `submit_actions` route
 
-## What's Broken / Incomplete (Current)
+**CSS additions to `static/style.css`:**
+```css
+.game-viewport { display:flex; flex-direction:column; height:calc(100vh - 60px); overflow:hidden; }
+.game-topbar { ... }  /* resource bar */
+.game-main { display:flex; flex:1; min-height:0; }
+.game-map-panel { flex:1; position:relative; overflow:hidden; background:#0a1520; }
+.game-side-panel { width:200px; ... }
+.game-botbar { ... }
+```
 
-### Critical
-- **`AIController` wiring unverified** — the class exists but it's unclear whether `decide_*` methods are called on every `advance_turn` for non-human dynasties. → Sprint 5A.
+**base.html change:** add `{% block body_class %}{% endblock %}` to `<body>` tag.
+`world_map.html` sets `{% block body_class %}game-page{% endblock %}` and overrides
+the default `container mt-4` main wrapper to use `game-viewport` instead.
 
-### High Priority
-- **`main_flask_app.py` is still a monolith (~3300 lines).** Auth Blueprint extracted; 5 more remain (military, economy, diplomacy, map, dynasty). → Sprint 7.
-- **Turn enforcement missing** — players can submit actions out of turn; no server-side turn-order lock. → Sprint 5C.
-- **7 legacy test failures** — `test_flask_app.py` + `test_game_flow.py` use wrong expected strings/URLs from before auth Blueprint refactor. → Sprint 5B.
-
-### Medium Priority
-- **`chronicle_entry` table** — may not be created on all deployments; needs explicit migration. → Sprint 5D.
-- **No pagination** — list endpoints load all DB rows; will degrade at scale. → Sprint 5D / Sprint 7.
-- **CSS is minimal** — `static/style.css` is ~100 lines; UI is functional but rough. → Sprint 6.
-- **Circular FK cycle** on dynasty/person_db/territory DROP — needs `use_alter=True` on FKs. → Sprint 7.
-
-### Low Priority
-- **`print()` statements** remain in some model files — replace with `logger.debug()`. → Sprint 7.
-- **Banking / loans, espionage, court politics** — not implemented. → Sprint 8.
-- **Terrain-specific production tuning** — terrain types exist but multipliers are uniform.
-
----
-
-## Original Roadmap — P1–P5 (All Complete ✅)
-
-> These are preserved for historical reference. See "Active Roadmap — Sprints 5–8" above for current work.
-
-### P1 — Personality-driven AI dynasties (`models/ai_controller.py`)
-**Why first:** fixes the critical "no AI player" blocker while making it interesting rather than purely rule-based.
-
-Each AI dynasty is assigned a one-sentence personality string at game creation (e.g. "House Vane is paranoid and expansionist — always assumes neighbours are plotting"). This personality is injected into LLM prompts when the AI makes decisions, so different dynasties genuinely think and behave differently.
-
-Implementation notes:
-- Create `models/ai_controller.py` with an `AIController` class. Constructor takes `session`, `dynasty_id`, and `personality: str`.
-- Register one controller per non-human dynasty in `GameManager.process_turn()` via `self.ai_controllers`.
-- Each phase method (`decide_diplomacy`, `decide_military`, `decide_economy`, `decide_character`) calls the LLM with: game state summary + personality string + available actions → returns chosen action.
-- Fall back to rule-based defaults if LLM is unavailable (`FLASK_APP_LLM_MODEL is None`).
-- Rule-based fallbacks: relations < -50 + weaker → propose NAP; army > 1.5× enemy → attack; food < 20% → build food; leader age > 55 + no heir → arrange marriage.
-- Log every AI decision at `logger.info` level with dynasty name and reasoning.
-- Predefined personalities live in `themes/cultural_themes.json` alongside cultural themes.
-
-### P2a — Living chronicle (`models/chronicle.py`, `templates/chronicle.html`)
-**Why now:** LLM hook already exists; wiring turn events into narrative is low effort, high drama.
-
-After each turn resolves, collect the turn's key events (battles, deaths, treaties, disasters) and pass them to the LLM with a prompt instructing it to write 2-3 sentences in the style of a medieval chronicler. Store the result in a new `ChronicleEntryDB` table (columns: `game_id`, `turn`, `year`, `text`, `created_at`). Render as a scrollable timeline on `templates/chronicle.html`.
-
-Implementation notes:
-- Prompt template lives in `utils/llm_prompts.py` (create this file as the single source of all LLM prompts in the project).
-- Chronicle generation is triggered at the end of `TimeSystem.end_turn()`.
-- If LLM is unavailable, generate a simple template string from event data instead.
-- `ChronicleEntryDB` belongs in `models/db_models.py`.
-
-### P2b — In-game AI advisor / "Hand of the King" (`utils/llm_prompts.py`, new route)
-**Why now:** same LLM infrastructure as the chronicle; can share `utils/llm_prompts.py`.
-
-At the start of each turn's Planning Phase, the advisor reads the player's current game state (treasury, military strength, relations scores, active threats) and returns 2-3 prioritised strategic suggestions written in character as a loyal counsellor. Displayed as a dismissible panel on the dashboard.
-
-Implementation notes:
-- Route: `GET /game/<id>/advisor` → returns JSON `{suggestions: [str, str, str]}`.
-- Prompt template in `utils/llm_prompts.py`. Include dynasty name, current year, season, treasury level, strongest neighbour, active wars.
-- Cache the advisor response for the current turn in the session to avoid redundant LLM calls on page refresh.
-- Degrade gracefully: if LLM unavailable, return 2 rule-based tips based on game state thresholds.
-
-### P3a — Procedural coat of arms (`visualization/heraldry_renderer.py`)
-**Why now:** pure SVG, zero dependencies, no LLM needed, high visual impact.
-
-Generate a unique heraldic shield SVG for each dynasty at creation time. The shield is deterministic — same dynasty_id always produces the same arms.
-
-Components (all randomly seeded from dynasty_id):
-- **Tincture**: background colour from heraldic palette (or, argent, gules, azure, sable, vert, purpure)
-- **Ordinary**: geometric division (bend, chevron, pale, fess, cross, saltire)
-- **Charge**: central symbol (lion passant, eagle displayed, fleur-de-lis, cross pattée, tower) — drawn as SVG paths
-- **Motto**: dynasty name in small-caps below the shield
-
-Output: a standalone SVG string stored as `DynastyDB.coat_of_arms_svg` (Text column). Rendered inline on the dashboard, family tree header, battle reports, and the world map tooltip.
-
-### P3b — Procedural character portraits (`visualization/portrait_renderer.py`)
-**Why now:** same SVG-only approach as coat of arms; makes the family tree feel alive.
-
-Generate a unique SVG face for each `PersonDB` record, driven by their traits and stats.
-
-Trait → visual mapping examples:
-- `brave` → strong jaw, direct gaze
-- `shrewd` → narrowed eyes, raised brow
-- `kind` → soft features, slight smile
-- `old` (age > 60) → grey hair, wrinkles
-- `ill` → pale fill, sunken eyes
-- Gender field drives hair length and facial hair options.
-
-Output: SVG string stored as `PersonDB.portrait_svg`. Rendered in character detail pages and the family tree.
-
-### P4 — Real-time battle ticker (`Flask-SocketIO`)
-**Why after P3:** depends on Flask-SocketIO being added to requirements; more moving parts.
-
-When a battle resolves, stream the round-by-round combat log to the client via WebSocket instead of a static page reload. Each round, the LLM writes one sentence of dramatic commentary.
-
-Implementation notes:
-- Add `flask-socketio` to `requirements.txt`.
-- Emit `battle_round` events from `MilitarySystem.resolve_battle()` via `socketio.emit()`.
-- Client listens in `templates/military_battle.html` and appends each round to a live log panel.
-- LLM commentary prompt: "In one sentence, narrate this battle round in a dramatic medieval style: [round_data]". Keep max_tokens low (60) for speed.
-- Fall back to plain round log if LLM unavailable.
-
-### P5 — Interactive canvas map (replaces Matplotlib PNGs)
-**Why last:** largest scope; touches map_renderer, world_map.html, and all territory routes.
-
-Replace the server-side Matplotlib PNG map with a browser-rendered interactive canvas (plain HTML5 Canvas or Leaflet.js with a custom tile layer).
-
-- Territories are clickable polygons; clicking opens a sidebar with territory details.
-- Army tokens are draggable (movement actions submitted via AJAX).
-- Map data served as GeoJSON from a new route: `GET /game/<id>/map.geojson`.
-- `visualization/map_renderer.py` is repurposed to generate the GeoJSON; PNG generation is removed.
-- `templates/world_map.html` handles all rendering client-side.
 
 ---
 
-## Coding Conventions
+## Existing Systems — What's Already Built (Do Not Rewrite)
 
-### Python Style
-- Module-level docstrings on every file in `models/`.
-- Class docstrings: one-liner summary, blank line, detail paragraph.
-- Type hints used in `models/` (`List`, `Dict`, `Optional`, `Any` from `typing`); absent in `main_flask_app.py`.
-- `snake_case` for variables/functions, `PascalCase` for classes, `UPPER_SNAKE_CASE` for module-level constants.
-- DB model classes are suffixed `DB` (e.g. `DynastyDB`, `PersonDB`).
+### blueprints/ (all routes)
+| Blueprint | File | Key routes |
+|-----------|------|-----------|
+| auth | `blueprints/auth.py` | `/login`, `/logout`, `/register`, `/dashboard` |
+| dynasty | `blueprints/dynasty.py` | `/dynasty/create`, `/dynasty/<id>/view`, `/dynasty/<id>/advance_turn`, `/dynasty/<id>/turn_report` |
+| military | `blueprints/military.py` | `/dynasty/<id>/military`, `/recruit_unit`, `/form_army`, `/army/<id>/battle`, `/naval_battle` |
+| economy | `blueprints/economy.py` | `/dynasty/<id>/economy`, `/build_building`, `/upgrade_building`, `/develop_territory`, `/trade` |
+| diplomacy | `blueprints/diplomacy.py` | `/dynasty/<id>/diplomacy`, `/diplomatic_action`, `/declare_war`, `/negotiate_peace` |
+| map | `blueprints/map.py` | `/world/map`, `/game/<id>/map.geojson`, `/territory/<id>`, `/game/<id>/chronicle`, `/game/<id>/advisor` |
 
-### LLM Prompts
-- All prompt templates live in `utils/llm_prompts.py`. Never inline prompt strings in route handlers or model methods.
-- Every prompt function signature: `def build_<name>_prompt(**kwargs) -> str`.
-- Guard every LLM call: `if llm_model is None: return fallback_value`.
-- Keep `max_tokens` as low as the task allows (chronicle: 150, advisor: 200, AI decision: 100, battle commentary: 60).
+### models/ (all implemented, use as-is)
+- `MilitarySystem` — `recruit_unit()`, `form_army()`, `assign_commander()`, `initiate_battle()`, `resolve_naval_battle()`
+- `EconomySystem` — `construct_building()`, `upgrade_building()`, `repair_building()`, `develop_territory()`, `establish_trade_route()`, `calculate_dynasty_economy()`, `update_dynasty_economy()`
+- `DiplomacySystem` — `declare_war()`, `negotiate_peace()`, `create_treaty()`, `perform_diplomatic_action()`
+- `AIController` — 4-phase AI, wired into `advance_turn` for non-human dynasties
+- `GameManager` — `process_ai_turns(user_id)`, `create_new_game()`
+- `MapGenerator` / `TerritoryManager` / `BorderSystem` — map generation, territory assignment
+- `TimeSystem` — `process_turn()`, `get_current_season()`, `calculate_action_points()`
 
-### Logging
-- Each module acquires a logger: `logger = setup_logger('royal_succession.<module_name>')`
-- `logger.debug` — routine tracing; `logger.info` — state changes and AI decisions; `logger.warning`/`logger.error` — problems.
-- No bare `print()` statements.
+### visualization/ (all implemented, SVG stored in DB)
+- `heraldry_renderer.py` — `generate_coat_of_arms(dynasty_id, name)` → SVG string
+- `portrait_renderer.py` — `generate_portrait(person_id)` → SVG string (called via `person.generate_portrait()`)
+- `map_renderer.py` — `generate_geojson(dynasty_id, session)` → GeoJSON dict
 
-### Database
-- All models in `models/db_models.py`, SQLAlchemy declarative base via `db = SQLAlchemy()`.
-- Explicit `__tablename__` on every model.
-- Foreign keys use integer IDs; use `back_populates` (not `backref`) with explicit `foreign_keys=` when ambiguous.
-- JSON fields stored as `db.Text` with `json.dumps`/`json.loads`.
+### db_models.py — Key tables
+```
+DynastyDB       id, name, user_id, current_wealth, current_iron, current_timber,
+                current_simulation_year, start_year, coat_of_arms_svg,
+                is_turn_processing, last_played_at, theme_identifier_or_json
 
-### Flask Routes
-- `@login_required` on all game actions.
-- Flash messages use Bootstrap categories: `"success"`, `"danger"`, `"info"`, `"warning"`.
-- Serialize data before passing to templates — never pass raw ORM objects.
-- Wrap all DB writes in try/except with rollback:
-  ```python
-  try:
-      db.session.commit()
-  except Exception as e:
-      db.session.rollback()
-      logger.error(f"...: {e}")
-      flash("An error occurred.", "danger")
-  ```
+PersonDB        id, dynasty_id, name, surname, gender, birth_year, death_year,
+                is_monarch, is_noble, reign_start_year, spouse_sim_id,
+                mother_sim_id, father_sim_id, portrait_svg, traits_json, titles_json
 
-### Subsystem Pattern
-Every subsystem class takes `session: Session` as its only constructor arg and stores it as `self.session`. No Flask app context inside subsystems.
+Territory       id, name, terrain_type, controller_dynasty_id, population,
+                development_level, base_tax, base_manpower, fortification_level,
+                x_coord, y_coord, is_capital, governor_id
 
-### SVG / Visualization
-- All procedural SVG output (portraits, heraldry) must work in both light and dark mode.
-- Use CSS variables for colours wherever SVG is embedded in HTML templates.
-- Portrait and coat of arms SVGs are stored as strings in the DB, not as files.
-- Heraldry SVGs must be self-contained (no external assets, no JS).
+MilitaryUnit    id, dynasty_id, unit_type, name, size, quality, morale,
+                experience, territory_id, army_id, maintenance_cost, food_consumption
+
+Army            id, dynasty_id, name, territory_id, commander_id, is_active, is_sieging
+
+Building        id, territory_id, building_type, name, level, condition,
+                is_under_construction, construction_year, completion_year
+
+TradeRoute      id, source_dynasty_id, target_dynasty_id, resource_type,
+                resource_amount, profit_source, profit_target, is_active
+
+War             id, attacker_dynasty_id, defender_dynasty_id, is_active, start_year, end_year
+
+HistoryLogEntryDB  id, dynasty_id, year, event_string, event_type, person1_sim_id, territory_id
+ChronicleEntryDB   id, game_id, turn, year, text, created_at
+```
+
 
 ---
 
-## Environment & Running
+## Coding Rules (Follow These Exactly)
+
+### Python
+- All DB writes wrapped in `try/except` with `db.session.rollback()` and `flash("...", "danger")`
+- All LLM calls guarded: `if llm_model is None: return fallback_value`
+- All prompt strings in `utils/llm_prompts.py` — never inline in routes or models
+- `logger = logging.getLogger('royal_succession.<module_name>')` in every module
+- No `print()` statements — use `logger.debug/info/warning/error`
+- Subsystem classes take `session: Session` as only constructor arg
+- DB model classes suffixed `DB` (e.g. `DynastyDB`, `PersonDB`)
+- Foreign keys use `back_populates` not `backref`; explicit `foreign_keys=` when ambiguous
+- `@login_required` on all game routes
+- Flash categories: `"success"`, `"danger"`, `"info"`, `"warning"` only
+
+### LLM token budgets
+| Use case | max_tokens |
+|----------|-----------|
+| Chronicle narration | 150 |
+| AI advisor | 200 |
+| AI dynasty decision | 100 |
+| Battle commentary | 60 |
+
+### Templates
+- All templates extend `base.html`
+- Use `url_for('blueprint.function_name')` — never hardcode URLs
+- Pass serialized data to templates — never raw ORM objects
+- SVG strings rendered with `{{ svg_string | safe }}`
+- Flash messages via `get_flashed_messages(with_categories=true)` already in `base.html`
+
+### Tests
+- Run `pytest` after every change — must stay at 163 passed, 0 failed
+- New routes need at least one integration test in `tests/integration/`
+- New game mechanics need a unit test in `tests/unit/`
+- Never skip a test without a comment explaining why
+
+---
+
+## Environment
 
 ```bash
-pip install -r requirements.txt
-python main_flask_app.py          # dev server
-python run_local_simulation.py    # headless simulation
-pytest                            # run tests
-pytest --cov=. --cov-report=term-missing
+cd /Users/barakganon/personal_projects/Royal-Succession-Simulation
+source .venv/bin/activate
+python main_flask_app.py          # dev server → http://localhost:5000
+pytest                            # run all tests
+pytest tests/integration/ -v     # integration tests only
 
-export FLASK_SECRET_KEY="your_secret"
-export DATABASE_URL="sqlite:///instance/dynastysim.db"
-export GOOGLE_API_KEY="your_key_here"   # enables LLM features
+# LLM features require:
+export GOOGLE_API_KEY="your_key_here"
 ```
 
----
+Default login: username `test_user`, password `password`
 
-## Completed Features (Sprints 1–4)
-
-All original roadmap items are done. See `STATUS.md` for full details.
-
-- ✅ SQLAlchemy backref conflicts fixed (`back_populates` throughout)
-- ✅ Auth Blueprint (`blueprints/auth.py`)
-- ✅ Integration tests (143 passing)
-- ✅ `AIController` — 4-phase personality-driven AI dynasties
-- ✅ Living chronicle (`ChronicleEntryDB`, `/game/<id>/chronicle`)
-- ✅ AI advisor (`/game/<id>/advisor`, dashboard panel)
-- ✅ SVG coat of arms (`visualization/heraldry_renderer.py`)
-- ✅ SVG character portraits (`visualization/portrait_renderer.py`)
-- ✅ Naval combat + blockade (`/dynasty/<id>/naval_battle`)
-- ✅ Real-time battle ticker (Flask-SocketIO + LLM commentary)
-- ✅ Interactive HTML5 canvas map (replaces Matplotlib PNG)
+DB location: `instance/dynastysim.db` (SQLite)
+Logs location: `logs/` (performance logs per session)
 
 ---
 
-## Active Roadmap — Sprints 5–8
+## Sprint 8 Task List
 
-### Sprint 5 — Playability (Current)
+| # | Task | File(s) to create/edit | Status |
+|---|------|------------------------|--------|
+| 8A | Add `action_phase` route | `blueprints/dynasty.py` | ✅ Done |
+| 8B | Add `submit_actions` route | `blueprints/dynasty.py` | ✅ Done |
+| 8C | Create `templates/action_phase.html` | new file | ✅ Done |
+| 8D | Wire "Advance Turn" btn → action_phase | `templates/view_dynasty.html` | ✅ Done |
+| 8E | Rewrite `templates/world_map.html` as full-viewport hex map | existing file | ✅ Done |
+| 8F | Add hex grid support to `generate_geojson()` | `visualization/map_renderer.py` | ✅ Done |
+| 8G | Add resource bar data to `world_map` route | `blueprints/map.py` | ✅ Done |
+| 8H | Add game-viewport CSS | `static/style.css` | ✅ Done |
+| 8I | Add `body_class` block to `base.html` | `templates/base.html` | ✅ Done |
+| 8J | Write tests for new routes | `tests/integration/` | TODO |
 
-Make the game actually playable end-to-end before anything else.
-
-| Task | Description | Priority |
-|------|-------------|----------|
-| 5A | **Audit + wire `AIController` into the turn loop** — verify `decide_diplomacy/military/economy/character` are called on every `advance_turn` for non-human dynasties. Fix any gaps. | Critical |
-| 5B | **Fix 7 legacy test failures** + write full game-loop integration tests (create dynasty → advance turns → battle → succession) | High |
-| 5C | **Turn-order enforcement** — server-side lock so players cannot submit actions out of turn | High |
-| 5D | **`chronicle_entry` DB migration** — ensure table is created on startup; add pagination to all list endpoints | Medium |
-
-### Sprint 6 — UI Overhaul
-
-The CSS is ~100 lines and the interface is rough. This sprint makes the game look and feel like a real medieval strategy game.
-
-| Task | Description |
-|------|-------------|
-| 6A | **Dark medieval CSS redesign** — full stylesheet rewrite using `frontend-design` + `ui-ux-pro-max` skills. Parchment textures, gothic fonts, dark sidebar nav. |
-| 6B | **Game-specific UI panels** — character cards with portrait + traits, territory HUD with resource bars, diplomacy relation wheel, live battle screen layout. |
-| 6C | **Art layer** — improve procedural SVGs (richer coat of arms charges, more portrait detail). Optionally wire `pixel-art-sprites` / `ai-game-art-generation` skills for AI-generated territory icons and unit tokens. |
-
-### Sprint 7 — Blueprint Refactor
-
-Extract the remaining 5 blueprints from `main_flask_app.py` one at a time. Run the full test suite after each extraction before moving to the next. Do NOT batch these.
-
-| Order | Blueprint | Routes to extract |
-|-------|-----------|-------------------|
-| 1 | `blueprints/dynasty.py` | `/dynasty/create`, `/dynasty/<id>/view`, `/dynasty/<id>/advance_turn`, `/dynasty/<id>/delete` |
-| 2 | `blueprints/military.py` | `/dynasty/<id>/military`, `/recruit_unit`, `/form_army`, `/army/<id>/battle`, `/dynasty/<id>/naval_battle` |
-| 3 | `blueprints/economy.py` | `/dynasty/<id>/economy`, `/build`, `/upgrade`, `/repair`, `/develop_territory` |
-| 4 | `blueprints/diplomacy.py` | `/dynasty/<id>/diplomacy`, `/diplomatic_action`, `/declare_war`, `/negotiate_peace` |
-| 5 | `blueprints/map.py` | `/world/map`, `/game/<id>/map.geojson`, `/generate_initial_map` |
-
-After all blueprints are extracted: add pagination to remaining list endpoints, replace any remaining `print()` with `logger.debug()`, fix circular FK cycle with `use_alter=True`.
-
-### Sprint 8 — Audio & Advanced Features (Optional / Paid APIs)
-
-These features require external API keys and incur per-call costs. Treat as an optional enhancement layer.
-
-| Task | Requires | Description |
-|------|----------|-------------|
-| 8A | ElevenLabs API key | NPC narrator voice for chronicle entries and battle results (`elevenlabs-tts` skill) |
-| 8B | ElevenLabs API key | Ambient medieval background music (`elevenlabs-music` skill) |
-| 8C | — | Banking/loans system (economy depth) |
-| 8D | — | Espionage / spy networks (diplomacy depth) |
-| 8E | — | Court faction politics |
+**Do tasks in order. Run `pytest` after each task. Do not batch.**
 
 ---
 
-## Agent Instructions
+## What NOT To Do
 
-- Always run tasks in parallel with sub-agents where tasks are independent.
-- Always update `STATUS.md` after completing any task.
-- Blueprint extraction (Sprint 7): test after each blueprint, never batch.
-- LLM calls: guard with `if llm_model is None: return fallback`. Max tokens: chronicle 150, advisor 200, AI decision 100, battle commentary 60.
-- Never inline prompt strings — all prompts live in `utils/llm_prompts.py`.
-- Audio/art features (Sprint 8): check for API key before calling external service; degrade gracefully if absent.
+- Do not rewrite working subsystem classes (`MilitarySystem`, `EconomySystem`, etc.)
+- Do not change the DB schema without a migration in `db_initialization.py`
+- Do not add new dependencies without updating `requirements.txt`
+- Do not use `backref=` in SQLAlchemy relationships — use `back_populates`
+- Do not hardcode API keys — use `current_app.config.get('GOOGLE_API_KEY')`
+- Do not inline LLM prompt strings outside `utils/llm_prompts.py`
+- Do not change `main_flask_app.py` beyond app setup and blueprint registration
+- Do not break existing tests
+

@@ -1,0 +1,474 @@
+{% extends "base.html" %}
+
+{% block title %}{{ dynasty.name }} — Action Phase{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3">
+
+  <!-- ── Resource Bar ───────────────────────────────────────── -->
+  <div class="d-flex align-items-center flex-wrap py-2 mb-2" style="background:rgba(13,13,26,.9);border-bottom:1px solid var(--dark-border);border-radius:6px;padding:0 .75rem;">
+    {% if dynasty.coat_of_arms_svg %}
+    <div style="width:36px;height:44px;flex-shrink:0;margin-right:.6rem;">
+      {{ dynasty.coat_of_arms_svg | safe }}
+    </div>
+    {% endif %}
+    <span class="page-title" style="font-family:'Cinzel',serif;font-size:1.2rem;color:var(--gold);margin-right:1rem;">{{ dynasty.name }}</span>
+    <span class="badge badge-secondary mr-2">Year {{ dynasty.current_simulation_year }}</span>
+
+    <!-- Resources -->
+    <span class="ml-auto d-flex flex-wrap" style="gap:.5rem;">
+      <span class="badge" style="background:#2b2000;color:var(--gold);border:1px solid var(--gold);font-family:'Cinzel',serif;">
+        &#128176; {{ economy.gold | int }}
+        {% if economy.gold_income is defined %}<small style="opacity:.7"> (+{{ economy.gold_income | int }})</small>{% endif %}
+      </span>
+      <span class="badge" style="background:#0e2b0e;color:#8ad48a;border:1px solid #2a5a2a;font-family:'Cinzel',serif;">
+        &#127807; {{ economy.food | int if economy.food is defined else 0 }}
+      </span>
+      <span class="badge" style="background:#1a1a3a;color:#aaaaff;border:1px solid #3a3a7a;font-family:'Cinzel',serif;">
+        &#9874; {{ economy.iron | int if economy.iron is defined else 0 }}
+      </span>
+      <span class="badge" style="background:#1a2b1a;color:#aaddaa;border:1px solid #2a5a2a;font-family:'Cinzel',serif;">
+        &#127795; {{ economy.timber | int if economy.timber is defined else 0 }}
+      </span>
+      <span class="badge" style="background:#2a1a1a;color:#ddaaaa;border:1px solid #5a2a2a;font-family:'Cinzel',serif;">
+        &#9876; {{ economy.manpower | int if economy.manpower is defined else 0 }}
+      </span>
+      <a href="{{ url_for('dynasty.action_phase', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-warning ml-2" id="end-turn-btn" style="font-family:'Cinzel',serif;letter-spacing:.04em;" onclick="submitActions(event)">
+        &#9654; End Turn
+      </a>
+    </span>
+  </div>
+
+  <div class="row">
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- LEFT — Action queue panel                             -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <div class="col-lg-8">
+
+      <!-- AP counter -->
+      <div class="card mb-3">
+        <div class="card-header d-flex align-items-center">
+          <span>Action Points</span>
+          <span class="ml-auto" id="ap-display">
+            <span class="ap-dot" id="ap-1" style="font-size:1.4rem;color:var(--gold);">&#9679;</span>
+            <span class="ap-dot" id="ap-2" style="font-size:1.4rem;color:var(--gold);">&#9679;</span>
+            <span class="ap-dot" id="ap-3" style="font-size:1.4rem;color:var(--gold);">&#9679;</span>
+            <span class="ml-2 text-muted" style="font-size:.85rem;">(<span id="ap-count">3</span> remaining)</span>
+          </span>
+        </div>
+        <div class="card-body py-2">
+          <small class="text-muted">Queue up to 3 actions below, then click <strong>End Turn</strong>. Actions execute in order.</small>
+        </div>
+      </div>
+
+      <!-- ── Action cards ── -->
+
+      <!-- 1. Recruit Troops -->
+      <div class="card mb-2" id="card-recruit">
+        <div class="card-header d-flex align-items-center" style="cursor:pointer;" onclick="toggleCard('recruit')">
+          <span>&#9876; Recruit Troops</span>
+          <span class="ml-auto badge badge-secondary">Infantry / Cavalry / Archers</span>
+        </div>
+        <div class="card-body" id="body-recruit" style="display:none;">
+          <div class="form-row">
+            <div class="form-group col-md-4">
+              <label>Territory</label>
+              <select class="form-control" id="recruit-territory">
+                {% for t in territories %}
+                <option value="{{ t.id }}">{{ t.name }}</option>
+                {% else %}
+                <option value="">— no territories —</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group col-md-4">
+              <label>Unit Type</label>
+              <select class="form-control" id="recruit-type">
+                <option value="infantry">Infantry</option>
+                <option value="cavalry">Cavalry</option>
+                <option value="archers">Archers</option>
+                <option value="spearmen">Spearmen</option>
+                <option value="heavy_infantry">Heavy Infantry</option>
+                <option value="light_cavalry">Light Cavalry</option>
+              </select>
+            </div>
+            <div class="form-group col-md-4">
+              <label>Size: <span id="recruit-size-val">100</span></label>
+              <input type="range" class="form-control-range" id="recruit-size" min="50" max="500" step="50" value="100"
+                     oninput="document.getElementById('recruit-size-val').textContent=this.value">
+            </div>
+          </div>
+          <button class="btn btn-success btn-sm" onclick="queueAction('recruit')">+ Queue Action</button>
+        </div>
+      </div>
+
+      <!-- 2. Build Structure -->
+      <div class="card mb-2" id="card-build">
+        <div class="card-header d-flex align-items-center" style="cursor:pointer;" onclick="toggleCard('build')">
+          <span>&#127968; Build Structure</span>
+          <span class="ml-auto badge badge-secondary">Farm / Barracks / Market / Walls / Mine</span>
+        </div>
+        <div class="card-body" id="body-build" style="display:none;">
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label>Territory</label>
+              <select class="form-control" id="build-territory">
+                {% for t in territories %}
+                <option value="{{ t.id }}">{{ t.name }}</option>
+                {% else %}
+                <option value="">— no territories —</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group col-md-6">
+              <label>Building Type</label>
+              <select class="form-control" id="build-type">
+                <option value="farm">Farm</option>
+                <option value="barracks">Barracks</option>
+                <option value="market">Market</option>
+                <option value="walls">Walls</option>
+                <option value="mine">Mine</option>
+                <option value="lumber_mill">Lumber Mill</option>
+                <option value="blacksmith">Blacksmith</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-success btn-sm" onclick="queueAction('build')">+ Queue Action</button>
+        </div>
+      </div>
+
+      <!-- 3. Develop Territory -->
+      <div class="card mb-2" id="card-develop">
+        <div class="card-header d-flex align-items-center" style="cursor:pointer;" onclick="toggleCard('develop')">
+          <span>&#127959; Develop Territory</span>
+          <span class="ml-auto badge badge-secondary">Raise development level</span>
+        </div>
+        <div class="card-body" id="body-develop" style="display:none;">
+          <div class="form-group">
+            <label>Territory</label>
+            <select class="form-control" id="develop-territory">
+              {% for t in territories %}
+              <option value="{{ t.id }}">{{ t.name }} (Dev: {{ t.development_level }})</option>
+              {% else %}
+              <option value="">— no territories —</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button class="btn btn-success btn-sm" onclick="queueAction('develop')">+ Queue Action</button>
+        </div>
+      </div>
+
+      <!-- 4. March Army -->
+      <div class="card mb-2" id="card-march">
+        <div class="card-header d-flex align-items-center" style="cursor:pointer;" onclick="toggleCard('march')">
+          <span>&#128196; March Army</span>
+          <span class="ml-auto badge badge-secondary">Move an army to a territory</span>
+        </div>
+        <div class="card-body" id="body-march" style="display:none;">
+          {% if armies %}
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label>Army</label>
+              <select class="form-control" id="march-army">
+                {% for a in armies %}
+                <option value="{{ a.id }}">{{ a.name }} ({{ a.unit_count }} units)</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group col-md-6">
+              <label>Destination Territory</label>
+              <select class="form-control" id="march-territory">
+                {% for t in territories %}
+                <option value="{{ t.id }}">{{ t.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-success btn-sm" onclick="queueAction('march')">+ Queue Action</button>
+          {% else %}
+          <p class="text-muted mb-0"><em>No active armies. Recruit troops first.</em></p>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- 5. Declare War -->
+      <div class="card mb-2" id="card-war">
+        <div class="card-header d-flex align-items-center" style="cursor:pointer;" onclick="toggleCard('war')">
+          <span>&#9876; Declare War</span>
+          <span class="ml-auto badge badge-danger">Aggressive action</span>
+        </div>
+        <div class="card-body" id="body-war" style="display:none;">
+          {% if neighboring_dynasties %}
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label>Target Dynasty</label>
+              <select class="form-control" id="war-target">
+                {% for d in neighboring_dynasties %}
+                <option value="{{ d.id }}">{{ d.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group col-md-6">
+              <label>Casus Belli</label>
+              <select class="form-control" id="war-cb">
+                <option value="conquest">Conquest</option>
+                <option value="claim">Claim</option>
+                <option value="revenge">Revenge</option>
+                <option value="subjugation">Subjugation</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="queueAction('war')">+ Queue Action</button>
+          {% else %}
+          <p class="text-muted mb-0"><em>No known rival dynasties at this time.</em></p>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Queued actions list -->
+      <div class="card mt-3">
+        <div class="card-header">Queued Actions <span class="badge badge-primary ml-2" id="queue-count">0</span></div>
+        <div class="card-body p-2" id="queue-list">
+          <p class="text-muted mb-0" id="queue-empty-msg"><em>No actions queued. Select an action above.</em></p>
+        </div>
+      </div>
+
+    </div><!-- /col-lg-8 -->
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- RIGHT — Situation panel                               -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <div class="col-lg-4">
+
+      <!-- Ruler mini-card -->
+      {% if current_monarch %}
+      <div class="card ruler-card mb-3">
+        <div class="card-header">Current Ruler</div>
+        <div class="card-body d-flex align-items-start">
+          {% if current_monarch.portrait_svg %}
+          <div style="width:64px;height:80px;flex-shrink:0;margin-right:.75rem;">
+            {{ current_monarch.portrait_svg | safe }}
+          </div>
+          {% endif %}
+          <div>
+            <div class="ruler-name">{{ current_monarch.name }} {{ current_monarch.surname }}</div>
+            <div class="ruler-title">Age {{ current_monarch_age }}</div>
+            {% if current_monarch.traits %}
+            <div class="mt-1">
+              {% for trait in current_monarch.traits[:4] %}
+              <span class="badge badge-pill trait-{{ trait | lower | replace(' ', '_') }} trait-default mr-1">{{ trait }}</span>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Territories summary -->
+      <div class="card mb-3">
+        <div class="card-header">Territories <span class="badge badge-secondary ml-1">{{ territories | length }}</span></div>
+        <div class="card-body p-2" style="max-height:180px;overflow-y:auto;">
+          {% if territories %}
+          <ul class="list-unstyled mb-0">
+            {% for t in territories %}
+            <li class="d-flex align-items-center py-1" style="border-bottom:1px solid var(--dark-border);">
+              <span style="color:var(--gold);font-size:.82rem;">
+                {% if t.is_capital %}&#9812; {% endif %}{{ t.name }}
+              </span>
+              <span class="ml-auto text-muted" style="font-size:.75rem;">Pop {{ t.population }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="text-muted mb-0"><em>No territories controlled.</em></p>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Armies summary -->
+      <div class="card mb-3">
+        <div class="card-header">Armies <span class="badge badge-secondary ml-1">{{ armies | length }}</span></div>
+        <div class="card-body p-2">
+          {% if armies %}
+          <ul class="list-unstyled mb-0">
+            {% for a in armies %}
+            <li class="py-1" style="border-bottom:1px solid var(--dark-border);font-size:.88rem;">
+              <span style="color:var(--gold);">{{ a.name }}</span>
+              <span class="text-muted ml-2">{{ a.unit_count }} units</span>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="text-muted mb-0"><em>No active armies.</em></p>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Unmarried nobles hint -->
+      {% if unmarried_nobles %}
+      <div class="card mb-3">
+        <div class="card-header">Unmarried Nobles <span class="badge badge-secondary ml-1">{{ unmarried_nobles | length }}</span></div>
+        <div class="card-body p-2" style="max-height:140px;overflow-y:auto;">
+          <ul class="list-unstyled mb-0">
+            {% for p in unmarried_nobles %}
+            <li class="py-1" style="font-size:.85rem;border-bottom:1px solid var(--dark-border);">
+              <span style="color:var(--gold);">{{ p.name }} {{ p.surname }}</span>
+              <span class="text-muted ml-1">({{ p.gender | lower }}, age {{ p.age }})</span>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+      {% endif %}
+
+    </div><!-- /col-lg-4 -->
+  </div><!-- /row -->
+
+  <!-- ── Bottom nav ── -->
+  <div class="mt-3 mb-4">
+    <a href="{{ url_for('dynasty.view_dynasty', dynasty_id=dynasty.id) }}" class="btn btn-secondary btn-sm">
+      &#8592; Back to Dynasty
+    </a>
+  </div>
+
+</div><!-- /container-fluid -->
+
+<script>
+// ---------------------------------------------------------------------------
+// Action Phase JS — vanilla, no external libs
+// ---------------------------------------------------------------------------
+
+var queue = [];
+var apLeft = {{ action_points }};
+
+function updateApDisplay() {
+  var dots = ['ap-1', 'ap-2', 'ap-3'];
+  for (var i = 0; i < dots.length; i++) {
+    var el = document.getElementById(dots[i]);
+    if (el) {
+      el.style.color = (i < apLeft) ? 'var(--gold)' : 'var(--iron)';
+    }
+  }
+  var cnt = document.getElementById('ap-count');
+  if (cnt) cnt.textContent = apLeft;
+}
+
+function toggleCard(name) {
+  var body = document.getElementById('body-' + name);
+  if (!body) return;
+  body.style.display = (body.style.display === 'none') ? 'block' : 'none';
+}
+
+function queueAction(type) {
+  if (apLeft <= 0) {
+    alert('No action points remaining. Remove a queued action first.');
+    return;
+  }
+
+  var action = { type: type, params: {} };
+
+  if (type === 'recruit') {
+    action.params.territory_id = document.getElementById('recruit-territory').value;
+    action.params.unit_type    = document.getElementById('recruit-type').value;
+    action.params.size         = document.getElementById('recruit-size').value;
+  } else if (type === 'build') {
+    action.params.territory_id   = document.getElementById('build-territory').value;
+    action.params.building_type  = document.getElementById('build-type').value;
+  } else if (type === 'develop') {
+    action.params.territory_id = document.getElementById('develop-territory').value;
+  } else if (type === 'march') {
+    action.params.army_id      = document.getElementById('march-army').value;
+    action.params.territory_id = document.getElementById('march-territory').value;
+  } else if (type === 'war') {
+    action.params.target_dynasty_id = document.getElementById('war-target').value;
+    action.params.casus_belli        = document.getElementById('war-cb').value;
+  }
+
+  queue.push(action);
+  apLeft -= 1;
+  updateApDisplay();
+  renderQueue();
+}
+
+function removeAction(idx) {
+  queue.splice(idx, 1);
+  apLeft += 1;
+  updateApDisplay();
+  renderQueue();
+}
+
+function renderQueue() {
+  var list = document.getElementById('queue-list');
+  var countBadge = document.getElementById('queue-count');
+  var emptyMsg = document.getElementById('queue-empty-msg');
+
+  if (countBadge) countBadge.textContent = queue.length;
+
+  // Clear existing items (keep empty msg node)
+  var items = list.querySelectorAll('.queue-item');
+  items.forEach(function(el) { el.remove(); });
+
+  if (queue.length === 0) {
+    if (emptyMsg) emptyMsg.style.display = '';
+    return;
+  }
+
+  if (emptyMsg) emptyMsg.style.display = 'none';
+
+  var icons = { recruit:'&#9876;', build:'&#127968;', develop:'&#127959;', march:'&#128196;', war:'&#9876;', trade:'&#128506;' };
+
+  queue.forEach(function(a, i) {
+    var div = document.createElement('div');
+    div.className = 'queue-item d-flex align-items-center py-1';
+    div.style.cssText = 'border-bottom:1px solid var(--dark-border);font-size:.88rem;';
+
+    var icon = icons[a.type] || '&#9632;';
+    var label = a.type.charAt(0).toUpperCase() + a.type.slice(1);
+    var detail = '';
+    if (a.params.unit_type)    detail += ' ' + a.params.unit_type;
+    if (a.params.building_type) detail += ' ' + a.params.building_type;
+    if (a.params.size)         detail += ' x' + a.params.size;
+
+    div.innerHTML = '<span style="color:var(--gold);margin-right:.4rem;">' + (i+1) + '.</span>'
+      + '<span>' + icon + ' ' + label + detail + '</span>'
+      + '<button class="btn btn-sm btn-outline-danger ml-auto" style="padding:.1rem .4rem;font-size:.75rem;" onclick="removeAction(' + i + ')">&#10005;</button>';
+
+    list.appendChild(div);
+  });
+}
+
+function submitActions(e) {
+  e.preventDefault();
+
+  var btn = document.getElementById('end-turn-btn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Processing…';
+  }
+
+  fetch('/dynasty/{{ dynasty.id }}/submit_actions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(queue),
+    redirect: 'follow'
+  })
+  .then(function(response) {
+    // Flask redirect — follow it
+    window.location.href = response.url;
+  })
+  .catch(function(err) {
+    console.error('submit_actions error:', err);
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '&#9654; End Turn';
+    }
+    alert('An error occurred submitting your actions. Please try again.');
+  });
+}
+
+// Init display
+updateApDisplay();
+</script>
+{% endblock %}

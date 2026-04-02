@@ -10,11 +10,16 @@ from functools import wraps
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session as flask_session
 from flask_login import login_required, current_user
 
+from flask import jsonify
+
 from models.db_models import (
     db, DynastyDB, PersonDB, HistoryLogEntryDB, Territory,
-    DiplomaticRelation, War, TradeRoute
+    DiplomaticRelation, War, TradeRoute, Army
 )
 from models.game_manager import GameManager
+from models.economy_system import EconomySystem
+from models.military_system import MilitarySystem
+from models.diplomacy_system import DiplomacySystem
 from utils.theme_manager import get_all_theme_names, generate_theme_from_story_llm, get_theme
 from visualization.heraldry_renderer import generate_coat_of_arms
 
@@ -363,6 +368,233 @@ def turn_report(dynasty_id):
         summary=summary,
         ai_news=ai_news,
     )
+
+
+@dynasty_bp.route('/dynasty/<int:dynasty_id>/action_phase')
+@login_required
+@block_if_turn_processing
+def action_phase(dynasty_id):
+    """Show the action-phase planning screen for the dynasty."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('auth.dashboard'))
+
+    # Load theme configuration
+    theme_config = {}
+    if dynasty.theme_identifier_or_json:
+        if dynasty.theme_identifier_or_json in get_all_theme_names():
+            theme_config = get_theme(dynasty.theme_identifier_or_json)
+        else:
+            try:
+                theme_config = json.loads(dynasty.theme_identifier_or_json)
+            except json.JSONDecodeError:
+                pass
+
+    # Current monarch
+    current_monarch = None
+    current_monarch_age = 0
+    monarch_query = PersonDB.query.filter_by(
+        dynasty_id=dynasty_id,
+        is_monarch=True,
+        death_year=None
+    ).first()
+    if monarch_query:
+        current_monarch = {
+            'id': monarch_query.id,
+            'name': monarch_query.name,
+            'surname': monarch_query.surname,
+            'portrait_svg': monarch_query.portrait_svg if hasattr(monarch_query, 'portrait_svg') else None,
+            'traits': monarch_query.get_traits() if hasattr(monarch_query, 'get_traits') else [],
+        }
+        current_monarch_age = dynasty.current_simulation_year - monarch_query.birth_year
+
+    # Territories
+    territory_objs = Territory.query.filter_by(controller_dynasty_id=dynasty_id).all()
+    territories = [
+        {
+            'id': t.id,
+            'name': t.name,
+            'terrain_type': t.terrain_type if hasattr(t, 'terrain_type') else '',
+            'population': t.population if hasattr(t, 'population') else 0,
+            'development_level': t.development_level if hasattr(t, 'development_level') else 0,
+            'fortification_level': t.fortification_level if hasattr(t, 'fortification_level') else 0,
+            'is_capital': t.is_capital if hasattr(t, 'is_capital') else False,
+        }
+        for t in territory_objs
+    ]
+
+    # Armies
+    army_objs = Army.query.filter_by(dynasty_id=dynasty_id, is_active=True).all()
+    armies = [
+        {
+            'id': a.id,
+            'name': a.name,
+            'territory_id': a.territory_id if hasattr(a, 'territory_id') else None,
+            'unit_count': len(a.units) if hasattr(a, 'units') else 0,
+        }
+        for a in army_objs
+    ]
+
+    # Unmarried nobles
+    unmarried_objs = PersonDB.query.filter_by(
+        dynasty_id=dynasty_id,
+        death_year=None,
+        is_noble=True,
+        spouse_sim_id=None
+    ).all()
+    unmarried_nobles = [
+        {
+            'id': p.id,
+            'name': p.name,
+            'surname': p.surname,
+            'gender': p.gender,
+            'age': dynasty.current_simulation_year - p.birth_year,
+        }
+        for p in unmarried_objs
+    ]
+
+    # Economy
+    try:
+        es = EconomySystem(db.session)
+        economy = es.calculate_dynasty_economy(dynasty_id)
+    except Exception as e:
+        logger.warning(f"action_phase: economy calculation failed for dynasty {dynasty_id}: {e}")
+        economy = {
+            'gold': dynasty.current_wealth,
+            'food': 0,
+            'iron': 0,
+            'timber': 0,
+            'manpower': 0,
+        }
+
+    # Neighbouring dynasties (other dynasties owned by this user — visible targets)
+    neighbour_objs = DynastyDB.query.filter(
+        DynastyDB.id != dynasty_id,
+        DynastyDB.user_id == current_user.id
+    ).all()
+    neighboring_dynasties = [{'id': d.id, 'name': d.name} for d in neighbour_objs]
+
+    dynasty_data = {
+        'id': dynasty.id,
+        'name': dynasty.name,
+        'current_wealth': dynasty.current_wealth,
+        'current_simulation_year': dynasty.current_simulation_year,
+        'coat_of_arms_svg': dynasty.coat_of_arms_svg,
+    }
+
+    return render_template(
+        'action_phase.html',
+        dynasty=dynasty_data,
+        current_monarch=current_monarch,
+        current_monarch_age=current_monarch_age,
+        territories=territories,
+        armies=armies,
+        unmarried_nobles=unmarried_nobles,
+        economy=economy,
+        neighboring_dynasties=neighboring_dynasties,
+        action_points=3,
+        theme_config=theme_config,
+        current_year=dynasty.current_simulation_year,
+    )
+
+
+@dynasty_bp.route('/dynasty/<int:dynasty_id>/submit_actions', methods=['POST'])
+@login_required
+@block_if_turn_processing
+def submit_actions(dynasty_id):
+    """Accept a JSON list of player actions, execute up to 3, then advance the turn."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        return jsonify({'error': 'Not authorized'}), 403
+
+    actions = request.get_json() or []
+
+    ap_used = 0
+    results = []
+    for action in actions[:3]:
+        action_type = action.get('type')
+        params = action.get('params', {})
+        try:
+            if action_type == 'recruit':
+                ms = MilitarySystem(db.session)
+                ms.recruit_unit(dynasty_id, params.get('unit_type', 'infantry'),
+                                int(params.get('size', 100)), params.get('territory_id'))
+                results.append({'type': action_type, 'success': True})
+            elif action_type == 'build':
+                es = EconomySystem(db.session)
+                es.construct_building(params.get('territory_id'), params.get('building_type', 'farm'))
+                results.append({'type': action_type, 'success': True})
+            elif action_type == 'develop':
+                es = EconomySystem(db.session)
+                es.develop_territory(params.get('territory_id'), dynasty_id)
+                results.append({'type': action_type, 'success': True})
+            elif action_type == 'march':
+                army = Army.query.filter_by(id=params.get('army_id'), dynasty_id=dynasty_id).first()
+                if army:
+                    army.territory_id = params.get('territory_id')
+                    db.session.commit()
+                results.append({'type': action_type, 'success': bool(army)})
+            elif action_type == 'trade':
+                es = EconomySystem(db.session)
+                es.establish_trade_route(params.get('source_id'), params.get('target_id'),
+                                         params.get('resource_type', 'food'),
+                                         int(params.get('amount', 50)))
+                results.append({'type': action_type, 'success': True})
+            elif action_type == 'war':
+                ds = DiplomacySystem(db.session)
+                ds.declare_war(dynasty_id, params.get('target_dynasty_id'),
+                               params.get('casus_belli', 'conquest'))
+                results.append({'type': action_type, 'success': True})
+            else:
+                results.append({'type': action_type, 'success': False, 'error': 'Unknown action type'})
+                continue
+            ap_used += 1
+        except Exception as e:
+            logger.warning(f"Action {action_type} failed for dynasty {dynasty_id}: {e}")
+            results.append({'type': action_type, 'success': False, 'error': str(e)})
+
+    # Mark turn as processing
+    dynasty.is_turn_processing = True
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"submit_actions: failed to set is_turn_processing for dynasty {dynasty_id}: {e}")
+        return redirect(url_for('dynasty.view_dynasty', dynasty_id=dynasty_id))
+
+    turn_summary = None
+    success = False
+    try:
+        result = process_dynasty_turn(dynasty_id, years_to_advance=5)
+        if len(result) == 3:
+            success, message, turn_summary = result
+        else:
+            success, message = result
+            turn_summary = None
+
+        # Process AI turns
+        try:
+            game_manager = GameManager(db.session)
+            game_manager.process_ai_turns(user_id=current_user.id)
+        except Exception as e:
+            logger.error(f"submit_actions: AI turn error for user {current_user.id}: {e}", exc_info=True)
+
+        dynasty.last_played_at = datetime.datetime.utcnow()
+    finally:
+        dynasty.is_turn_processing = False
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"submit_actions: error releasing lock for dynasty {dynasty_id}: {e}")
+
+    if success and turn_summary:
+        flask_session['last_turn_summary'] = turn_summary
+        flask_session['last_turn_dynasty_id'] = dynasty_id
+        return redirect(url_for('dynasty.turn_report', dynasty_id=dynasty_id))
+
+    return redirect(url_for('dynasty.view_dynasty', dynasty_id=dynasty_id))
 
 
 @dynasty_bp.route('/dynasty/<int:dynasty_id>/delete', methods=['GET', 'POST'])

@@ -586,7 +586,7 @@ def _make_hex_polygon(cx: float, cy: float, radius: float = 20) -> List[List[flo
     return points
 
 
-def generate_geojson(dynasty_id: int, session) -> dict:
+def generate_geojson(dynasty_id: int, session, hex_mode: bool = False) -> dict:
     """Generate GeoJSON FeatureCollection of all territories for the canvas map.
 
     Each territory becomes a GeoJSON Feature with:
@@ -594,10 +594,18 @@ def generate_geojson(dynasty_id: int, session) -> dict:
     - properties: territory_id, name, owner_dynasty_id, owner_dynasty_name,
                   terrain_type, is_capital, population, army_count, centroid
 
+    When hex_mode=True the properties also include ``col`` and ``row`` integer
+    grid coordinates derived from x_coordinate and y_coordinate respectively,
+    and ``owner_dynasty_hue`` (stable hue derived from dynasty id) so the
+    canvas renderer can colour each hex by owner without extra lookups.
+
     Args:
         dynasty_id: The dynasty whose perspective we are rendering (used to scope
                     the query; currently all territories are returned).
         session: SQLAlchemy database session
+        hex_mode: When True, add col/row grid properties and owner_dynasty_hue
+                  to each feature; geometry coordinates are still generated from
+                  the raw floating-point coordinates for backward compatibility.
 
     Returns:
         GeoJSON FeatureCollection dict
@@ -629,23 +637,36 @@ def generate_geojson(dynasty_id: int, session) -> dict:
         owner_id = t.controller_dynasty_id
         dynasty_name = dynasty_names.get(owner_id) if owner_id else None
 
+        properties: Dict[str, Any] = {
+            'territory_id': t.id,
+            'name': t.name,
+            'owner_dynasty_id': owner_id,
+            'owner_dynasty_name': dynasty_name,
+            'terrain_type': terrain_val,
+            'is_capital': bool(t.is_capital) if hasattr(t, 'is_capital') else False,
+            'population': getattr(t, 'population', 0),
+            'army_count': army_counts.get(t.id, 0),
+            'centroid': [cx, cy],
+        }
+
+        if hex_mode:
+            # Grid indices: x_coordinate and y_coordinate store integer col/row values
+            properties['col'] = int(cx)
+            properties['row'] = int(cy)
+            # Stable hue: 12 distinct hues spaced 30° apart
+            properties['owner_dynasty_hue'] = (owner_id % 12 * 30) if owner_id else -1
+            # Extra fields for the info panel
+            properties['development_level'] = getattr(t, 'development_level', 1)
+            properties['base_tax'] = getattr(t, 'base_tax', 0)
+            properties['fortification_level'] = getattr(t, 'fortification_level', 0)
+
         feature = {
             'type': 'Feature',
             'geometry': {
                 'type': 'Polygon',
                 'coordinates': [polygon_points]
             },
-            'properties': {
-                'territory_id': t.id,
-                'name': t.name,
-                'owner_dynasty_id': owner_id,
-                'owner_dynasty_name': dynasty_name,
-                'terrain_type': terrain_val,
-                'is_capital': bool(t.is_capital) if hasattr(t, 'is_capital') else False,
-                'population': getattr(t, 'population', 0),
-                'army_count': army_counts.get(t.id, 0),
-                'centroid': [cx, cy]
-            }
+            'properties': properties,
         }
         features.append(feature)
 

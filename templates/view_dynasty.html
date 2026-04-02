@@ -27,8 +27,8 @@
     <a href="{{ url_for('auth.dashboard') }}" class="btn btn-sm btn-secondary">
       &#8592; Dashboard
     </a>
-    <a href="{{ url_for('dynasty.advance_turn', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-success">
-      &#9654; Advance Turn
+    <a href="{{ url_for('dynasty.action_phase', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-success">
+      &#9654; Take Actions
     </a>
     <a href="{{ url_for('military.military_view', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-primary">
       &#9876; Military
