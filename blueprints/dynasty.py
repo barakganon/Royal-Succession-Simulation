@@ -20,6 +20,7 @@ from models.game_manager import GameManager
 from models.economy_system import EconomySystem
 from models.military_system import MilitarySystem
 from models.diplomacy_system import DiplomacySystem
+from models.banking_system import BankingSystem
 from utils.theme_manager import get_all_theme_names, generate_theme_from_story_llm, get_theme
 from utils.llm_prompts import build_turn_story_prompt, generate_turn_story_fallback
 from visualization.heraldry_renderer import generate_coat_of_arms
@@ -984,6 +985,13 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
         db.session.rollback()
         logger.error(f"Error committing changes: {commit_error}", exc_info=True)
         return False, f"Error advancing turn: {commit_error}", None
+
+    # --- Banking: accrue interest on active loans ---
+    try:
+        banking = BankingSystem(db.session)
+        banking.accrue_interest_for_dynasty(dynasty_id)
+    except Exception as bank_exc:
+        logger.error(f"Error accruing loan interest for dynasty {dynasty_id}: {bank_exc}", exc_info=True)
 
     # Collect events created during this turn from HistoryLogEntryDB
     new_events = HistoryLogEntryDB.query.filter(
