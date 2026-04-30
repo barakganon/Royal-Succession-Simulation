@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}Banking — {{ dynasty.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+
+  <!-- Header -->
+  <div class="d-flex align-items-center mb-4">
+    {% if dynasty.coat_of_arms_svg %}
+      <div style="width:60px;height:60px;flex-shrink:0;" class="me-3">
+        {{ dynasty.coat_of_arms_svg | safe }}
+      </div>
+    {% endif %}
+    <div>
+      <h2 class="mb-0" style="font-family:'Cinzel',serif;color:var(--gold-primary);">
+        Treasury &amp; Moneylenders
+      </h2>
+      <small class="text-muted">{{ dynasty.name }} · Year {{ dynasty.current_simulation_year }}</small>
+    </div>
+    <a href="{{ url_for('economy.dynasty_economy', dynasty_id=dynasty.id) }}"
+       class="btn btn-sm btn-outline-secondary ms-auto">← Economy</a>
+  </div>
+
+  <div class="row">
+
+    <!-- Left: borrow + active loans -->
+    <div class="col-md-7 mb-4">
+
+      <!-- Current treasury -->
+      <div class="card mb-3">
+        <div class="card-header">Current Treasury</div>
+        <div class="card-body py-2">
+          <span style="font-size:1.4rem;color:var(--gold-primary);font-family:'Cinzel',serif;">
+            {{ dynasty.current_wealth | default(0) | int }} gold
+          </span>
+          {% if total_debt > 0 %}
+          <span class="ms-3 text-danger">
+            · {{ total_debt }} gold owed
+          </span>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Borrow new loan -->
+      <div class="card mb-4">
+        <div class="card-header">Borrow from Moneylenders</div>
+        <div class="card-body">
+          <p class="text-muted small mb-3">
+            Loans carry <strong>{{ interest_rate }}% interest per turn</strong>, compounding.
+            Maximum {{ max_active_loans | default(3) }} concurrent loans.
+            Borrowing range: {{ min_loan }}–{{ max_loan }} gold.
+          </p>
+          <form method="POST"
+                action="{{ url_for('economy.banking_borrow', dynasty_id=dynasty.id) }}">
+            <div class="input-group">
+              <input type="number" name="amount" class="form-control"
+                     placeholder="Amount ({{ min_loan }}–{{ max_loan }})"
+                     min="{{ min_loan }}" max="{{ max_loan }}" required>
+              <button class="btn btn-warning" type="submit">Borrow Gold</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Active loans -->
+      <div class="card">
+        <div class="card-header">Active Loans ({{ active_loans | length }})</div>
+        <div class="card-body p-0">
+          {% if active_loans %}
+          <table class="table table-sm mb-0" style="color:var(--text-primary);">
+            <thead>
+              <tr>
+                <th>Year Taken</th>
+                <th>Principal</th>
+                <th>Owed Now</th>
+                <th>Rate</th>
+                <th>Repay</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for loan in active_loans %}
+              <tr>
+                <td>{{ loan.year_borrowed }}</td>
+                <td>{{ loan.principal }}</td>
+                <td class="text-danger fw-bold">{{ loan.amount_owed }}</td>
+                <td>{{ loan.interest_rate }}%</td>
+                <td>
+                  <form method="POST"
+                        action="{{ url_for('economy.banking_repay', dynasty_id=dynasty.id) }}"
+                        class="d-flex gap-1">
+                    <input type="hidden" name="loan_id" value="{{ loan.id }}">
+                    <input type="number" name="amount" class="form-control form-control-sm"
+                           placeholder="Gold" min="1"
+                           max="{{ [loan.amount_owed, dynasty.current_wealth] | min }}"
+                           style="width:90px;" required>
+                    <button class="btn btn-sm btn-success" type="submit">Pay</button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <p class="text-muted p-3 mb-0">No active loans. Your coffers are your own.</p>
+          {% endif %}
+        </div>
+      </div>
+
+    </div><!-- /col-md-7 -->
+
+    <!-- Right: loan history + advice -->
+    <div class="col-md-5 mb-4">
+
+      <div class="card mb-3">
+        <div class="card-header">Moneylender's Advice</div>
+        <div class="card-body small text-muted">
+          <ul class="ps-3 mb-0">
+            <li>Interest compounds <strong>every turn</strong> — repay quickly.</li>
+            <li>Total debt above <strong>5 000 gold</strong> triggers default:
+                infamy +20, honor −20.</li>
+            <li>Loans fund armies, buildings, and expansions when your treasury runs dry.</li>
+            <li>Max {{ max_active_loans | default(3) }} concurrent loans per dynasty.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">Loan History</div>
+        <div class="card-body p-0" style="max-height:340px;overflow-y:auto;">
+          {% if loan_history %}
+          <table class="table table-sm mb-0" style="color:var(--text-primary);">
+            <thead>
+              <tr><th>Year</th><th>Principal</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              {% for loan in loan_history %}
+              <tr>
+                <td>{{ loan.year_borrowed }}</td>
+                <td>{{ loan.principal }}</td>
+                <td>
+                  {% if loan.is_active %}
+                  <span class="badge bg-warning text-dark">Active</span>
+                  {% else %}
+                  <span class="badge bg-success">Repaid {{ loan.year_repaid }}</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <p class="text-muted p-3 mb-0">No loan history yet.</p>
+          {% endif %}
+        </div>
+      </div>
+
+    </div><!-- /col-md-5 -->
+
+  </div><!-- /row -->
+
+</div>
+{% endblock %}
