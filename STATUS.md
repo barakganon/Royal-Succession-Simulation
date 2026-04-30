@@ -1,11 +1,11 @@
 # Royal Succession Simulation - Development Status
-Last updated: 2026-04-02
-Last commit: pending — Sprint 9 complete
+Last updated: 2026-05-01
+Last commit: feat(banking): complete Task 10B — banking/loans subsystem with 24 new tests
 
 ---
 
 ## Current State
-**Tests:** 187 passed · 0 skipped · 0 failed
+**Tests:** 211 passed · 0 skipped · 0 failed
 **App:** imports cleanly, all 6 blueprints registered
 **main_flask_app.py:** 290 lines — app setup + blueprint registration only
 
@@ -36,11 +36,12 @@ Last commit: pending — Sprint 9 complete
 - Real-time battle ticker via SocketIO + LLM commentary
 - Army / battle / siege detail pages
 
-### Economy - blueprints/economy.py (13 routes)
+### Economy - blueprints/economy.py (16 routes)
 - Resources: food, timber, stone, iron, gold
 - Build, upgrade, repair buildings
 - Develop territories, establish/cancel trade routes
 - World economy overview, territory economy detail
+- **Banking/Loans:** borrow gold (100–2000, max 3 loans), 15% compound interest per turn, repay, default penalty (infamy +20, honor −20 when debt ≥ 5000 gold)
 
 ### Diplomacy - blueprints/diplomacy.py (7 routes)
 - Relation scores (color-coded with progress bars), prestige/honor/infamy
@@ -75,7 +76,6 @@ Last commit: pending — Sprint 9 complete
 | 2 dead placeholder routes in blueprints/map.py | Low | `create_dynasty_placeholder`, `view_dynasty_placeholder` — delete |
 | `print()` statements in some model files | Low | Replace with `logger.debug()` |
 | Banking, espionage, court politics | Low | Post-MVP |
-| Epic Story panel not yet in view_dynasty.html | Low | Add scrollable Chronicles card to template |
 
 ---
 
@@ -102,17 +102,23 @@ Result: Players have a decision screen (3 AP across 5 action types) before each 
 | 9A-4 | Generate + append one epic paragraph per process_dynasty_turn() | blueprints/dynasty.py | Done |
 | 9A-5 | Import new prompt helpers in dynasty blueprint | blueprints/dynasty.py | Done |
 | 9A-6 | Expose new_story_paragraph in turn_summary dict | blueprints/dynasty.py | Done |
-| 9A-7 | Add Chronicles panel to dynasty view template | templates/view_dynasty.html | Pending |
+| 9A-7 | Add Chronicles panel to dynasty view template | templates/view_dynasty.html | Done |
 
 Design: Each turn Claude (or rule-based fallback) writes one 4-6 sentence high-fantasy paragraph weaving that turn events into a living saga. Paragraphs are appended to dynasty.epic_story_text separated by blank lines. Over 10-20 turns the player accumulates a full fantasy chapter about their dynasty history.
 
 ---
 
+## Sprint 10 — Polish & Depth (IN PROGRESS)
+| # | Task | Files | Status |
+|---|------|-------|--------|
+| 10A | Chronicles panel in view_dynasty.html | templates/view_dynasty.html | Done (branch merged) |
+| 10B | Banking / loans subsystem | models/banking_system.py, blueprints/economy.py, templates/banking.html | Done — 211 tests pass |
+| 10C | Espionage / spy networks | models/espionage_system.py, blueprints/espionage.py | TODO |
+| 10D | ElevenLabs TTS narrator (requires API key) | utils/tts_narrator.py | TODO |
+
 ## Next Steps
 | # | Task | Effort |
 |---|------|--------|
-| 10A | Add story panel to view_dynasty.html (scrollable Chronicles card) | Low |
-| 10B | Banking / loans subsystem | High |
 | 10C | Espionage / spy networks | High |
 | 10D | ElevenLabs TTS narrator (requires API key) | Low |
 
