@@ -212,8 +212,8 @@ class TestSuccession:
             original_monarch_id = original_monarch.id
 
         # Patch process_death_check so the monarch always dies on the next turn
-        # Function lives in blueprints.dynasty after Sprint 7-1 blueprint extraction
-        original_death_check_path = 'blueprints.dynasty.process_death_check'
+        # Function lives in models.turn_processor after Sprint 1 extraction
+        original_death_check_path = 'models.turn_processor.process_death_check'
 
         def mock_death_check(person, current_year, theme_config):
             """Force the monarch to die; leave everyone else alive."""
