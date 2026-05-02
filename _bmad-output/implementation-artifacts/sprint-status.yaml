@@ -64,7 +64,7 @@ development_status:
   # Story 1-3: Turn report UI update
   # Show interrupt.reason prominently, display "N years passed" in turn_report.html,
   # visually distinguish 4 interrupt classes (death / completion / war / quiet).
-  1-3-turn-report-interrupt-ui: ready-for-dev
+  1-3-turn-report-interrupt-ui: in-progress
 
   # Story 1-4: Chronicle prompt update
   # build_turn_story_prompt receives years_advanced + interrupt_reason so the
