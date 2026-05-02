@@ -157,6 +157,16 @@ class TestAdvanceTurn:
         # "Chronicles" heading; on failure it shows an "Error" flash on view_dynasty.
         assert b'Chronicles' in response.data or b'Error' in response.data or b'Turn Report' in response.data
 
+    def test_advance_turn_interrupt_reason_quiet_period(self, dynasty_client, app, db):
+        dynasty_id = _get_dynasty_id(app, db, 'loop_user')
+        from models.turn_processor import process_dynasty_turn
+        with patch('models.turn_processor.process_death_check', return_value=False):
+            with app.app_context():
+                success, _message, summary = process_dynasty_turn(dynasty_id, years_to_advance=5)
+        assert success is True
+        assert summary['interrupt_reason'] == 'quiet_period'
+        assert summary['years_advanced'] == 5
+
 
 @pytest.mark.integration
 class TestAdvanceMultipleTurns:

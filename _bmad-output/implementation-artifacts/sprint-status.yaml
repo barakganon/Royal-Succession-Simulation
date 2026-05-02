@@ -39,7 +39,7 @@
 # - Each story should have a corresponding file: {story_key}.md in story_location
 
 generated: 2026-05-02
-last_updated: 2026-05-03
+last_updated: 2026-05-03  # updated: Story 1-2 done after code review patches
 project: Royal-Succession-Simulation
 project_key: RSS
 tracking_system: file-system
@@ -59,12 +59,12 @@ development_status:
   # Story 1-2: Interrupt-driven turn loop
   # Implement INTERRUPT_REASONS, make process_dynasty_turn loop until interrupt,
   # each lifecycle function returns Optional[Interrupt] instead of bool.
-  1-2-interrupt-driven-turn-loop: review
+  1-2-interrupt-driven-turn-loop: done
 
   # Story 1-3: Turn report UI update
   # Show interrupt.reason prominently, display "N years passed" in turn_report.html,
   # visually distinguish 4 interrupt classes (death / completion / war / quiet).
-  1-3-turn-report-interrupt-ui: backlog
+  1-3-turn-report-interrupt-ui: ready-for-dev
 
   # Story 1-4: Chronicle prompt update
   # build_turn_story_prompt receives years_advanced + interrupt_reason so the

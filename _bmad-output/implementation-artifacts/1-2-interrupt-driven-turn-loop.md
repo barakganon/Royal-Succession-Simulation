@@ -1,6 +1,6 @@
 # Story 1.2: Interrupt-driven turn loop
 
-Status: review
+Status: done
 
 ## Story
 
@@ -352,3 +352,11 @@ None — implementation matched the story spec exactly on first attempt.
 - `STATUS.md` — Task 1-2 marked done
 - `_bmad-output/implementation-artifacts/1-2-interrupt-driven-turn-loop.md` — story marked review
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` — story status → review
+
+### Review Findings
+
+- [x] [Review][Patch] Missing `break` after `interrupt = ('monarch_death', ...)` — after setting interrupt and calling `continue`, the inner `for person` loop exits but the outer `while` body completes for the rest of that year's persons, risking a second `process_succession` call if the newly-crowned heir is also in `living_persons` and also dies [models/turn_processor.py:131-135]
+- [x] [Review][Patch] No test directly asserts `turn_summary['interrupt_reason']` value — AC4/AC5 have no coverage for the interrupt_reason string output; year-value assertions pass but the new key could be misspelled or wrong without detection [tests/integration/test_game_loop.py, tests/functional/test_game_flow.py]
+- [x] [Review][Defer] `years_advanced` incremented unconditionally after exception — a year whose `try` block throws still advances the clock; pre-existing behavior made explicit by the new `years_advanced` variable; no behavior change from this story — deferred, pre-existing
+- [x] [Review][Defer] `quiet_period` interrupt tuple stores count (`years_advanced`) as second element, inconsistent with `monarch_death` which stores absolute `current_year` — internal inconsistency; `interrupt[1]` not exposed in `turn_summary` so no external impact today — deferred, pre-existing
+- [x] [Review][Defer] `living_persons` snapshot excludes newly-created persons — new spouses or children created by `process_marriage_check`/`process_childbirth_check` never receive lifecycle processing in the same turn; pre-existing simulation accuracy gap — deferred, pre-existing

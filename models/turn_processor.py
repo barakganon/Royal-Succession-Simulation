@@ -132,6 +132,7 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
                     if person.is_monarch:
                         process_succession(dynasty, person, current_year, theme_config)
                         interrupt = ('monarch_death', current_year)
+                        break  # exit person loop; prevents double-succession if heir also in living_persons
                     continue
 
                 # Process marriage for unmarried nobles
