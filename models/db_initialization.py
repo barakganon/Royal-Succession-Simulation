@@ -148,6 +148,11 @@ class DatabaseInitializer:
                             conn.execute(text("ALTER TABLE dynasty ADD COLUMN epic_story_text TEXT DEFAULT ''"))
                             conn.commit()
                         self.logger.info("Added epic_story_text column to dynasty table.")
+                # Create loan table if missing (Banking system)
+                if 'loan' not in inspector.get_table_names():
+                    from models.db_models import Loan
+                    Loan.__table__.create(db.engine, checkfirst=True)
+                    self.logger.info("Created loan table.")
 
         except Exception as e:
             self.logger.error(f"Error creating tables: {str(e)}")

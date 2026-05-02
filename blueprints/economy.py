@@ -531,3 +531,80 @@ def form_alliance():
     """Form an alliance with another dynasty."""
     flash("Alliance formation functionality will be implemented in a future update.", "info")
     return redirect(url_for('economy.world_economy_view'))
+
+
+# ---------------------------------------------------------------------------
+# Banking routes
+# ---------------------------------------------------------------------------
+
+from models.banking_system import BankingSystem
+from models.db_models import Loan
+
+
+@economy_bp.route('/dynasty/<int:dynasty_id>/banking')
+@login_required
+def banking_view(dynasty_id):
+    """Display the banking / loans overview for a dynasty."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash('Not authorized to view this dynasty.', 'danger')
+        return redirect(url_for('auth.dashboard'))
+
+    bs = BankingSystem(db.session)
+    active_loans = bs.get_active_loans(dynasty_id)
+    loan_history = bs.get_loan_history(dynasty_id)
+    total_debt = bs.total_debt(dynasty_id)
+
+    return render_template(
+        'banking.html',
+        dynasty=dynasty,
+        active_loans=active_loans,
+        loan_history=loan_history,
+        total_debt=total_debt,
+        max_loan=2000,
+        min_loan=100,
+        interest_rate=15,
+    )
+
+
+@economy_bp.route('/dynasty/<int:dynasty_id>/banking/borrow', methods=['POST'])
+@login_required
+def banking_borrow(dynasty_id):
+    """Take out a new loan."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash('Not authorized.', 'danger')
+        return redirect(url_for('auth.dashboard'))
+
+    try:
+        amount = int(request.form.get('amount', 0))
+    except (ValueError, TypeError):
+        flash('Invalid loan amount.', 'danger')
+        return redirect(url_for('economy.banking_view', dynasty_id=dynasty_id))
+
+    bs = BankingSystem(db.session)
+    result = bs.borrow(dynasty_id, amount, dynasty.current_simulation_year)
+    flash(result['message'], 'success' if result['success'] else 'danger')
+    return redirect(url_for('economy.banking_view', dynasty_id=dynasty_id))
+
+
+@economy_bp.route('/dynasty/<int:dynasty_id>/banking/repay', methods=['POST'])
+@login_required
+def banking_repay(dynasty_id):
+    """Repay gold toward a specific loan."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash('Not authorized.', 'danger')
+        return redirect(url_for('auth.dashboard'))
+
+    try:
+        loan_id = int(request.form.get('loan_id', 0))
+        amount = int(request.form.get('amount', 0))
+    except (ValueError, TypeError):
+        flash('Invalid repayment values.', 'danger')
+        return redirect(url_for('economy.banking_view', dynasty_id=dynasty_id))
+
+    bs = BankingSystem(db.session)
+    result = bs.repay(dynasty_id, loan_id, amount, dynasty.current_simulation_year)
+    flash(result['message'], 'success' if result['success'] else 'danger')
+    return redirect(url_for('economy.banking_view', dynasty_id=dynasty_id))

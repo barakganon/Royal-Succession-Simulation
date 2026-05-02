@@ -124,6 +124,8 @@ class DynastyDB(db.Model):
                                  foreign_keys='Battle.winner_dynasty_id',
                                  back_populates='winner',
                                  lazy='dynamic')
+    loans = db.relationship('Loan', back_populates='dynasty', lazy='dynamic',
+                            cascade='all, delete-orphan')
 
     # For storing serialized complex data like alliances or active global event effects for this dynasty
     # serialized_alliances_json = db.Column(db.Text, nullable=True) # e.g., JSON string of the alliances dict
@@ -1062,4 +1064,37 @@ class ChronicleEntryDB(db.Model):
         return f"<ChronicleEntryDB (GameID: {self.game_id}, Turn: {self.turn}, Year: {self.year})>"
 
 
-logger.debug("models.db_models defined (User, DynastyDB, PersonDB, HistoryLogEntryDB, Region, Province, Territory, Settlement, Resource, TerritoryResource, Building, TradeRoute, MilitaryUnit, Army, DiplomaticRelation, Treaty, War, Battle, Siege, ChronicleEntryDB).")
+class Loan(db.Model):
+    """A loan taken by a dynasty from a moneylender.
+
+    Loans accrue compound interest each turn. The dynasty receives gold
+    immediately; each turn `interest_rate` percent is added to `amount_owed`.
+    Once `amount_owed` reaches zero the loan is marked repaid.
+    """
+    __tablename__ = 'loan'
+
+    id = db.Column(db.Integer, primary_key=True)
+    dynasty_id = db.Column(db.Integer, db.ForeignKey('dynasty.id'), nullable=False, index=True)
+
+    # Principal disbursed (for display / history only — repayment reduces amount_owed)
+    principal = db.Column(db.Integer, nullable=False)
+    # Current balance (principal + accrued interest)
+    amount_owed = db.Column(db.Integer, nullable=False)
+    # Annual interest rate as a percentage (e.g. 15 means 15 % per turn)
+    interest_rate = db.Column(db.Integer, nullable=False, default=15)
+
+    year_borrowed = db.Column(db.Integer, nullable=False)
+    # NULL until the loan is fully repaid
+    year_repaid = db.Column(db.Integer, nullable=True)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+
+    dynasty = db.relationship('DynastyDB', back_populates='loans')
+
+    def __repr__(self):
+        return (
+            f"<Loan dynasty={self.dynasty_id} principal={self.principal} "
+            f"owed={self.amount_owed} active={self.is_active}>"
+        )
+
+
+logger.debug("models.db_models defined (User, DynastyDB, PersonDB, HistoryLogEntryDB, Region, Province, Territory, Settlement, Resource, TerritoryResource, Building, TradeRoute, MilitaryUnit, Army, DiplomaticRelation, Treaty, War, Battle, Siege, ChronicleEntryDB, Loan).")
