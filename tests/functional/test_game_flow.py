@@ -1,5 +1,6 @@
 # tests/functional/test_game_flow.py
 import pytest
+from unittest.mock import patch
 from flask import url_for
 from models.db_models import User, DynastyDB, PersonDB, Territory
 
@@ -103,7 +104,10 @@ class TestGameFlow:
             assert ruler is not None
 
         # 4. Advance a turn (GET /dynasty/<id>/advance_turn — advances 5 years)
-        response = client.get(f'/dynasty/{dynasty_id}/advance_turn', follow_redirects=True)
+        # Patch death check to guarantee no monarch death interrupt fires, ensuring
+        # exactly 5 years advance and a deterministic year assertion.
+        with patch('models.turn_processor.process_death_check', return_value=False):
+            response = client.get(f'/dynasty/{dynasty_id}/advance_turn', follow_redirects=True)
         assert response.status_code == 200
         # Flash message contains the advance summary
         assert b'Advanced' in response.data or b'advanced' in response.data or b'Error' not in response.data
@@ -132,8 +136,10 @@ class TestGameFlow:
         assert response.status_code == 200
 
         # 9. Advance multiple turns and verify cumulative year
-        for _ in range(3):
-            client.get(f'/dynasty/{dynasty_id}/advance_turn', follow_redirects=True)
+        # Patch death check to guarantee no interrupt, so exactly 5 years advance per turn.
+        with patch('models.turn_processor.process_death_check', return_value=False):
+            for _ in range(3):
+                client.get(f'/dynasty/{dynasty_id}/advance_turn', follow_redirects=True)
 
         with app.app_context():
             dynasty = db.session.query(DynastyDB).get(dynasty_id)
@@ -179,11 +185,13 @@ class TestMultiDynastyInteraction:
         dynasty_b_id = all_dynasties[1].id
 
         # Advance turns for both dynasties
+        # Patch death check to guarantee no interrupt, so exactly 5 years advance per turn.
         for dynasty_id in (dynasty_a_id, dynasty_b_id):
-            response = client.get(
-                f'/dynasty/{dynasty_id}/advance_turn',
-                follow_redirects=True
-            )
+            with patch('models.turn_processor.process_death_check', return_value=False):
+                response = client.get(
+                    f'/dynasty/{dynasty_id}/advance_turn',
+                    follow_redirects=True
+                )
             assert response.status_code == 200
 
         # Verify both dynasties advanced 5 years

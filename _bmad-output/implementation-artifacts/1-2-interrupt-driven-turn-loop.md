@@ -1,6 +1,6 @@
 # Story 1.2: Interrupt-driven turn loop
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -26,30 +26,30 @@ so that subsequent sprints (succession UI, project completion, heir-majority) ca
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add `INTERRUPT_REASONS` constant to `models/turn_processor.py` (AC1)
-  - [ ] Place it after the logger line, before `_llm_available()`
-  - [ ] 8-element list matching master plan exactly
+- [x] Task 1: Add `INTERRUPT_REASONS` constant to `models/turn_processor.py` (AC1)
+  - [x] Place it after the logger line, before `_llm_available()`
+  - [x] 8-element list matching master plan exactly
 
-- [ ] Task 2: Refactor `process_dynasty_turn` while loop (AC2, AC3, AC4, AC5)
-  - [ ] Remove `end_year = start_year + years_to_advance` pre-computation
-  - [ ] Replace `for current_year in range(start_year, end_year)` with `while years_advanced < years_to_advance and interrupt is None`
-  - [ ] Inside loop: derive `current_year = start_year + years_advanced`
-  - [ ] After monarch death in the person loop: call `process_succession` then set `interrupt = ('monarch_death', current_year)`
-  - [ ] After the while loop: `if interrupt is None: interrupt = ('quiet_period', years_advanced)`
-  - [ ] Update HistoryLogEntryDB events query to use `dynasty.current_simulation_year` as upper bound
-  - [ ] Update epic story prompt `end_year` argument to `dynasty.current_simulation_year - 1`
-  - [ ] Update `turn_summary` dict: `end_year=dynasty.current_simulation_year`, `years_advanced=years_advanced`, add `interrupt_reason=interrupt[0]`
+- [x] Task 2: Refactor `process_dynasty_turn` while loop (AC2, AC3, AC4, AC5)
+  - [x] Remove `end_year = start_year + years_to_advance` pre-computation
+  - [x] Replace `for current_year in range(start_year, end_year)` with `while years_advanced < years_to_advance and interrupt is None`
+  - [x] Inside loop: derive `current_year = start_year + years_advanced`
+  - [x] After monarch death in the person loop: call `process_succession` then set `interrupt = ('monarch_death', current_year)`
+  - [x] After the while loop: `if interrupt is None: interrupt = ('quiet_period', years_advanced)`
+  - [x] Update HistoryLogEntryDB events query to use `dynasty.current_simulation_year` as upper bound
+  - [x] Update epic story prompt `end_year` argument to `dynasty.current_simulation_year - 1`
+  - [x] Update `turn_summary` dict: `end_year=dynasty.current_simulation_year`, `years_advanced=years_advanced`, add `interrupt_reason=interrupt[0]`
 
-- [ ] Task 3: Update year-increment tests to mock death check (AC6)
-  - [ ] `tests/integration/test_game_loop.py` — `test_advance_turn_increments_year`
-  - [ ] `tests/integration/test_game_loop.py` — `test_three_turns_year_correct`
-  - [ ] `tests/functional/test_game_flow.py` — line 112–114 (advance 1 turn, assert == 1405)
-  - [ ] `tests/functional/test_game_flow.py` — line 134–141 (advance 3 more turns, assert == 1420)
-  - [ ] `tests/functional/test_game_flow.py` — line 181–194 (multi-dynasty, assert == 1405)
+- [x] Task 3: Update year-increment tests to mock death check (AC6)
+  - [x] `tests/integration/test_game_loop.py` — `test_advance_turn_increments_year`
+  - [x] `tests/integration/test_game_loop.py` — `test_three_turns_year_correct`
+  - [x] `tests/functional/test_game_flow.py` — line 112–114 (advance 1 turn, assert == 1405)
+  - [x] `tests/functional/test_game_flow.py` — line 134–141 (advance 3 more turns, assert == 1420)
+  - [x] `tests/functional/test_game_flow.py` — line 181–194 (multi-dynasty, assert == 1405)
 
-- [ ] Task 4: Run `pytest` — confirm 211 passed, 0 failed (AC6)
+- [x] Task 4: Run `pytest` — confirm 211 passed, 0 failed (AC6)
 
-- [ ] Task 5: Create feature branch, commit, push, update STATUS.md
+- [x] Task 5: Create feature branch, commit, push, update STATUS.md
 
 ## Dev Notes
 
@@ -332,6 +332,31 @@ claude-sonnet-4-6
 
 ### Debug Log References
 
+None — implementation matched the story spec exactly on first attempt.
+
 ### Completion Notes List
 
+- AC1: `INTERRUPT_REASONS` list (8 items) added after logger declaration at `models/turn_processor.py:38`
+- AC2: `for` loop replaced with `while years_advanced < years_to_advance and interrupt is None` loop
+- AC3: Monarch death sets `interrupt = ('monarch_death', current_year)` after `process_succession` fires; non-monarch deaths do not interrupt
+- AC4: `turn_summary` now has `end_year=dynasty.current_simulation_year`, `years_advanced=years_advanced` (actual), `interrupt_reason=interrupt[0]`; events query and story prompt both updated to use `dynasty.current_simulation_year` instead of pre-computed `end_year`
+- AC5: Quiet-period turns (no interrupt) still advance exactly `years_to_advance` years; `interrupt = ('quiet_period', years_advanced)` assigned after loop exits naturally
+- AC6: 5 year-assertion tests wrapped with `patch('models.turn_processor.process_death_check', return_value=False)`; `unittest.mock.patch` import added to `test_game_flow.py`; 211 tests pass, 0 fail
+- AC7: `templates/turn_report.html` and `utils/llm_prompts.py` unchanged
+
 ### File List
+
+- `models/turn_processor.py` — INTERRUPT_REASONS constant + while loop refactor
+- `tests/integration/test_game_loop.py` — year-increment tests mock death check
+- `tests/functional/test_game_flow.py` — year-assertion tests mock death check; added `from unittest.mock import patch`
+- `STATUS.md` — Task 1-2 marked done
+- `_bmad-output/implementation-artifacts/1-2-interrupt-driven-turn-loop.md` — story marked review
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — story status → review
+
+### Review Findings
+
+- [x] [Review][Patch] Missing `break` after `interrupt = ('monarch_death', ...)` — after setting interrupt and calling `continue`, the inner `for person` loop exits but the outer `while` body completes for the rest of that year's persons, risking a second `process_succession` call if the newly-crowned heir is also in `living_persons` and also dies [models/turn_processor.py:131-135]
+- [x] [Review][Patch] No test directly asserts `turn_summary['interrupt_reason']` value — AC4/AC5 have no coverage for the interrupt_reason string output; year-value assertions pass but the new key could be misspelled or wrong without detection [tests/integration/test_game_loop.py, tests/functional/test_game_flow.py]
+- [x] [Review][Defer] `years_advanced` incremented unconditionally after exception — a year whose `try` block throws still advances the clock; pre-existing behavior made explicit by the new `years_advanced` variable; no behavior change from this story — deferred, pre-existing
+- [x] [Review][Defer] `quiet_period` interrupt tuple stores count (`years_advanced`) as second element, inconsistent with `monarch_death` which stores absolute `current_year` — internal inconsistency; `interrupt[1]` not exposed in `turn_summary` so no external impact today — deferred, pre-existing
+- [x] [Review][Defer] `living_persons` snapshot excludes newly-created persons — new spouses or children created by `process_marriage_check`/`process_childbirth_check` never receive lifecycle processing in the same turn; pre-existing simulation accuracy gap — deferred, pre-existing

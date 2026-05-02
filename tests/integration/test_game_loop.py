@@ -139,10 +139,12 @@ class TestAdvanceTurn:
 
     def test_advance_turn_increments_year(self, dynasty_client, app, db):
         dynasty_id = _get_dynasty_id(app, db, 'loop_user')
-        dynasty_client.get(f'/dynasty/{dynasty_id}/advance_turn', follow_redirects=True)
+        # Patch death check so no monarch_death interrupt fires; guarantees exactly
+        # 5 years advance and keeps this assertion deterministic.
+        with patch('models.turn_processor.process_death_check', return_value=False):
+            dynasty_client.get(f'/dynasty/{dynasty_id}/advance_turn', follow_redirects=True)
         with app.app_context():
             dynasty = db.session.query(DynastyDB).get(dynasty_id)
-            # Each advance_turn call moves forward by 5 years
             assert dynasty.current_simulation_year == 1305
 
     def test_advance_turn_shows_flash(self, dynasty_client, app, db):
@@ -155,6 +157,16 @@ class TestAdvanceTurn:
         # "Chronicles" heading; on failure it shows an "Error" flash on view_dynasty.
         assert b'Chronicles' in response.data or b'Error' in response.data or b'Turn Report' in response.data
 
+    def test_advance_turn_interrupt_reason_quiet_period(self, dynasty_client, app, db):
+        dynasty_id = _get_dynasty_id(app, db, 'loop_user')
+        from models.turn_processor import process_dynasty_turn
+        with patch('models.turn_processor.process_death_check', return_value=False):
+            with app.app_context():
+                success, _message, summary = process_dynasty_turn(dynasty_id, years_to_advance=5)
+        assert success is True
+        assert summary['interrupt_reason'] == 'quiet_period'
+        assert summary['years_advanced'] == 5
+
 
 @pytest.mark.integration
 class TestAdvanceMultipleTurns:
@@ -162,10 +174,13 @@ class TestAdvanceMultipleTurns:
 
     def test_three_turns_year_correct(self, dynasty_client, app, db):
         dynasty_id = _get_dynasty_id(app, db, 'loop_user')
-        for _ in range(3):
-            dynasty_client.get(
-                f'/dynasty/{dynasty_id}/advance_turn', follow_redirects=True
-            )
+        # Patch death check so no monarch_death interrupt fires across all 3 turns;
+        # guarantees exactly 15 years advance and keeps this assertion deterministic.
+        with patch('models.turn_processor.process_death_check', return_value=False):
+            for _ in range(3):
+                dynasty_client.get(
+                    f'/dynasty/{dynasty_id}/advance_turn', follow_redirects=True
+                )
         with app.app_context():
             dynasty = db.session.query(DynastyDB).get(dynasty_id)
             # start 1300 + 3 turns × 5 years = 1315

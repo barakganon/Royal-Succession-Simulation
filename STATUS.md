@@ -1,6 +1,6 @@
 # Royal Succession Simulation - Development Status
-Last updated: 2026-05-02
-Last commit: refactor(turn-processor): import process_dynasty_turn from models, drop duplicates from blueprint
+Last updated: 2026-05-03
+Last commit: feat(turn-processor): interrupt-driven while loop + INTERRUPT_REASONS (Story 1-2)
 
 ---
 
@@ -120,15 +120,14 @@ Design: Each turn Claude (or rule-based fallback) writes one 4-6 sentence high-f
 | # | Task | Files | Status |
 |---|------|-------|--------|
 | 1-1 | Extract lifecycle functions into models/turn_processor.py | models/turn_processor.py, blueprints/dynasty.py | Done — 211 tests pass |
-| 1-2 | Interrupt-driven turn loop (monarch_death, heir_majority, etc.) | models/turn_processor.py | TODO |
+| 1-2 | Interrupt-driven turn loop (monarch_death, heir_majority, etc.) | models/turn_processor.py, tests/ | Done — 211 tests pass |
 | 1-3 | Add years_advanced + interrupt_reason to turn report UI | templates/turn_report.html | TODO |
 | 1-4 | Update Chronicle prompt to receive years_advanced + interrupt_reason | utils/llm_prompts.py | TODO |
 
-Branch: feature/turn-processor-extraction → pushed to origin ✅
-Commit 1: 6355957 feat(turn-processor): add models/turn_processor.py with extracted lifecycle functions
-Commit 2: 07c74c3 refactor(turn-processor): import process_dynasty_turn from models, drop duplicates from blueprint
+Branch: feature/turn-processor-extraction → merged to main ✅
+Branch: feature/interrupt-driven-turn-loop → in progress
 
-Tasks 1-2 through 1-4 deferred to subsequent stories.
+Tasks 1-3 and 1-4 remain (turn report UI and chronicle prompt).
 
 ## Next Steps
 | # | Task | Effort |

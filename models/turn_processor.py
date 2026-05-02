@@ -35,6 +35,17 @@ from utils.llm_prompts import build_turn_story_prompt, generate_turn_story_fallb
 
 logger = logging.getLogger('royal_succession.turn_processor')
 
+INTERRUPT_REASONS = [
+    'monarch_death',
+    'heir_majority',
+    'project_complete',
+    'war_declared',
+    'attack_received',
+    'major_world_event',
+    'story_moment',
+    'quiet_period',
+]
+
 
 # ---------------------------------------------------------------------------
 # LLM availability — resolved lazily so this module does not depend on Flask
@@ -98,11 +109,13 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
         death_year=None
     ).first()
 
-    # Process each year
+    # Process each year — interrupt-driven loop (Sprint 1)
     start_year = dynasty.current_simulation_year
-    end_year = start_year + years_to_advance
+    interrupt = None
+    years_advanced = 0
 
-    for current_year in range(start_year, end_year):
+    while years_advanced < years_to_advance and interrupt is None:
+        current_year = start_year + years_advanced
         try:
             # Process world events
             process_world_events(dynasty, current_year, theme_config)
@@ -118,6 +131,8 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
                     # Person died, check if they were the monarch
                     if person.is_monarch:
                         process_succession(dynasty, person, current_year, theme_config)
+                        interrupt = ('monarch_death', current_year)
+                        break  # exit person loop; prevents double-succession if heir also in living_persons
                     continue
 
                 # Process marriage for unmarried nobles
@@ -134,8 +149,11 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
             logger.error(f"Error processing year {current_year} for dynasty {dynasty_id}: {year_exc}", exc_info=True)
             # Continue to next year rather than aborting entire turn
 
-        # Update dynasty's current year
+        years_advanced += 1
         dynasty.current_simulation_year = current_year + 1
+
+    if interrupt is None:
+        interrupt = ('quiet_period', years_advanced)
 
     # Generate family tree visualization
     try:
@@ -161,7 +179,7 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
     new_events = HistoryLogEntryDB.query.filter(
         HistoryLogEntryDB.dynasty_id == dynasty_id,
         HistoryLogEntryDB.year >= start_year,
-        HistoryLogEntryDB.year < end_year
+        HistoryLogEntryDB.year < dynasty.current_simulation_year
     ).order_by(HistoryLogEntryDB.year).all()
 
     # --- Epic Story Generation (one paragraph per turn) ---
@@ -186,7 +204,7 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
                     prompt = build_turn_story_prompt(
                         dynasty_name=dynasty.name,
                         start_year=start_year,
-                        end_year=end_year - 1,
+                        end_year=dynasty.current_simulation_year - 1,
                         events=event_texts,
                         monarch_name=monarch_display,
                         existing_story=existing_story,
@@ -200,7 +218,7 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
                 new_paragraph = ""
         if not new_paragraph:
             new_paragraph = generate_turn_story_fallback(
-                dynasty.name, start_year, end_year - 1, event_texts, monarch_display
+                dynasty.name, start_year, dynasty.current_simulation_year - 1, event_texts, monarch_display
             )
         if new_paragraph:
             separator = "\n\n" if existing_story.strip() else ""
@@ -215,8 +233,9 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
 
     turn_summary = {
         'start_year': start_year,
-        'end_year': end_year,
-        'years_advanced': years_to_advance,
+        'end_year': dynasty.current_simulation_year,
+        'years_advanced': years_advanced,
+        'interrupt_reason': interrupt[0],
         'events': [
             {
                 'type': e.event_type or 'event',
@@ -230,7 +249,7 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
         'new_story_paragraph': new_paragraph,
     }
 
-    return True, f"Advanced {years_to_advance} years from {start_year} to {end_year}.", turn_summary
+    return True, f"Advanced {years_advanced} years from {start_year} to {dynasty.current_simulation_year}.", turn_summary
 
 
 # ===========================================================================
