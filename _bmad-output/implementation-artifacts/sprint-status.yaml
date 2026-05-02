@@ -1,0 +1,381 @@
+# generated: 2026-05-02
+# last_updated: 2026-05-02
+# project: Royal-Succession-Simulation
+# project_key: RSS
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+#
+# SOURCE OF TRUTH: review_documents/8_master_plan_2026.md
+# (supersedes CLAUDE.md sprints 8-10 "polish" plan)
+# Legacy pre-master-plan tasks (10C espionage, 10D TTS) captured in epic-L below.
+#
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in the source doc
+#   - ready-for-dev: Story file created in implementation_artifacts/
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review
+#   - done: Story completed and merged
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories should be worked in sequence within an epic (each story informs the next)
+# - Sprints 1-4 are tightly coupled (foundation phase) — ship together before 5+
+# - Each story should have a corresponding file: {story_key}.md in story_location
+
+generated: 2026-05-02
+last_updated: 2026-05-03
+project: Royal-Succession-Simulation
+project_key: RSS
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+
+  # ── EPIC 1: Turn Cadence Rework (Sprint 1) ─────────────────────────────────
+  # Goal: Variable turn length, interrupt-driven. Unlocks all subsequent sprints.
+  epic-1: in-progress
+
+  # Story 1-1: Extract lifecycle logic into models/turn_processor.py
+  # File: sprint01-task01-turn-processor-extraction.md (naming pre-dates this tracker)
+  # Branch: feature/turn-processor-extraction → merged to main 2026-05-02
+  1-1-turn-processor-extraction: done
+
+  # Story 1-2: Interrupt-driven turn loop
+  # Implement INTERRUPT_REASONS, make process_dynasty_turn loop until interrupt,
+  # each lifecycle function returns Optional[Interrupt] instead of bool.
+  1-2-interrupt-driven-turn-loop: ready-for-dev
+
+  # Story 1-3: Turn report UI update
+  # Show interrupt.reason prominently, display "N years passed" in turn_report.html,
+  # visually distinguish 4 interrupt classes (death / completion / war / quiet).
+  1-3-turn-report-interrupt-ui: backlog
+
+  # Story 1-4: Chronicle prompt update
+  # build_turn_story_prompt receives years_advanced + interrupt_reason so the
+  # narrative can pace itself ("five quiet years" vs "a year of crisis").
+  1-4-chronicle-prompt-years-and-interrupt: backlog
+
+  epic-1-retrospective: optional
+
+  # ── EPIC 2: Project Model (Sprint 2) ───────────────────────────────────────
+  # Goal: Multi-year projects replace instant actions. Three project slots replace 3 AP.
+  epic-2: backlog
+
+  # Story 2-1: Project DB model + migration
+  # Add Project table (db_models.py), DynastyDB.projects relationship, migration in
+  # db_initialization.py. Fields: project_type, target_*, params_json, started_year,
+  # completion_year, yearly costs, status, initiated_by / completed_by monarch FKs.
+  2-1-project-db-model: backlog
+
+  # Story 2-2: project_system.py core logic
+  # start_project(), tick_projects() (drain yearly cost → stalled interrupt),
+  # complete_project() (apply effect), cancel_project() (50% refund),
+  # get_active_projects(). Full project-type catalogue with durations.
+  2-2-project-system-logic: backlog
+
+  # Story 2-3: Wire projects into turn processor + migrate submit_actions
+  # tick_projects runs before lifecycle each year; migrate 6 submit_actions action
+  # types into project-starter dispatchers; replace Building.is_under_construction
+  # machinery with active Project of type build_*.
+  2-3-wire-projects-and-migrate-actions: backlog
+
+  # Story 2-4: Multi-generation chronicle hook
+  # When project completes under different monarch than started it, generate
+  # chronicle line: "What [original] began, [current] finished — the [name] stands."
+  2-4-multi-generation-story-hook: backlog
+
+  epic-2-retrospective: optional
+
+  # ── EPIC 3: Map as Main View (Sprint 3) ────────────────────────────────────
+  # Goal: world_map.html becomes the single play surface. Kill action_phase.html.
+  epic-3: backlog
+
+  # Story 3-1: Rebuild world_map.html side panels
+  # Audit existing world_map.html canvas + tooltip code; implement left rail (60px
+  # icon strip: CoA, resources, 3 project slots, monarch portrait, chronicle/world/war
+  # buttons); stub right detail panel as slide-in <aside>.
+  3-1-world-map-panel-rebuild: backlog
+
+  # Story 3-2: Right-click context menu + cost-preview submenu
+  # Vanilla JS right-click on hex → context menu with territory name + actions;
+  # submenus show project type, duration, and resource cost preview before commit.
+  3-2-right-click-context-menu: backlog
+
+  # Story 3-3: Right detail panel + GeoJSON upgrade
+  # Conditional templates per entity (territory / project slot / monarch portrait);
+  # update /game/<id>/map.geojson to include per-hex building list, garrison summary,
+  # active project; add overlay modes (threats, projects) to canvas renderer.
+  3-3-detail-panel-and-geojson: backlog
+
+  # Story 3-4: Border drawing + pan/zoom + overlay tabs
+  # Thicker ink-style strokes between hexes of different controller_dynasty_id;
+  # canvas transform-matrix pan/zoom (middle-drag, scroll, double-click re-centre);
+  # overlay tab switcher (terrain / armies / threats / projects).
+  3-4-borders-panzoom-overlays: backlog
+
+  # Story 3-5: Animated turn pass + routing + delete action_phase
+  # On End Turn click: fetch turn summary, play events as toasts with delays before
+  # redirecting; redirect auth.dashboard → world_map for users with active dynasty;
+  # delete templates/action_phase.html + action_phase route (→ 404).
+  3-5-animated-turn-routing-cleanup: backlog
+
+  epic-3-retrospective: optional
+
+  # ── EPIC 4: Free Actions Split (Sprint 4) ──────────────────────────────────
+  # Goal: Distinguish decisions (instant) from commitments (project, slot-consuming).
+  epic-4: backlog
+
+  # Story 4-1: free_action endpoint + dispatcher
+  # POST /dynasty/<id>/free_action with action_type + params; validate, apply, append
+  # chronicle line; does NOT tick the turn. Implement: declare_war, propose_treaty,
+  # send_envoy, issue_ultimatum, name_heir, adopt_succession_law, hold_feast,
+  # hold_tournament, pardon_vassal.
+  4-1-free-action-endpoint: backlog
+
+  # Story 4-2: LLM flavor lines + right-click menu integration
+  # Each free action triggers a flavor line (LLM or fallback); surface free actions
+  # in right-click menus separated visually from project actions; allow undo before
+  # End Turn is clicked.
+  4-2-free-action-llm-and-ui: backlog
+
+  epic-4-retrospective: optional
+
+  # ── EPIC 5: Generational Interrupts + Succession Drama (Sprint 5) ──────────
+  # Goal: Monarch death stops the world. Player chooses heir. Pretenders exist.
+  epic-5: backlog
+
+  # Story 5-1: Monarch death interrupt + succession UI
+  # monarch_death interrupt halts turn loop at year of death; build
+  # /dynasty/<id>/succession_choice POST endpoint; succession modal template showing
+  # candidate portraits, traits, and default heir designation.
+  5-1-monarch-death-interrupt-and-ui: backlog
+
+  # Story 5-2: LLM succession candidate cards
+  # build_succession_card_prompt(candidate, monarch, recent_events) → 3-sentence
+  # flavor per candidate; fallback templates using traits; coronation chronicle entry
+  # after choice is made.
+  5-2-succession-candidate-llm-cards: backlog
+
+  # Story 5-3: Pretender mechanics
+  # Add is_pretender + pretender_strength to PersonDB (migration); pretender
+  # accumulation logic in lifecycle tick; choosing non-default heir flags bypassed
+  # candidate as pretender.
+  5-3-pretender-mechanics: backlog
+
+  # Story 5-4: Civil war + heir-of-age interrupts
+  # civil_war interrupt type (modal: fight / negotiate / abdicate) when pretender
+  # support crosses threshold; heir_majority interrupt fires once per character at
+  # age 16 with one free-action opportunity (tracks has_seen_majority on PersonDB).
+  5-4-civil-war-and-heir-majority: backlog
+
+  epic-5-retrospective: optional
+
+  # ── EPIC 6: Traits and Buildings Actually Matter (Sprint 6) ────────────────
+  # Goal: Wire trait/building systems so they affect mechanical outcomes.
+  epic-6: backlog
+
+  # Story 6-1: trait_effects.py + hook into subsystems
+  # models/trait_effects.py with 8-trait modifier map (Brave, Craven, Cunning, Wroth,
+  # Patient, Sickly, Pious, Greedy); hook into MilitarySystem.resolve_battle,
+  # EconomySystem tax tick, DiplomacySystem acceptance.
+  6-1-trait-effects-system: backlog
+
+  # Story 6-2: Building gates + lifespan + trait inheritance
+  # Lock recruit-project starts behind building check (Stables → cavalry, Barracks →
+  # heavy infantry); apply Sickly -50% lifespan in process_death_check; trait
+  # inheritance in process_childbirth_check (~30% per-parent, cap 3, +1 random).
+  6-2-building-gates-and-trait-lifecycle: backlog
+
+  # Story 6-3: Chronicle voice + trait documentation
+  # build_chronicle_prompt receives active monarch's traits so narrative voice
+  # reflects them; surface traits in template tooltips; docs/traits.md player-facing.
+  6-3-chronicle-trait-voice: backlog
+
+  epic-6-retrospective: optional
+
+  # ── EPIC 7: Dynastic Marriages (Sprint 7) ──────────────────────────────────
+  # Goal: Marriages become political instruments between actual dynasties.
+  epic-7: backlog
+
+  # Story 7-1: Marriage negotiation model + cross-dynasty matching
+  # Add MarriageOffer model or marriage_negotiation project type; replace
+  # stranger-generation in process_marriage_check with cross-dynasty search first,
+  # stranger fallback only if no candidates.
+  7-1-cross-dynasty-marriage-model: backlog
+
+  # Story 7-2: AI acceptance + wedding chronicle
+  # AIController.decide_marriage_response (prestige, relations, religion, traits);
+  # on acceptance: relations +30, alliance pull; LLM-narrated wedding chronicle
+  # entry using both spouse traits.
+  7-2-ai-marriage-acceptance-and-chronicle: backlog
+
+  # Story 7-3: Children-with-claims + UI
+  # Register Claim row when cross-dynasty child born (claim on maternal dynasty);
+  # right-click on foreign character → "Propose marriage to my [son/daughter]".
+  7-3-children-claims-and-ui: backlog
+
+  epic-7-retrospective: optional
+
+  # ── EPIC 8: Family Tree Replacement (Sprint 8) ─────────────────────────────
+  # Goal: Replace matplotlib PNG with interactive dark-themed SVG family tree.
+  epic-8: backlog
+
+  # Story 8-1: family_tree_svg.py renderer + DynastyDB column
+  # visualization/family_tree_svg.py with Reingold-Tilford layout; BFS generation
+  # assignment; node = portrait + name + dates + crown; edges: solid parent-child,
+  # double marriage, dashed cross-dynasty; parchment color palette.
+  # Add family_tree_svg TEXT column to DynastyDB (migration).
+  8-1-family-tree-svg-renderer: backlog
+
+  # Story 8-2: SVG interactivity
+  # Pan/zoom JS (~50 LoC vanilla); hover tooltip with full character info;
+  # "Show deceased" toggle (default ON); "Highlight bloodline" on click;
+  # search box jump-to-node.
+  8-2-family-tree-interactivity: backlog
+
+  # Story 8-3: Delete matplotlib + integrate into templates
+  # Delete visualization/plotter.py; delete visualizations/family_tree_*.png (all
+  # 99 files); add visualizations/*.png to .gitignore; update view_dynasty.html to
+  # render dynasty.family_tree_svg inline with `| safe`.
+  8-3-delete-matplotlib-and-integrate: backlog
+
+  epic-8-retrospective: optional
+
+  # ── EPIC 9: LLM Storytelling Spine (Sprint 9) ──────────────────────────────
+  # Goal: LLM as connective tissue across all events. Names → characters, numbers → stakes.
+  epic-9: backlog
+
+  # Story 9-1: Event flavor prompt builders
+  # Add 7 prompt builders to utils/llm_prompts.py (each with deterministic fallback):
+  # build_birth_flavor_prompt, build_death_flavor_prompt, build_battle_flavor_prompt,
+  # build_world_news_prompt, build_succession_card_prompt, build_coronation_prompt,
+  # build_construction_complete_prompt. Token budgets: 50-120 each.
+  9-1-event-flavor-prompt-builders: backlog
+
+  # Story 9-2: Wire flavor calls into lifecycle functions
+  # Each lifecycle function in turn_processor.py calls the relevant flavor prompt
+  # immediately after the mechanical event; result stored as event_string on
+  # HistoryLogEntryDB. Fallback fires if LLM unavailable or times out (>3s).
+  9-2-lifecycle-flavor-wiring: backlog
+
+  # Story 9-3: World news + async LLM calls
+  # When AI dynasty does something significant, generate "letter from the east"
+  # entry on player's chronicle; async background thread for turns with 5+ LLM calls;
+  # per-event calls must not block the turn.
+  9-3-world-news-and-async-llm: backlog
+
+  epic-9-retrospective: optional
+
+  # ── EPIC 10: Story Moment Events (Sprint 10) ───────────────────────────────
+  # Goal: Occasional branching narrative vignettes with 2-3 player choices.
+  # Depends on: Epic 6 (traits matter), Epic 9 (LLM hooked in).
+  epic-10: backlog
+
+  # Story 10-1: Story moment template library
+  # models/story_moments.py with 8 templates (forbidden_love, council_whispers,
+  # dueling_lords, bonds_of_kin, fading_heir, letter_from_east, etc.);
+  # STORY_MOMENT_TEMPLATES list with preconditions, mechanical_choices, effects dicts;
+  # maybe_trigger_story_moment(dynasty_state) with 5% base + state weighting.
+  10-1-story-moment-templates: backlog
+
+  # Story 10-2: Story moment interrupt + modal template
+  # story_moment interrupt in turn_processor; LLM prompt builder for prose generation
+  # per template (receives monarch traits, relationships, recent events, choices);
+  # templates/story_moment.html full-screen modal with prose + 3 choice cards.
+  10-2-story-moment-interrupt-and-modal: backlog
+
+  # Story 10-3: Effect applicator + chronicle integration
+  # Effect applicator mutates dynasty state per chosen choice (trait add, relation
+  # delta, prestige, exile, etc.); each chosen choice creates a chronicle entry with
+  # LLM prose + choice description; 5-turn cooldown between story moments.
+  10-3-effect-applicator-and-cooldown: backlog
+
+  epic-10-retrospective: optional
+
+  # ── EPIC 11: Code Cleanup (Sprint 11) ──────────────────────────────────────
+  # Goal: Pay down all technical debt from sprints 1-10.
+  # Note: This sprint is also where deferred-work.md items land.
+  epic-11: backlog
+
+  # Story 11-1: Delete dead code
+  # simulation_engine.py.bak, models/economy.py, models/person.py, models/family_tree.py
+  # (after Sprint 8), visualization/plotter.py (after Sprint 8), templates/action_phase.html
+  # (after Sprint 3), all 99 visualizations/family_tree_*.png, cookies.txt, flask_app.log.
+  # Two dead placeholder routes in blueprints/map.py.
+  11-1-delete-dead-code: backlog
+
+  # Story 11-2: Flask-Migrate / Alembic adoption
+  # Replace ad-hoc ALTER TABLE in db_initialization.py with Alembic; initial migration
+  # captures current schema; document migration workflow in CLAUDE.md.
+  11-2-flask-migrate-alembic: backlog
+
+  # Story 11-3: Performance optimizations
+  # joinedload for PersonDB relationships in turn_processor (N+1 kill);
+  # cache theme_config per dynasty in app.config; index HistoryLogEntryDB(dynasty_id, year);
+  # index Project(dynasty_id, status, completion_year).
+  11-3-performance-optimizations: backlog
+
+  # Story 11-4: Logging + SQLAlchemy warnings
+  # RotatingFileHandler (5MB, 3 backups); replace remaining print() with logger.*;
+  # conditional atexit handler (skip in pytest); switch .query.get(id) → session.get();
+  # datetime.utcnow() → datetime.now(UTC). Target: <50 warnings.
+  11-4-logging-and-warnings: backlog
+
+  epic-11-retrospective: optional
+
+  # ── EPIC 12: Compile the Chronicle (Sprint 12) ─────────────────────────────
+  # Goal: Stitch dynasty saga into a publishable Chronicle the player wants to keep.
+  # Depends on: Epic 9 (narrative events accumulated).
+  epic-12: backlog
+
+  # Story 12-1: chronicle_compiler.py
+  # models/chronicle_compiler.py with compile_chronicle(dynasty_id); highlight
+  # selection algorithm (top events by importance score); group paragraphs into
+  # chapters by reigning monarch; ChronicleBook dataclass.
+  12-1-chronicle-compiler: backlog
+
+  # Story 12-2: Foreword + epilogue prompts
+  # build_foreword_prompt(dynasty, first_3_paragraphs) → 200 tokens;
+  # build_epilogue_prompt(dynasty, last_5_paragraphs, current_state) → 200 tokens;
+  # both in utils/llm_prompts.py with deterministic fallbacks.
+  12-2-foreword-epilogue-prompts: backlog
+
+  # Story 12-3: Chronicle book template + PDF export
+  # templates/chronicle_book.html paginated reader; PDF export route using pdf skill;
+  # family_tree_svg embedded in book; coat_of_arms_svg embedded;
+  # "Compile Chronicle" button on left rail (always available, not end-game only).
+  12-3-chronicle-book-and-pdf: backlog
+
+  epic-12-retrospective: optional
+
+  # ── EPIC L: Legacy Polish (pre-master-plan, from old CLAUDE.md Sprint 10) ──
+  # These tasks predate the master plan. They are independent of Epics 1-12 and
+  # can be worked at any time. 10A (chronicles panel) and 10B (banking) are done.
+  epic-L: in-progress
+
+  # Story L-1: Espionage system (old 10C)
+  # new models/espionage_system.py, blueprints/espionage.py, espionage template.
+  # Spy missions: assassinate, sabotage, intel gathering.
+  L-1-espionage-system: backlog
+
+  # Story L-2: ElevenLabs TTS narrator (old 10D)
+  # utils/tts_narrator.py; requires ELEVENLABS_API_KEY; wire into turn_report.
+  L-2-elevenlabs-tts-narrator: backlog
+
+  epic-L-retrospective: optional
