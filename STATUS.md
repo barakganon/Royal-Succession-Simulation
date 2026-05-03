@@ -1,11 +1,11 @@
 # Royal Succession Simulation - Development Status
 Last updated: 2026-05-03
-Last commit: feat(turn-processor): interrupt-driven while loop + INTERRUPT_REASONS (Story 1-2)
+Last commit: feat(turn-report): interrupt banner + years-passed stat (Story 1-3)
 
 ---
 
 ## Current State
-**Tests:** 211 passed · 0 skipped · 0 failed
+**Tests:** 212 passed · 0 skipped · 0 failed
 **App:** imports cleanly, all 6 blueprints registered
 **main_flask_app.py:** 290 lines — app setup + blueprint registration only
 
@@ -121,13 +121,14 @@ Design: Each turn Claude (or rule-based fallback) writes one 4-6 sentence high-f
 |---|------|-------|--------|
 | 1-1 | Extract lifecycle functions into models/turn_processor.py | models/turn_processor.py, blueprints/dynasty.py | Done — 211 tests pass |
 | 1-2 | Interrupt-driven turn loop (monarch_death, heir_majority, etc.) | models/turn_processor.py, tests/ | Done — 211 tests pass |
-| 1-3 | Add years_advanced + interrupt_reason to turn report UI | templates/turn_report.html | TODO |
+| 1-3 | Add years_advanced + interrupt_reason to turn report UI | templates/turn_report.html | Done — 212 tests pass |
 | 1-4 | Update Chronicle prompt to receive years_advanced + interrupt_reason | utils/llm_prompts.py | TODO |
 
 Branch: feature/turn-processor-extraction → merged to main ✅
-Branch: feature/interrupt-driven-turn-loop → in progress
+Branch: feature/interrupt-driven-turn-loop → merged to main ✅
+Branch: feature/turn-report-interrupt-ui → in progress
 
-Tasks 1-3 and 1-4 remain (turn report UI and chronicle prompt).
+Task 1-4 remains (chronicle prompt update).
 
 ## Next Steps
 | # | Task | Effort |
