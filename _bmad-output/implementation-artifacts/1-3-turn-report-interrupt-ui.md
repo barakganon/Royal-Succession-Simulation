@@ -1,6 +1,6 @@
 # Story 1-3: Turn Report Interrupt UI
 
-Status: review
+Status: done
 
 ## Story
 
@@ -234,3 +234,9 @@ claude-sonnet-4-6
 - `STATUS.md` — Story 1-3 marked done, test count updated to 212
 - `_bmad-output/implementation-artifacts/1-3-turn-report-interrupt-ui.md` — tasks checked, status → review
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` — story 1-3 status → review
+
+### Review Findings
+
+- [x] [Review][Defer] `alert-warning` (yellow/amber) used for war/attack banner instead of orange — AC3 says "Orange background" but Dev Notes explicitly specify `alert-warning`; internal spec contradiction resolved in favor of Dev Notes; can tint to orange via inline style in Sprint 11 polish [templates/turn_report.html:31] — deferred, spec contradiction
+- [x] [Review][Defer] Unknown INTERRUPT_REASONS (`heir_majority`, `major_world_event`, `story_moment`) fall into the `{% else %}` quiet_period branch with misleading banner text — not a current bug (none of these fire in Sprint 1), but future sprint wiring needs corresponding banner branches [templates/turn_report.html:34-38] — deferred, future sprint concern
+- [x] [Review][Defer] `summary.years_advanced | default(5)` evaluated twice in the pluralisation expression — purely cosmetic; could use `{% set yrs = ... %}` once; no incorrect output in practice [templates/turn_report.html:37] — deferred, cosmetic
