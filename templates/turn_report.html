@@ -16,6 +16,32 @@
       The Years {{ summary.start_year }} — {{ summary.end_year }}
     </p>
     <hr class="section-divider">
+
+    {# ── Interrupt banner ── #}
+    {% set reason = summary.interrupt_reason | default('quiet_period') %}
+    {% if reason == 'monarch_death' %}
+      {% set banner_class = 'alert-danger' %}
+      {% set banner_icon = '&#9760;' %}
+      {% set banner_text = 'Your monarch has died — a new reign begins' %}
+    {% elif reason == 'project_complete' %}
+      {% set banner_class = 'alert-success' %}
+      {% set banner_icon = '&#10003;' %}
+      {% set banner_text = 'A great work has been completed' %}
+    {% elif reason == 'war_declared' or reason == 'attack_received' %}
+      {% set banner_class = 'alert-warning' %}
+      {% set banner_icon = '&#9876;' %}
+      {% set banner_text = 'War has come to your realm' %}
+    {% else %}
+      {% set banner_class = 'alert-secondary' %}
+      {% set banner_icon = '&#128375;' %}
+      {% set banner_text = (summary.years_advanced | default(5)) ~ ' quiet year' ~ ('s' if (summary.years_advanced | default(5)) != 1 else '') ~ ' passed without incident' %}
+    {% endif %}
+    <div class="alert {{ banner_class }} text-center mb-0" role="alert"
+         style="font-family:'Cinzel',serif;font-size:1.05rem;border-radius:6px;">
+      <span style="font-size:1.3rem;margin-right:.5rem;">{{ banner_icon | safe }}</span>
+      {{ banner_text }}
+    </div>
+
   </div>
 
   <!-- ── Summary stat row ── -->
@@ -40,8 +66,8 @@
     </div>
     <div class="col-6 col-md-3">
       <div class="turn-report-stat">
-        <div class="turn-stat-value">{{ dynasty.current_simulation_year }}</div>
-        <div class="turn-stat-label">Current Year</div>
+        <div class="turn-stat-value">{{ summary.years_advanced | default(5) }}</div>
+        <div class="turn-stat-label">Years Passed</div>
       </div>
     </div>
   </div>
