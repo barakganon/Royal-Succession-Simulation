@@ -18,5 +18,10 @@ static/visualizations/
 # OS files
 .DS_Store
 
+# Environment variables (secrets)
+.env
+.env.local
+.env.*.local
+
 # Claude internal
 .claude/worktrees/
