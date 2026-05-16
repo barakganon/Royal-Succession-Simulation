@@ -16,7 +16,7 @@ from models.db_models import (
     db, User, DynastyDB, PersonDB, HistoryLogEntryDB, Territory, Region, Province,
     MilitaryUnit, UnitType, Army, Battle, Siege, War, DiplomaticRelation, Treaty, TreatyType,
     Resource, ResourceType, TerritoryResource, Building, BuildingType, Settlement,
-    TradeRoute, ChronicleEntryDB
+    TradeRoute, ChronicleEntryDB, Project
 )
 
 class DatabaseInitializer:
@@ -153,6 +153,10 @@ class DatabaseInitializer:
                     from models.db_models import Loan
                     Loan.__table__.create(db.engine, checkfirst=True)
                     self.logger.info("Created loan table.")
+                # Create project table if missing (Sprint 2 Project model)
+                if 'project' not in inspector.get_table_names():
+                    Project.__table__.create(db.engine, checkfirst=True)
+                    self.logger.info("Created project table.")
 
         except Exception as e:
             self.logger.error(f"Error creating tables: {str(e)}")
