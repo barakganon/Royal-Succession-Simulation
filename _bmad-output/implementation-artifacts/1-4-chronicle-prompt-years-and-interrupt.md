@@ -1,6 +1,6 @@
 # Story 1-4: Chronicle Prompt Update
 
-Status: review
+Status: done
 
 ## Story
 
