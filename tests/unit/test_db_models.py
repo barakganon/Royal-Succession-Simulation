@@ -2,9 +2,48 @@
 import pytest
 import datetime
 from models.db_models import (
-    User, DynastyDB, PersonDB, HistoryLogEntryDB, 
-    Territory, Province, Region, TerrainType
+    User, DynastyDB, PersonDB, HistoryLogEntryDB,
+    Territory, Province, Region, TerrainType,
+    Project,
 )
+
+
+import uuid
+
+
+def _make_user_and_dynasty(session, name='Test Dynasty', year=1300):
+    suffix = uuid.uuid4().hex[:8]
+    slug = name.lower().replace(' ', '_')
+    user = User(username=f"u_{slug}_{suffix}", email=f"{slug}+{suffix}@x.test")
+    user.set_password("password123")
+    session.add(user)
+    session.commit()
+    dynasty = DynastyDB(
+        user_id=user.id,
+        name=name,
+        theme_identifier_or_json="medieval_europe",
+        start_year=year,
+        current_simulation_year=year,
+    )
+    session.add(dynasty)
+    session.commit()
+    return user, dynasty
+
+
+def _make_monarch(session, dynasty, name='Aldric I', birth_year=1270):
+    person = PersonDB(
+        dynasty_id=dynasty.id,
+        name=name.split(' ')[0],
+        surname=dynasty.name,
+        gender='MALE',
+        birth_year=birth_year,
+        is_noble=True,
+        is_monarch=True,
+        reign_start_year=dynasty.start_year,
+    )
+    session.add(person)
+    session.commit()
+    return person
 
 
 @pytest.mark.unit
@@ -372,3 +411,175 @@ class TestTerritoryModel:
         assert territory in dynasty.controlled_territories
         assert dynasty.capital_territory_id == territory.id
         assert dynasty.capital.name == "Rouen"
+
+
+@pytest.mark.unit
+@pytest.mark.model
+class TestProjectModel:
+    """Unit tests for the Project model (Sprint 2 — Project DB model)."""
+
+    def test_project_creation_defaults(self, session):
+        _, dynasty = _make_user_and_dynasty(session)
+        monarch = _make_monarch(session, dynasty)
+        project = Project(
+            dynasty_id=dynasty.id,
+            project_type='build_walls',
+            started_year=1300,
+            completion_year=1305,
+            initiated_by_monarch_id=monarch.id,
+        )
+        session.add(project)
+        session.commit()
+        saved = session.query(Project).filter_by(id=project.id).first()
+        assert saved is not None
+        assert saved.status == 'active'
+        assert saved.yearly_cost_gold == 0
+        assert saved.yearly_cost_food == 0
+        assert saved.yearly_cost_iron == 0
+        assert saved.yearly_cost_timber == 0
+        assert saved.completed_by_monarch_id is None
+        assert saved.target_territory_id is None
+        assert saved.target_dynasty_id is None
+        assert saved.target_person_id is None
+        assert saved.params_json is None
+
+    def test_dynasty_projects_relationship_disambiguation(self, session):
+        _, dynasty_a = _make_user_and_dynasty(session, name='Anjou')
+        _, dynasty_b = _make_user_and_dynasty(session, name='Bourbon')
+        mon_a = _make_monarch(session, dynasty_a, name='Aldric I')
+        mon_b = _make_monarch(session, dynasty_b, name='Bertrand I')
+        p_a = Project(
+            dynasty_id=dynasty_a.id, project_type='build_farm',
+            started_year=1300, completion_year=1302,
+            initiated_by_monarch_id=mon_a.id,
+        )
+        p_b = Project(
+            dynasty_id=dynasty_b.id, project_type='build_walls',
+            started_year=1300, completion_year=1305,
+            initiated_by_monarch_id=mon_b.id,
+        )
+        p_envoy = Project(
+            dynasty_id=dynasty_a.id, target_dynasty_id=dynasty_b.id,
+            project_type='envoy_mission', started_year=1301, completion_year=1302,
+            initiated_by_monarch_id=mon_a.id,
+        )
+        session.add_all([p_a, p_b, p_envoy])
+        session.commit()
+        a_projects = dynasty_a.projects.all()
+        b_projects = dynasty_b.projects.all()
+        assert {p.id for p in a_projects} == {p_a.id, p_envoy.id}
+        assert {p.id for p in b_projects} == {p_b.id}
+
+    def test_params_json_roundtrip(self, session):
+        _, dynasty = _make_user_and_dynasty(session)
+        mon = _make_monarch(session, dynasty)
+        project = Project(
+            dynasty_id=dynasty.id, project_type='recruit_unit',
+            started_year=1300, completion_year=1301,
+            initiated_by_monarch_id=mon.id,
+        )
+        project.set_params({'unit_type': 'cavalry', 'count': 50})
+        session.add(project)
+        session.commit()
+        reloaded = session.query(Project).filter_by(id=project.id).first()
+        assert reloaded.get_params() == {'unit_type': 'cavalry', 'count': 50}
+
+    def test_params_json_empty_dict_when_unset(self, session):
+        _, dynasty = _make_user_and_dynasty(session)
+        mon = _make_monarch(session, dynasty)
+        project = Project(
+            dynasty_id=dynasty.id, project_type='envoy_mission',
+            started_year=1300, completion_year=1301,
+            initiated_by_monarch_id=mon.id,
+        )
+        session.add(project)
+        session.commit()
+        assert project.get_params() == {}
+
+    def test_delete_dynasty_cascades_to_projects(self, session):
+        _, dynasty = _make_user_and_dynasty(session)
+        mon = _make_monarch(session, dynasty)
+        project = Project(
+            dynasty_id=dynasty.id, project_type='build_market',
+            started_year=1300, completion_year=1303,
+            initiated_by_monarch_id=mon.id,
+        )
+        session.add(project)
+        session.commit()
+        project_id = project.id
+        session.delete(dynasty)
+        session.commit()
+        assert session.query(Project).filter_by(id=project_id).first() is None
+
+    def test_project_repr(self, session):
+        _, dynasty = _make_user_and_dynasty(session)
+        mon = _make_monarch(session, dynasty)
+        project = Project(
+            dynasty_id=dynasty.id, project_type='build_cathedral',
+            started_year=1300, completion_year=1315,
+            initiated_by_monarch_id=mon.id,
+        )
+        session.add(project)
+        session.commit()
+        assert repr(project) == (
+            f"<Project 'build_cathedral' (ID: {project.id}, "
+            f"Dynasty: {dynasty.id}, Status: active)>"
+        )
+
+    def test_initiated_by_monarch_id_is_required(self, session):
+        # AC2 / AC4: initiated_by_monarch_id is NOT NULL — every project must
+        # be attributed to a monarch at start time (the chronicle hook needs it).
+        from sqlalchemy.exc import IntegrityError
+        _, dynasty = _make_user_and_dynasty(session)
+        bad = Project(
+            dynasty_id=dynasty.id, project_type='build_walls',
+            started_year=1300, completion_year=1305,
+            # NB: initiated_by_monarch_id intentionally omitted
+        )
+        session.add(bad)
+        with pytest.raises(IntegrityError):
+            session.commit()
+        session.rollback()
+
+    def test_all_five_foreign_keys_declared(self, session):
+        # AC6: confirms all five FKs are declared in the schema so the
+        # underlying DB engine (Postgres in prod) will reject orphans. SQLite
+        # ships with FK enforcement off by default; flipping it on at runtime
+        # here would leak into other tests' teardown, so we assert the static
+        # constraint definitions instead.
+        cols = Project.__table__.columns
+        fk_targets = {
+            'dynasty_id': 'dynasty.id',
+            'target_dynasty_id': 'dynasty.id',
+            'target_territory_id': 'territory.id',
+            'target_person_id': 'person_db.id',
+            'initiated_by_monarch_id': 'person_db.id',
+            'completed_by_monarch_id': 'person_db.id',
+        }
+        for col_name, target in fk_targets.items():
+            col = cols[col_name]
+            assert col.foreign_keys, f"{col_name} should declare a FK"
+            fk = next(iter(col.foreign_keys))
+            assert str(fk.target_fullname) == target, (
+                f"{col_name} should target {target}, got {fk.target_fullname}"
+            )
+
+    def test_project_table_created_by_db_initializer(self, app, session):
+        # AC5 / Task 4 final subtask: verify that DatabaseInitializer's
+        # _create_tables_if_not_exist migration guard actually fires when the
+        # 'project' table is missing. We drop the table from the in-memory
+        # DB, run the initializer, and assert it was recreated.
+        from sqlalchemy import inspect
+        from models.db_models import db, Project
+        from models.db_initialization import DatabaseInitializer
+
+        # drop the project table, then re-run the initializer
+        Project.__table__.drop(db.engine, checkfirst=True)
+        inspector = inspect(db.engine)
+        assert 'project' not in inspector.get_table_names()
+
+        initializer = DatabaseInitializer(app)
+        initializer._create_tables_if_not_exist()
+
+        inspector = inspect(db.engine)
+        assert 'project' in inspector.get_table_names()
