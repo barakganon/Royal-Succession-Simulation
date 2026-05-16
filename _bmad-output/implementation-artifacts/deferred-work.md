@@ -34,6 +34,23 @@ All items below are pre-existing issues in `blueprints/dynasty.py` surfaced duri
 
 - **`living_persons` snapshot excludes newly-created persons** [`models/turn_processor.py:99-102`] — persons created by `process_marriage_check` or `process_childbirth_check` are never added to the in-loop snapshot; new spouses and children receive no lifecycle processing in the same turn they're created. Pre-existing simulation accuracy gap; fix when rewriting lifecycle iteration in Sprint 6 or later.
 
+## Deferred from: code review of 2-1-project-db-model (2026-05-16)
+
+- **`project_type` and `status` as free-form strings, not `db.Enum`** [`models/db_models.py:Project`] — typos like `'build_wals'` or `'actve'` will persist silently. Define `ProjectType` / `ProjectStatus` enums when Story 2-2 finalizes the catalogue.
+- **No `ondelete='SET NULL'` on `target_*` and monarch FKs** [`models/db_models.py:Project`] — deleting a target territory/dynasty/person leaves stale FKs. Story 2-2's `tick_projects` should defensively skip / cancel projects whose target is gone; alternatively add `ondelete='SET NULL'` to the FK definitions in 2-2.
+- **No `CheckConstraint` for `completion_year >= started_year`, non-negative costs, or year bounds** [`models/db_models.py:Project`] — app-level validation in Story 2-2's `start_project()` is the planned guard. DB-level constraints would be belt-and-braces.
+- **`yearly_cost_*` columns `nullable=True` with Python `default=0`** [`models/db_models.py:Project`] — raw SQL inserts could write NULL; subsequent arithmetic in `tick_projects` would raise `TypeError`. Tighten to `nullable=False` + `server_default='0'` in Story 2-2 when those columns are actively read.
+- **`get_params`/`set_params` lacks malformed-JSON guard and `None` handling** [`models/db_models.py:Project`] — caller responsibility; corruption is an exceptional path. Add try/except + logging in Sprint 11 cleanup if it surfaces in practice.
+- **No composite index on `(dynasty_id, status)` / `(status, completion_year)`** [`models/db_models.py:Project`] — already on the deferred list at `11-3-performance-optimizations`. Will become important once Story 2-2's `tick_projects` scans active projects every year for every dynasty.
+- **No `created_at`/`updated_at` timestamps on Project** [`models/db_models.py:Project`] — every other late-added model (Chronicle, Loan, Building) has them. Sprint 11 cleanup normalization.
+- **No DB-level `ondelete='CASCADE'` on `Project.dynasty_id`** [`models/db_models.py:Project.dynasty_id`] — ORM `cascade='all, delete-orphan'` covers normal session-mediated deletes; a raw SQL `DELETE FROM dynasty` would orphan. Add at the same time as the other ondelete tightening.
+- **No reverse `back_populates` on `Territory`, `PersonDB`, `DynastyDB.target_*` sides** [`models/db_models.py:Project`] — intentional one-way for now (Story 2-2 only walks Project → target). Add inverse collections when navigation in the other direction is actually needed (Sprint 3 UI may need `territory.active_projects`).
+- **No app-level guard against `dynasty_id == target_dynasty_id` self-targeting** [`models/db_models.py:Project`] — Story 2-2's `start_project` should reject self-envoys / self-marriages with a domain validation error.
+- **Migration test covers only the "table missing" branch** [`tests/unit/test_db_models.py`] — the "table already exists" branch is also worth exercising once Sprint 11 introduces Alembic and the lazy-create pattern goes away anyway.
+- **`Project` imported top-level in `db_initialization.py` while `Loan` is lazy-imported** [`models/db_initialization.py`] — inconsistent. Normalize when Sprint 11 introduces Alembic (Story 11-2).
+- **No file-end trailing newline on `test_db_models.py`** [`tests/unit/test_db_models.py`] — pre-existing. Trivial cleanup at any time.
+- **No test for "Project pointing at deleted `target_*` row continues to exist"** [`tests/unit/test_db_models.py`] — Story 2-2 will need this coverage once `tick_projects` walks target relationships.
+
 ## Deferred from: code review of 1-4-chronicle-prompt-years-and-interrupt (2026-05-16)
 
 - **`monarch_death` fallback branch ignores `start_year`/`end_year`** [`utils/llm_prompts.py:151-163`] — Intentional per spec Dev Notes (uses `years_advanced` + `monarch_name` instead of explicit date range), but creates an inconsistency with the other two branches in the same function. Possible future polish: include "in the years X to Y" phrasing in the monarch-death sentence too.
