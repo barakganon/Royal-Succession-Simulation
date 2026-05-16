@@ -49,7 +49,7 @@ development_status:
 
   # ── EPIC 1: Turn Cadence Rework (Sprint 1) ─────────────────────────────────
   # Goal: Variable turn length, interrupt-driven. Unlocks all subsequent sprints.
-  epic-1: in-progress
+  epic-1: done
 
   # Story 1-1: Extract lifecycle logic into models/turn_processor.py
   # File: sprint01-task01-turn-processor-extraction.md (naming pre-dates this tracker)
