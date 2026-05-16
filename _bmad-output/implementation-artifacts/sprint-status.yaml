@@ -75,13 +75,13 @@ development_status:
 
   # ── EPIC 2: Project Model (Sprint 2) ───────────────────────────────────────
   # Goal: Multi-year projects replace instant actions. Three project slots replace 3 AP.
-  epic-2: backlog
+  epic-2: in-progress
 
   # Story 2-1: Project DB model + migration
   # Add Project table (db_models.py), DynastyDB.projects relationship, migration in
   # db_initialization.py. Fields: project_type, target_*, params_json, started_year,
   # completion_year, yearly costs, status, initiated_by / completed_by monarch FKs.
-  2-1-project-db-model: backlog
+  2-1-project-db-model: ready-for-dev
 
   # Story 2-2: project_system.py core logic
   # start_project(), tick_projects() (drain yearly cost → stalled interrupt),
