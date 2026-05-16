@@ -649,7 +649,7 @@ class Project(db.Model):
 
     status = db.Column(db.String(20), default='active')
 
-    initiated_by_monarch_id = db.Column(db.Integer, db.ForeignKey('person_db.id'), nullable=True)
+    initiated_by_monarch_id = db.Column(db.Integer, db.ForeignKey('person_db.id'), nullable=False)
     completed_by_monarch_id = db.Column(db.Integer, db.ForeignKey('person_db.id'), nullable=True)
 
     dynasty = db.relationship('DynastyDB', foreign_keys=[dynasty_id], back_populates='projects')

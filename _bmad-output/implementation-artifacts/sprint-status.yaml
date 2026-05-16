@@ -81,7 +81,7 @@ development_status:
   # Add Project table (db_models.py), DynastyDB.projects relationship, migration in
   # db_initialization.py. Fields: project_type, target_*, params_json, started_year,
   # completion_year, yearly costs, status, initiated_by / completed_by monarch FKs.
-  2-1-project-db-model: review
+  2-1-project-db-model: done
 
   # Story 2-2: project_system.py core logic
   # start_project(), tick_projects() (drain yearly cost → stalled interrupt),

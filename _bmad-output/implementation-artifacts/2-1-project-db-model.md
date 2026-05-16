@@ -1,6 +1,6 @@
 # Story 2-1: Project DB Model + Migration
 
-Status: review
+Status: done
 
 ## Story
 
@@ -259,3 +259,43 @@ claude-opus-4-7[1m] (bmad-dev-story workflow, direct execution)
 | 2026-05-16 | test(db-models): unit tests for Project model, dynasty.projects, cascade, params_json |
 | 2026-05-16 | pytest: 229 passed, 0 failed, 0 skipped |
 | 2026-05-16 | Story status → review |
+| 2026-05-16 | Code review (3 layers): 4 patches applied, ~15 deferred, ~6 dismissed |
+| 2026-05-16 | feat(db): initiated_by_monarch_id → NOT NULL (per AC2 spec compliance) |
+| 2026-05-16 | test(db-models): add FK-declaration audit + initiated_by_monarch_id NOT NULL test |
+| 2026-05-16 | test(db-models): strengthen migration test — actually exercise DatabaseInitializer._create_tables_if_not_exist |
+| 2026-05-16 | test(db-models): uniquify _make_user_and_dynasty helper to prevent username/email collisions |
+
+### Review Findings
+
+_Code review run 2026-05-16 — 3 parallel adversarial layers (Blind Hunter, Edge Case Hunter, Acceptance Auditor)._
+
+**Patches (applied):**
+
+- [x] [Review][Patch] AC2 deviation: `initiated_by_monarch_id` was nullable but spec/master-plan-snippet treat it as required (sibling `completed_by_monarch_id` is explicitly `nullable=True` precisely because the initiator is not) [`models/db_models.py:Project.initiated_by_monarch_id`]
+- [x] [Review][Patch] AC6 gap: orphan-FK-rejection test was missing. Added static metadata-level audit of all 5 FKs targeting the correct tables (SQLite ships with FK enforcement off; flipping it on at runtime leaks into other tests' teardown) [`tests/unit/test_db_models.py:test_all_five_foreign_keys_declared`]
+- [x] [Review][Patch] `_make_user_and_dynasty` helper produced colliding usernames/emails when called with the default `name='Test Dynasty'` — added uuid4 suffix [`tests/unit/test_db_models.py:_make_user_and_dynasty`]
+- [x] [Review][Patch] Migration test was tautological — it inspected the existing fixture DB rather than exercising the migration guard. Now drops the `project` table, runs `DatabaseInitializer._create_tables_if_not_exist`, and asserts re-creation [`tests/unit/test_db_models.py:test_project_table_created_by_db_initializer`]
+
+**Deferred (premature for schema-only story or future sprint):**
+
+- [x] [Review][Defer] `project_type` and `status` as free-form strings instead of `db.Enum` — Story 2-2 will define the catalogue and may introduce enums then [`models/db_models.py:Project.project_type,status`]
+- [x] [Review][Defer] No `ondelete=` cascade on monarch / target FKs — Story 2-2's `tick_projects` should handle stale FKs at the app level [`models/db_models.py:Project.*`]
+- [x] [Review][Defer] No `CheckConstraint` for `completion_year >= started_year`, non-negative costs, year bounds — app-level validation in Story 2-2's `start_project` [`models/db_models.py:Project`]
+- [x] [Review][Defer] `yearly_cost_*` columns are `nullable=True` with `default=0` (no `nullable=False`, no `server_default`) — raw SQL inserts could write NULL; ORM flow is safe [`models/db_models.py:Project.yearly_cost_*`]
+- [x] [Review][Defer] `get_params`/`set_params` lacks try/except for malformed JSON, doesn't distinguish "no params" from "empty params" — caller responsibility; corruption is exceptional [`models/db_models.py:Project.get_params,set_params`]
+- [x] [Review][Defer] No composite index on `(dynasty_id, status)` or `(status, completion_year)` — Story 11-3 perf pass already lists this work [`models/db_models.py:Project`]
+- [x] [Review][Defer] No `created_at`/`updated_at` timestamps despite codebase convention — Sprint 11 cleanup [`models/db_models.py:Project`]
+- [x] [Review][Defer] No FK `ondelete='CASCADE'` at DB level on `dynasty_id` (ORM cascade only) — raw SQL `DELETE FROM dynasty` would orphan; not a normal flow [`models/db_models.py:Project.dynasty_id`]
+- [x] [Review][Defer] No reverse-collection (`back_populates`) on `Territory`, `PersonDB`, `DynastyDB` for the 4 target relationships — Story 2-2's `tick_projects` only walks Project → target, not back [`models/db_models.py:Project`]
+- [x] [Review][Defer] `dynasty_id == target_dynasty_id` self-targeting envoy mission allowed — app-level validation in Story 2-2's `start_project` [`models/db_models.py:Project`]
+- [x] [Review][Defer] No test for the "table already exists" branch in `db_initialization.py` — single-branch coverage is acceptable for a guard [`tests/unit/test_db_models.py`]
+- [x] [Review][Defer] `Project` imported at top of `db_initialization.py` while `Loan` is lazy-imported — `chronicle_entry` pattern uses top-level; will normalize in Sprint 11 [`models/db_initialization.py`]
+- [x] [Review][Defer] No file-end trailing newline (pre-existing in `test_db_models.py`) [`tests/unit/test_db_models.py`]
+- [x] [Review][Defer] No test that `Project` row pointing at a soon-deleted `target_*` row continues to exist (verify no inverse cascade) — coverage for Story 2-2 [`tests/unit/test_db_models.py`]
+- [x] [Review][Defer] `__repr__` would render `Status: None` for transient pre-flush projects — repr is debug-only, acceptable [`models/db_models.py:Project.__repr__`]
+
+**Dismissed (false positives, premature, or speculative):**
+
+- 6 items including: race conditions in `db_initialization` for concurrent workers (SQLite single-writer; this app has 1 process), `get_params` returning non-dict from list/scalar JSON (we never write non-dict), `set_params(None)` ambiguity (caller responsibility), inspector cache staleness (re-instantiated per call), stale "Sprint X" comment rot, missing `pytest.mark.unit`/`pytest.mark.model` decorators on the new helper functions (helpers don't need marks).
+
+**Acceptance Auditor:** 2 substantive findings (AC2 nullability, AC6 orphan test) + 1 weakness (migration test depth) — all 3 patched. Rest of ACs and Out-of-scope boundaries: ✅ clean.
