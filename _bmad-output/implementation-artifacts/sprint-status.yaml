@@ -87,7 +87,7 @@ development_status:
   # start_project(), tick_projects() (drain yearly cost → stalled interrupt),
   # complete_project() (apply effect), cancel_project() (50% refund),
   # get_active_projects(). Full project-type catalogue with durations.
-  2-2-project-system-logic: backlog
+  2-2-project-system-logic: review
 
   # Story 2-3: Wire projects into turn processor + migrate submit_actions
   # tick_projects runs before lifecycle each year; migrate 6 submit_actions action
