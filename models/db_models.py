@@ -126,6 +126,11 @@ class DynastyDB(db.Model):
                                  lazy='dynamic')
     loans = db.relationship('Loan', back_populates='dynasty', lazy='dynamic',
                             cascade='all, delete-orphan')
+    projects = db.relationship('Project',
+                               foreign_keys='Project.dynasty_id',
+                               back_populates='dynasty',
+                               lazy='dynamic',
+                               cascade='all, delete-orphan')
 
     # For storing serialized complex data like alliances or active global event effects for this dynasty
     # serialized_alliances_json = db.Column(db.Text, nullable=True) # e.g., JSON string of the alliances dict
@@ -619,6 +624,49 @@ class Building(db.Model):
     
     def __repr__(self):
         return f"<Building '{self.name}' (Type: {self.building_type.value}, Level: {self.level}, Territory: {self.territory_id})>"
+
+
+class Project(db.Model):
+    """Multi-year project owned by a dynasty (Sprint 2 — Project model)."""
+    __tablename__ = 'project'
+
+    id = db.Column(db.Integer, primary_key=True)
+    dynasty_id = db.Column(db.Integer, db.ForeignKey('dynasty.id'), nullable=False, index=True)
+    project_type = db.Column(db.String(50), nullable=False)
+
+    target_territory_id = db.Column(db.Integer, db.ForeignKey('territory.id'), nullable=True)
+    target_dynasty_id = db.Column(db.Integer, db.ForeignKey('dynasty.id'), nullable=True)
+    target_person_id = db.Column(db.Integer, db.ForeignKey('person_db.id'), nullable=True)
+    params_json = db.Column(db.Text, nullable=True)
+
+    started_year = db.Column(db.Integer, nullable=False)
+    completion_year = db.Column(db.Integer, nullable=False)
+
+    yearly_cost_gold = db.Column(db.Integer, default=0)
+    yearly_cost_food = db.Column(db.Integer, default=0)
+    yearly_cost_iron = db.Column(db.Integer, default=0)
+    yearly_cost_timber = db.Column(db.Integer, default=0)
+
+    status = db.Column(db.String(20), default='active')
+
+    initiated_by_monarch_id = db.Column(db.Integer, db.ForeignKey('person_db.id'), nullable=True)
+    completed_by_monarch_id = db.Column(db.Integer, db.ForeignKey('person_db.id'), nullable=True)
+
+    dynasty = db.relationship('DynastyDB', foreign_keys=[dynasty_id], back_populates='projects')
+    target_territory = db.relationship('Territory', foreign_keys=[target_territory_id])
+    target_dynasty = db.relationship('DynastyDB', foreign_keys=[target_dynasty_id])
+    target_person = db.relationship('PersonDB', foreign_keys=[target_person_id])
+    initiator_monarch = db.relationship('PersonDB', foreign_keys=[initiated_by_monarch_id])
+    completer_monarch = db.relationship('PersonDB', foreign_keys=[completed_by_monarch_id])
+
+    def get_params(self) -> dict:
+        return json.loads(self.params_json or '{}')
+
+    def set_params(self, params: dict) -> None:
+        self.params_json = json.dumps(params or {})
+
+    def __repr__(self):
+        return f"<Project '{self.project_type}' (ID: {self.id}, Dynasty: {self.dynasty_id}, Status: {self.status})>"
 
 
 class TradeRoute(db.Model):
