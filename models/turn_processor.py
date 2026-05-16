@@ -208,6 +208,8 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
                         events=event_texts,
                         monarch_name=monarch_display,
                         existing_story=existing_story,
+                        years_advanced=years_advanced,
+                        interrupt_reason=interrupt[0],
                     )
                     response = model.generate_content(
                         prompt,
@@ -218,7 +220,9 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
                 new_paragraph = ""
         if not new_paragraph:
             new_paragraph = generate_turn_story_fallback(
-                dynasty.name, start_year, dynasty.current_simulation_year - 1, event_texts, monarch_display
+                dynasty.name, start_year, dynasty.current_simulation_year - 1, event_texts, monarch_display,
+                years_advanced=years_advanced,
+                interrupt_reason=interrupt[0],
             )
         if new_paragraph:
             separator = "\n\n" if existing_story.strip() else ""

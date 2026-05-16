@@ -125,7 +125,8 @@ def generate_advisor_fallback(treasury: float, active_wars: int, has_allies: boo
     return suggestions[:3]
 
 
-def build_turn_story_prompt(dynasty_name, start_year, end_year, events, monarch_name, existing_story):
+def build_turn_story_prompt(dynasty_name, start_year, end_year, events, monarch_name, existing_story,
+                            years_advanced: int = 5, interrupt_reason: str = 'quiet_period'):
     events_str = '; '.join(events[:8]) if events else 'quiet seasons of governance'
     continuation_hint = (
         'Continue the saga naturally from where it left off.'
@@ -133,28 +134,46 @@ def build_turn_story_prompt(dynasty_name, start_year, end_year, events, monarch_
         else 'Begin the saga of this dynasty.'
     )
     prev = existing_story[-800:] if existing_story else '(none yet)'
+    year_span = f'{years_advanced} year{"s" if years_advanced != 1 else ""}'
+    reason_human = interrupt_reason.replace('_', ' ')
+    pacing_hint = f'This turn spanned {year_span}. It ended because: {reason_human}. '
+    if interrupt_reason == 'monarch_death':
+        pacing_hint += "The shadow of the ruler's death defines this passage — write it accordingly. "
+    elif interrupt_reason == 'quiet_period':
+        pacing_hint += 'These were peaceful, uneventful seasons. '
     return (
         f'You are the immortal chronicler of a great dynasty, writing their epic saga.\n'
         f'Dynasty: {dynasty_name}\n'
         f'Current ruler: {monarch_name}\n'
         f'Years {start_year} to {end_year} the following transpired: {events_str}\n\n'
         f'Previous chronicle:\n{prev}\n\n'
-        f'{continuation_hint} Write exactly ONE paragraph (4-6 sentences) of vivid, '
+        f'{continuation_hint} {pacing_hint}Write exactly ONE paragraph (4-6 sentences) of vivid, '
         f'high-fantasy prose that weaves these events into the living legend of {dynasty_name}. '
         f'Use dramatic third-person narration. No bullet points, no headings, pure flowing prose only.'
     )
 
 
-def generate_turn_story_fallback(dynasty_name, start_year, end_year, events, monarch_name):
+def generate_turn_story_fallback(dynasty_name, start_year, end_year, events, monarch_name,
+                                 years_advanced: int = 5, interrupt_reason: str = 'quiet_period'):
+    year_word = 'year' if years_advanced == 1 else 'years'
+    if interrupt_reason == 'monarch_death':
+        key_event = events[0].lower() if events else 'the realm fell into mourning.'
+        return (
+            f'In the {years_advanced} {year_word} before the passing of {monarch_name}, '
+            f'{dynasty_name} was marked by {key_event} '
+            f'When the end came, the realm fell silent, and the scribes set down their quills '
+            f'to mourn before returning to record what followed.'
+        )
     if events:
         key_event = events[0]
         return (
-            f'In the years {start_year} through {end_year}, the annals of {dynasty_name} record '
-            f'the reign of {monarch_name}, under whose stewardship {key_event.lower()} '
-            f'The scribes of the realm set down these deeds in ink and candlelight, '
+            f'Across the {years_advanced} {year_word} from {start_year} through {end_year}, '
+            f'the annals of {dynasty_name} record the reign of {monarch_name}, under whose stewardship '
+            f'{key_event.lower()} The scribes of the realm set down these deeds in ink and candlelight, '
             f'that the glory and the grief of this age might endure beyond the lives of those who lived it.'
         )
     return (
-        f'The years {start_year} to {end_year} passed like quiet water beneath the banner of {dynasty_name}. '
+        f'The {years_advanced} {year_word} from {start_year} to {end_year} passed like quiet water '
+        f'beneath the banner of {dynasty_name}. '
         f'{monarch_name} ruled with measured hand, and the realm held its breath.'
     )
