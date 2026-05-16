@@ -1,5 +1,3 @@
-import pytest
-
 from utils.llm_prompts import build_turn_story_prompt, generate_turn_story_fallback
 
 
@@ -20,7 +18,7 @@ class TestBuildTurnStoryPrompt:
 
     def test_years_advanced_appears_in_prompt(self):
         result = self._call(years_advanced=3)
-        assert '3' in result
+        assert 'This turn spanned 3 years.' in result
 
     def test_interrupt_reason_appears_in_prompt(self):
         result = self._call(interrupt_reason='monarch_death')
@@ -36,7 +34,8 @@ class TestBuildTurnStoryPrompt:
 
     def test_singular_year_grammar_in_prompt(self):
         result = self._call(years_advanced=1)
-        assert '1 year' in result and '1 years' not in result
+        assert 'This turn spanned 1 year.' in result
+        assert 'This turn spanned 1 years.' not in result
 
     def test_returns_non_empty_for_no_events(self):
         result = self._call(events=[])
@@ -63,8 +62,14 @@ class TestGenerateTurnStoryFallback:
         assert quiet != death
 
     def test_singular_year_grammar(self):
-        result = self._call(years_advanced=1, interrupt_reason='quiet_period')
-        assert '1 year' in result.lower() and '1 years' not in result.lower()
+        # events-branch (default _call has non-empty events) renders "Across the N year(s) from ..."
+        result_events = self._call(years_advanced=1, interrupt_reason='quiet_period')
+        assert 'Across the 1 year from' in result_events
+        assert 'Across the 1 years from' not in result_events
+        # no-events branch renders "The N year(s) from ..."
+        result_empty = self._call(years_advanced=1, interrupt_reason='quiet_period', events=[])
+        assert 'The 1 year from' in result_empty
+        assert 'The 1 years from' not in result_empty
 
     def test_monarch_death_mentions_passing(self):
         result = self._call(interrupt_reason='monarch_death')

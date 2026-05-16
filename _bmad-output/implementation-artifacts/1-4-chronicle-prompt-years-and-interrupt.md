@@ -347,3 +347,29 @@ Followed story-prescribed red-green-refactor cycle:
 | 2026-05-13 | test(llm-prompts): add 10 unit tests across 2 test classes |
 | 2026-05-13 | pytest: 222 passed, 0 failed, 0 skipped |
 | 2026-05-13 | Story status → review |
+| 2026-05-16 | Code review (3 layers): Acceptance Auditor clean; 3 patches applied, 8 deferred, 13 dismissed |
+
+### Review Findings
+
+_Code review run 2026-05-16 — 3 parallel adversarial layers (Blind Hunter, Edge Case Hunter, Acceptance Auditor)._
+
+**Patches (applied):**
+
+- [x] [Review][Patch] Weak `years_advanced` substring assertion — `'3' in result` is trivially satisfied by year `1300` [`tests/unit/test_llm_prompts.py:test_years_advanced_appears_in_prompt`]
+- [x] [Review][Patch] Weak singular-year grammar assertion — substring match can collide with year strings [`tests/unit/test_llm_prompts.py:test_singular_year_grammar_in_prompt`]
+- [x] [Review][Patch] Unused `import pytest` (no `pytest.raises` / `pytest.mark` / fixtures) [`tests/unit/test_llm_prompts.py:1`]
+
+**Deferred (pre-existing or out of scope):**
+
+- [x] [Review][Defer] `monarch_death` fallback branch ignores `start_year`/`end_year` — intentional per Dev Notes design; possible future polish [`utils/llm_prompts.py:151-163`]
+- [x] [Review][Defer] No unit test for unknown `interrupt_reason` value — closed-set invariant from `INTERRUPT_REASONS` [`tests/unit/test_llm_prompts.py`]
+- [x] [Review][Defer] `start_year == end_year` produces awkward "from 1300 to 1300" — only when `years_advanced==1` [`utils/llm_prompts.py:175`]
+- [x] [Review][Defer] `pacing_hint` if/elif chain — premature abstraction for 2 branches now; revisit when 3rd interrupt class added [`utils/llm_prompts.py:138-143`]
+- [x] [Review][Defer] Test `_call` helper duplicated across two test classes — minor style [`tests/unit/test_llm_prompts.py`]
+- [x] [Review][Defer] Inconsistent parameter typing — only new params have type hints, existing positionals untyped [`utils/llm_prompts.py:128,148`]
+- [x] [Review][Defer] Magic default `years_advanced=5` / `interrupt_reason='quiet_period'` — documented in Dev Notes for backward compat; move to constants module in Sprint 11 [`utils/llm_prompts.py:128,148`]
+- [x] [Review][Defer] `pacing_hint` meta-instruction may bleed into LLM narrative output — speculative; depends on model behavior, no unit test can assert this [`utils/llm_prompts.py:136-143`]
+
+**Dismissed (false positives, pre-existing invariants, or noise):** 13 items — `interrupt` None, `years_advanced` None/non-int, `interrupt_reason` None, `monarch_name` None, `events[0]` None, `existing_story` None, etc. All such inputs are guaranteed by upstream callers in `turn_processor.py` (closed set from `INTERRUPT_REASONS`, integer counter, `or ""` guards, list-comprehension filters at call sites).
+
+**Acceptance Auditor:** ✅ All 6 ACs satisfied; scope boundaries respected (no changes to `max_output_tokens` or `FLASK_APP_GOOGLE_API_KEY`).
