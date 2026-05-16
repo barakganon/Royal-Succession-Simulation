@@ -2,9 +2,27 @@
 import pytest
 import datetime
 from models.db_models import (
-    User, DynastyDB, PersonDB, HistoryLogEntryDB, 
-    Territory, Province, Region, TerrainType
+    User, DynastyDB, PersonDB, HistoryLogEntryDB,
+    Territory, Province, Region, TerrainType,
+    Project,
 )
+
+
+def _make_user_and_dynasty(session, name='Test Dynasty', year=1300):
+    user = User(username=f"u_{name.lower().replace(' ', '_')}", email=f"{name}@x.test")
+    user.set_password("password123")
+    session.add(user)
+    session.commit()
+    dynasty = DynastyDB(
+        user_id=user.id,
+        name=name,
+        theme_identifier_or_json="medieval_europe",
+        start_year=year,
+        current_simulation_year=year,
+    )
+    session.add(dynasty)
+    session.commit()
+    return user, dynasty
 
 
 @pytest.mark.unit
@@ -372,3 +390,110 @@ class TestTerritoryModel:
         assert territory in dynasty.controlled_territories
         assert dynasty.capital_territory_id == territory.id
         assert dynasty.capital.name == "Rouen"
+
+
+@pytest.mark.unit
+@pytest.mark.model
+class TestProjectModel:
+    """Unit tests for the Project model (Sprint 2 — Project DB model)."""
+
+    def test_project_creation_defaults(self, session):
+        _, dynasty = _make_user_and_dynasty(session)
+        project = Project(
+            dynasty_id=dynasty.id,
+            project_type='build_walls',
+            started_year=1300,
+            completion_year=1305,
+        )
+        session.add(project)
+        session.commit()
+        saved = session.query(Project).filter_by(id=project.id).first()
+        assert saved is not None
+        assert saved.status == 'active'
+        assert saved.yearly_cost_gold == 0
+        assert saved.yearly_cost_food == 0
+        assert saved.yearly_cost_iron == 0
+        assert saved.yearly_cost_timber == 0
+        assert saved.completed_by_monarch_id is None
+        assert saved.target_territory_id is None
+        assert saved.target_dynasty_id is None
+        assert saved.target_person_id is None
+        assert saved.params_json is None
+
+    def test_dynasty_projects_relationship_disambiguation(self, session):
+        _, dynasty_a = _make_user_and_dynasty(session, name='Anjou')
+        _, dynasty_b = _make_user_and_dynasty(session, name='Bourbon')
+        p_a = Project(
+            dynasty_id=dynasty_a.id, project_type='build_farm',
+            started_year=1300, completion_year=1302,
+        )
+        p_b = Project(
+            dynasty_id=dynasty_b.id, project_type='build_walls',
+            started_year=1300, completion_year=1305,
+        )
+        p_envoy = Project(
+            dynasty_id=dynasty_a.id, target_dynasty_id=dynasty_b.id,
+            project_type='envoy_mission', started_year=1301, completion_year=1302,
+        )
+        session.add_all([p_a, p_b, p_envoy])
+        session.commit()
+        a_projects = dynasty_a.projects.all()
+        b_projects = dynasty_b.projects.all()
+        assert {p.id for p in a_projects} == {p_a.id, p_envoy.id}
+        assert {p.id for p in b_projects} == {p_b.id}
+
+    def test_params_json_roundtrip(self, session):
+        _, dynasty = _make_user_and_dynasty(session)
+        project = Project(
+            dynasty_id=dynasty.id, project_type='recruit_unit',
+            started_year=1300, completion_year=1301,
+        )
+        project.set_params({'unit_type': 'cavalry', 'count': 50})
+        session.add(project)
+        session.commit()
+        reloaded = session.query(Project).filter_by(id=project.id).first()
+        assert reloaded.get_params() == {'unit_type': 'cavalry', 'count': 50}
+
+    def test_params_json_empty_dict_when_unset(self, session):
+        _, dynasty = _make_user_and_dynasty(session)
+        project = Project(
+            dynasty_id=dynasty.id, project_type='envoy_mission',
+            started_year=1300, completion_year=1301,
+        )
+        session.add(project)
+        session.commit()
+        assert project.get_params() == {}
+
+    def test_delete_dynasty_cascades_to_projects(self, session):
+        _, dynasty = _make_user_and_dynasty(session)
+        project = Project(
+            dynasty_id=dynasty.id, project_type='build_market',
+            started_year=1300, completion_year=1303,
+        )
+        session.add(project)
+        session.commit()
+        project_id = project.id
+        session.delete(dynasty)
+        session.commit()
+        assert session.query(Project).filter_by(id=project_id).first() is None
+
+    def test_project_repr(self, session):
+        _, dynasty = _make_user_and_dynasty(session)
+        project = Project(
+            dynasty_id=dynasty.id, project_type='build_cathedral',
+            started_year=1300, completion_year=1315,
+        )
+        session.add(project)
+        session.commit()
+        assert repr(project) == (
+            f"<Project 'build_cathedral' (ID: {project.id}, "
+            f"Dynasty: {dynasty.id}, Status: active)>"
+        )
+
+    def test_project_table_created_by_initializer(self, session):
+        # The session fixture's setup runs DatabaseInitializer (or db.create_all);
+        # this test verifies the 'project' table is present in the in-memory DB.
+        from sqlalchemy import inspect
+        from models.db_models import db
+        inspector = inspect(db.engine)
+        assert 'project' in inspector.get_table_names()

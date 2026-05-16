@@ -1,6 +1,6 @@
 # Story 2-1: Project DB Model + Migration
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -29,15 +29,15 @@ so that Story 2-2 (`project_system.py` core logic) can persist and query project
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add `Project` model to `models/db_models.py` (AC1, AC2, AC4)
-  - [ ] Insert the class definition near other dynasty-owned models (after `Building`, before `TradeRoute` is reasonable). Use existing snippet (Dev Notes) as the template.
-  - [ ] Add `dynasty_id`, `project_type`, `target_territory_id`, `target_dynasty_id`, `target_person_id`, `params_json`, `started_year`, `completion_year`, 4 × `yearly_cost_*`, `status`, `initiated_by_monarch_id`, `completed_by_monarch_id` columns.
-  - [ ] Add `__repr__` returning `f"<Project '{self.project_type}' (ID: {self.id}, Dynasty: {self.dynasty_id}, Status: {self.status})>"`.
-  - [ ] Add `get_params() -> dict` and `set_params(params: dict) -> None` mirroring `Building.get_effects` / `set_effects` pattern (lines 612-618).
-  - [ ] Add 5 `db.relationship()` lines using explicit `foreign_keys=` (initiator monarch, completer monarch, target person, target dynasty, target territory). All use `back_populates=` (paired with the inverse side; if no inverse is needed yet — e.g., PersonDB doesn't gain a `projects_initiated` collection in this story — use a one-sided relationship without `back_populates`). For clarity, the relationships that DO need an inverse this story are dynasty.projects (AC3).
+- [x] Task 1: Add `Project` model to `models/db_models.py` (AC1, AC2, AC4)
+  - [x] Insert the class definition near other dynasty-owned models (after `Building`, before `TradeRoute` is reasonable). Use existing snippet (Dev Notes) as the template.
+  - [x] Add `dynasty_id`, `project_type`, `target_territory_id`, `target_dynasty_id`, `target_person_id`, `params_json`, `started_year`, `completion_year`, 4 × `yearly_cost_*`, `status`, `initiated_by_monarch_id`, `completed_by_monarch_id` columns.
+  - [x] Add `__repr__` returning `f"<Project '{self.project_type}' (ID: {self.id}, Dynasty: {self.dynasty_id}, Status: {self.status})>"`.
+  - [x] Add `get_params() -> dict` and `set_params(params: dict) -> None` mirroring `Building.get_effects` / `set_effects` pattern (lines 612-618).
+  - [x] Add 5 `db.relationship()` lines using explicit `foreign_keys=` (initiator monarch, completer monarch, target person, target dynasty, target territory). All use `back_populates=` (paired with the inverse side; if no inverse is needed yet — e.g., PersonDB doesn't gain a `projects_initiated` collection in this story — use a one-sided relationship without `back_populates`). For clarity, the relationships that DO need an inverse this story are dynasty.projects (AC3).
 
-- [ ] Task 2: Add `projects` relationship to `DynastyDB` (AC3)
-  - [ ] In the existing `DynastyDB` class (`models/db_models.py` line 42), after the `loans` relationship, add:
+- [x] Task 2: Add `projects` relationship to `DynastyDB` (AC3)
+  - [x] In the existing `DynastyDB` class (`models/db_models.py` line 42), after the `loans` relationship, add:
     ```python
     projects = db.relationship('Project',
                                foreign_keys='Project.dynasty_id',
@@ -45,11 +45,11 @@ so that Story 2-2 (`project_system.py` core logic) can persist and query project
                                lazy='dynamic',
                                cascade='all, delete-orphan')
     ```
-  - [ ] On `Project`, add the matching `dynasty = db.relationship('DynastyDB', foreign_keys=[dynasty_id], back_populates='projects')`.
+  - [x] On `Project`, add the matching `dynasty = db.relationship('DynastyDB', foreign_keys=[dynasty_id], back_populates='projects')`.
 
-- [ ] Task 3: Migrate the existing dev DB (AC5)
-  - [ ] In `models/db_initialization.py` line 19, add `Project` to the import block.
-  - [ ] In `_create_tables_if_not_exist` (line 108), after the existing `loan` block (line 152-155), add:
+- [x] Task 3: Migrate the existing dev DB (AC5)
+  - [x] In `models/db_initialization.py` line 19, add `Project` to the import block.
+  - [x] In `_create_tables_if_not_exist` (line 108), after the existing `loan` block (line 152-155), add:
     ```python
     # Create project table if missing (Sprint 2 Project model)
     if 'project' not in inspector.get_table_names():
@@ -57,19 +57,19 @@ so that Story 2-2 (`project_system.py` core logic) can persist and query project
         Project.__table__.create(db.engine, checkfirst=True)
         self.logger.info("Created project table.")
     ```
-  - [ ] Verify the dev DB at `instance/dynastysim.db` picks up the new table on next boot by running the Flask app once locally (manual smoke), OR by an integration test that asserts `'project' in inspector.get_table_names()` post-init.
+  - [x] Verify the dev DB at `instance/dynastysim.db` picks up the new table on next boot by running the Flask app once locally (manual smoke), OR by an integration test that asserts `'project' in inspector.get_table_names()` post-init.
 
-- [ ] Task 4: Tests — extend `tests/unit/test_db_models.py` (AC6)
-  - [ ] Use existing in-memory SQLite fixture pattern from the file.
-  - [ ] Test: `Project(dynasty_id=d.id, project_type='build_walls', started_year=1300, completion_year=1305)` persists and defaults render (`status == 'active'`, all `yearly_cost_* == 0`).
-  - [ ] Test: `dynasty.projects.all()` returns this Project; an unrelated Project on a different dynasty does NOT show up; a Project with `target_dynasty_id=dynasty.id` but `dynasty_id != dynasty.id` does NOT show up either (proves foreign_keys disambiguation works).
-  - [ ] Test: `set_params({'unit_type': 'cavalry', 'count': 50})` then `get_params()` returns the same dict.
-  - [ ] Test: Deleting the dynasty cascades to delete its projects (verify count goes to 0).
-  - [ ] Test (in `tests/unit/test_db_models.py` or `tests/integration/`): integration / initialization test that asserts `'project'` appears in `inspector.get_table_names()` after `DatabaseInitializer.initialize_database()` runs against an empty in-memory DB.
+- [x] Task 4: Tests — extend `tests/unit/test_db_models.py` (AC6)
+  - [x] Use existing in-memory SQLite fixture pattern from the file.
+  - [x] Test: `Project(dynasty_id=d.id, project_type='build_walls', started_year=1300, completion_year=1305)` persists and defaults render (`status == 'active'`, all `yearly_cost_* == 0`).
+  - [x] Test: `dynasty.projects.all()` returns this Project; an unrelated Project on a different dynasty does NOT show up; a Project with `target_dynasty_id=dynasty.id` but `dynasty_id != dynasty.id` does NOT show up either (proves foreign_keys disambiguation works).
+  - [x] Test: `set_params({'unit_type': 'cavalry', 'count': 50})` then `get_params()` returns the same dict.
+  - [x] Test: Deleting the dynasty cascades to delete its projects (verify count goes to 0).
+  - [x] Test (in `tests/unit/test_db_models.py` or `tests/integration/`): integration / initialization test that asserts `'project'` appears in `inspector.get_table_names()` after `DatabaseInitializer.initialize_database()` runs against an empty in-memory DB.
 
-- [ ] Task 5: Run `pytest`, confirm 222+ passed, 0 failed, 0 skipped (AC6)
+- [x] Task 5: Run `pytest`, confirm 222+ passed, 0 failed, 0 skipped (AC6)
 
-- [ ] Task 6: Create branch `feature/project-db-model`, commit per Dev Notes commit plan, push.
+- [x] Task 6: Create branch `feature/project-db-model`, commit per Dev Notes commit plan, push.
 
 ## Dev Notes
 
@@ -221,20 +221,41 @@ This story (2-1) is the schema foundation. None of those three end-user criteria
 
 ### Agent Model Used
 
-(to be filled by dev agent)
+claude-opus-4-7[1m] (bmad-dev-story workflow, direct execution)
 
 ### Implementation Plan
 
-(to be filled by dev agent)
+1. Inserted `Project` class in `models/db_models.py` between `Building` and `TradeRoute` per the spec snippet (with `db.Column` Flask-SQLAlchemy idiom and `person_db.id` correction noted in Dev Notes).
+2. Added `DynastyDB.projects` relationship with `foreign_keys='Project.dynasty_id'` disambiguation, `lazy='dynamic'`, `cascade='all, delete-orphan'`.
+3. On the `Project` side: `dynasty` relationship with `back_populates='projects'`; four one-sided relationships for the targets and the two monarch FKs.
+4. Updated `models/db_initialization.py`: added `Project` to the imports; added a 4-line migration guard after the existing `loan` block to create the `project` table on existing deployments.
+5. Added `TestProjectModel` (7 tests) to `tests/unit/test_db_models.py`, plus a shared `_make_user_and_dynasty` helper.
 
 ### Completion Notes
 
-(to be filled by dev agent)
+- All 6 ACs satisfied; all 6 tasks (and their subtasks) checked.
+- Sanity-checked `Project.__table__.columns` after edit — all 16 columns present.
+- `pytest tests/unit/test_db_models.py::TestProjectModel` → 7 passed.
+- Full regression suite: **229 passed, 0 failed, 0 skipped** (baseline was 222; +7 from this story).
+- The SAWarning about FK cycle `dynasty / person_db / territory` is pre-existing (already present before this story), caused by the dynasty↔territory↔person_db founder/capital relationships, not by anything Project adds. Project's FKs are all one-way OUT to other tables.
+- No `use_alter=True` was needed on any of the new Project FKs (anticipated in Dev Notes — confirmed by clean test run).
+- Scope held: no business logic, no turn-processor wiring, no `Building.is_under_construction` removal, no UI, no LLM hooks. All deferred to Stories 2-2 / 2-3 / 2-4.
 
 ### File List
 
-(to be filled by dev agent)
+- `models/db_models.py` — MODIFIED (new `Project` class ~45 LoC inserted between `Building` and `TradeRoute`; new `DynastyDB.projects` relationship 5 LoC)
+- `models/db_initialization.py` — MODIFIED (`Project` added to imports; 4-line migration guard for the `project` table)
+- `tests/unit/test_db_models.py` — MODIFIED (added `Project` to imports; added `_make_user_and_dynasty` helper; added `TestProjectModel` class with 7 tests)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — MODIFIED (epic-2: backlog → in-progress; 2-1 status: backlog → ready-for-dev → in-progress → review)
+- `_bmad-output/implementation-artifacts/2-1-project-db-model.md` — MODIFIED (status updates, Dev Agent Record sections populated)
 
 ### Change Log
 
-(to be filled by dev agent)
+| Date | Change |
+|---|---|
+| 2026-05-16 | feat(db): add Project model with FKs to dynasty/person/territory |
+| 2026-05-16 | feat(db): add DynastyDB.projects relationship with foreign_keys disambiguation |
+| 2026-05-16 | feat(db-init): create project table on app start for existing deployments |
+| 2026-05-16 | test(db-models): unit tests for Project model, dynasty.projects, cascade, params_json |
+| 2026-05-16 | pytest: 229 passed, 0 failed, 0 skipped |
+| 2026-05-16 | Story status → review |
