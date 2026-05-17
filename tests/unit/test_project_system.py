@@ -2,8 +2,8 @@ import uuid
 import pytest
 
 from models.db_models import (
-    Building, BuildingType, DynastyDB, MilitaryUnit, PersonDB, Project, Region,
-    Province, Territory, TerrainType, UnitType, User,
+    Building, BuildingType, DynastyDB, HistoryLogEntryDB, MilitaryUnit, PersonDB,
+    Project, Region, Province, Territory, TerrainType, UnitType, User,
 )
 from models.project_system import (
     EFFECT_DISPATCHER,
@@ -444,6 +444,67 @@ class TestProjectSystem:
         ps.complete_project(project.id)
         session.refresh(territory)
         assert territory.development_level == 3
+
+    # ------------------------------------------------------------------
+    # Multi-generation chronicle hook (Story 2-4)
+    # ------------------------------------------------------------------
+    def test_complete_same_monarch_no_multigen_entry(self, session):
+        """Same-monarch completion does NOT write a multi-gen chronicle entry."""
+        _, dynasty = _make_user_and_dynasty(session)
+        _make_monarch(session, dynasty)
+        ps = ProjectSystem(session)
+        project = ps.start_project(dynasty.id, 'envoy_mission', 1300)
+        ps.complete_project(project.id)
+        entries = session.query(HistoryLogEntryDB).filter_by(
+            dynasty_id=dynasty.id,
+            event_type='project_completed_multigen',
+        ).all()
+        assert entries == []
+
+    def test_complete_multigen_writes_history_entry(self, session):
+        """When initiator != completer, complete_project writes a HistoryLogEntryDB."""
+        _, dynasty = _make_user_and_dynasty(session)
+        initiator = _make_monarch(session, dynasty, name='Aldric I')
+        ps = ProjectSystem(session)
+        project = ps.start_project(dynasty.id, 'envoy_mission', 1300)
+        # Replace the monarch (simulating death between start and completion).
+        initiator.is_monarch = False
+        initiator.death_year = 1310
+        successor = _make_monarch(session, dynasty, name='Eldred II', birth_year=1290)
+        session.commit()
+        ps.complete_project(project.id)
+        entries = session.query(HistoryLogEntryDB).filter_by(
+            dynasty_id=dynasty.id,
+            event_type='project_completed_multigen',
+        ).all()
+        assert len(entries) == 1
+        entry = entries[0]
+        assert entry.person1_sim_id == initiator.id
+        assert entry.person2_sim_id == successor.id
+        assert entry.year == project.completion_year
+        assert 'Aldric' in entry.event_string
+        assert 'Eldred' in entry.event_string
+
+    def test_complete_with_null_completer_skips_multigen(self, session):
+        """Interregnum at completion (no living monarch) skips multi-gen entry."""
+        _, dynasty = _make_user_and_dynasty(session)
+        initiator = _make_monarch(session, dynasty, name='Aldric I')
+        ps = ProjectSystem(session)
+        project = ps.start_project(dynasty.id, 'envoy_mission', 1300)
+        # Kill the monarch with no successor; complete_project will see no
+        # living monarch and leave completed_by_monarch_id = NULL.
+        initiator.is_monarch = False
+        initiator.death_year = 1305
+        session.commit()
+        ps.complete_project(project.id)
+        entries = session.query(HistoryLogEntryDB).filter_by(
+            dynasty_id=dynasty.id,
+            event_type='project_completed_multigen',
+        ).all()
+        assert entries == []
+        # Project itself should still be marked completed.
+        session.refresh(project)
+        assert project.status == 'completed'
 
     def test_complete_effect_failure_rolls_back(self, session, monkeypatch):
         # If a dispatcher effect_fn raises, the session should be rolled back
