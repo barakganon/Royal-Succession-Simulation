@@ -21,14 +21,8 @@
 
     <div style="flex:1;"></div>
 
-    <!-- Resource pills -->
-    <div class="resource-pill">&#x1F4B0; <span class="res-val" id="res-gold">{{ gold }}</span></div>
-    <div class="resource-pill">&#x1F33E; <span class="res-val" id="res-food">—</span></div>
-    <div class="resource-pill">&#9881; <span class="res-val" id="res-iron">{{ dynasty.current_iron if dynasty else 0 }}</span></div>
-    <div class="resource-pill">&#x1FA77; <span class="res-val" id="res-timber">{{ dynasty.current_timber if dynasty else 0 }}</span></div>
-    <div class="resource-pill">&#9876; <span class="res-val" id="res-manpower">—</span></div>
+    <!-- Resource pills moved to .game-left-rail in Sprint 3 Story 3-1 -->
 
-    <div style="flex:1;"></div>
 
     <!-- Year -->
     <span style="font-family:'Cinzel',serif;font-size:.88rem;color:var(--text-muted);white-space:nowrap;">
@@ -46,6 +40,89 @@
 
   <!-- ══════════════════════════════ MAIN ROW ══════════════════════════════ -->
   <div class="game-main">
+
+    <!-- ─────────── LEFT RAIL (Sprint 3 Story 3-1) ─────────── -->
+    <div id="game-left-rail" class="game-left-rail">
+
+      <!-- Dynasty CoA -->
+      {% if dynasty and dynasty.coat_of_arms_svg %}
+        <div class="game-rail-coa" title="{{ dynasty.name }}">{{ dynasty.coat_of_arms_svg | safe }}</div>
+      {% else %}
+        <div class="game-rail-coa-fallback" title="No dynasty">&#9876;</div>
+      {% endif %}
+
+      <div class="game-rail-divider"></div>
+
+      <!-- Resources -->
+      <div class="game-rail-resource" title="Gold">
+        <div class="icon">&#x1F4B0;</div>
+        <div class="val" id="rail-gold">{{ gold }}</div>
+      </div>
+      <div class="game-rail-resource" title="Iron">
+        <div class="icon">&#9881;</div>
+        <div class="val" id="rail-iron">{{ dynasty.current_iron if dynasty else 0 }}</div>
+      </div>
+      <div class="game-rail-resource" title="Timber">
+        <div class="icon">&#x1FA77;</div>
+        <div class="val" id="rail-timber">{{ dynasty.current_timber if dynasty else 0 }}</div>
+      </div>
+
+      <div class="game-rail-divider"></div>
+
+      <!-- 3 Project slots -->
+      {% for i in range(3) %}
+        {% if active_projects and i < active_projects|length %}
+          {% set p = active_projects[i] %}
+          <div class="game-project-slot"
+               role="button" tabindex="0"
+               aria-label="Project {{ p.project_type }}, year {{ p.started_year }} to {{ p.completion_year }}"
+               title="{{ p.project_type }} ({{ p.started_year }}–{{ p.completion_year }})"
+               onclick="openDetailPanel({type:'project', id:{{ p.id }}})"
+               onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openDetailPanel({type:'project', id:{{ p.id }}});}">
+            {{ p.project_type[:2] | upper }}
+          </div>
+        {% else %}
+          <div class="game-project-slot is-empty"
+               role="button" tabindex="0"
+               aria-label="Empty project slot {{ i + 1 }}"
+               title="Empty project slot {{ i + 1 }}"
+               onclick="openDetailPanel({type:'project_slot', index:{{ i }}})"
+               onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openDetailPanel({type:'project_slot', index:{{ i }}});}">
+            {{ i + 1 }}
+          </div>
+        {% endif %}
+      {% endfor %}
+
+      <div class="game-rail-divider"></div>
+
+      <!-- Monarch portrait — null-safe name composition -->
+      {% if current_monarch %}
+        {% set monarch_name = (current_monarch.name or '') ~ ' ' ~ (current_monarch.surname or '') %}
+      {% else %}
+        {% set monarch_name = 'No monarch' %}
+      {% endif %}
+      <div class="game-rail-portrait" title="{{ monarch_name | trim }}" aria-label="Current monarch: {{ monarch_name | trim }}">
+        {% if current_monarch and current_monarch.portrait_svg %}
+          {{ current_monarch.portrait_svg | safe }}
+        {% else %}
+          &#x1F451;
+        {% endif %}
+      </div>
+
+      <div class="game-rail-divider"></div>
+
+      <!-- Nav buttons (Chronicle / World / War) -->
+      <button class="game-rail-btn" type="button"
+              aria-label="Open chronicle"
+              title="Chronicle" onclick="openDetailPanel({type:'chronicle'})">&#x1F4D6;</button>
+      <button class="game-rail-btn" type="button"
+              aria-label="Open world overview"
+              title="World" onclick="openDetailPanel({type:'world'})">&#x1F30D;</button>
+      <button class="game-rail-btn" type="button"
+              aria-label="Open war overview"
+              title="War" onclick="openDetailPanel({type:'war'})">&#9876;</button>
+
+    </div><!-- /game-left-rail -->
 
     <!-- ─────────── MAP PANEL ─────────── -->
     <div class="game-map-panel" id="map-panel">
@@ -140,6 +217,20 @@
 
     </div><!-- /game-side-panel -->
 
+    <!-- ─────────── SLIDE-IN DETAIL PANEL (Sprint 3 Story 3-1 stub) ─────────── -->
+    <aside class="game-detail-panel" id="game-detail-panel" aria-hidden="true"
+           role="dialog" aria-labelledby="detail-header-label">
+      <div class="game-detail-panel-header">
+        <span id="detail-header-label">Detail</span>
+        <button class="game-detail-panel-close" type="button"
+                aria-label="Close detail panel"
+                onclick="closeDetailPanel()" title="Close">&times;</button>
+      </div>
+      <div class="game-detail-panel-body" id="detail-body">
+        Select a project slot, a hex, or a nav button to see details.
+      </div>
+    </aside>
+
   </div><!-- /game-main -->
 
   <!-- ══════════════════════════════ BOTTOM BAR ══════════════════════════════ -->
@@ -153,6 +244,38 @@
 
 {% block extra_scripts %}
 <script>
+/* ── Sprint 3 Story 3-1: detail-panel toggle (module-level so onclick= can reach it) ── */
+window.currentDetailContext = null;
+function openDetailPanel(ctx) {
+  window.currentDetailContext = ctx;
+  var panel = document.getElementById('game-detail-panel');
+  var body = document.getElementById('detail-body');
+  var label = document.getElementById('detail-header-label');
+  if (!panel || !body) return;
+  panel.classList.add('is-open');
+  panel.setAttribute('aria-hidden', 'false');
+  if (label) {
+    label.textContent = (ctx && ctx.type) ? ('Detail · ' + ctx.type) : 'Detail';
+  }
+  body.textContent = JSON.stringify(ctx) + ' — Story 3-3 will fill this with the real detail view.';
+}
+function closeDetailPanel() {
+  var panel = document.getElementById('game-detail-panel');
+  if (!panel) return;
+  panel.classList.remove('is-open');
+  panel.setAttribute('aria-hidden', 'true');
+  window.currentDetailContext = null;
+}
+/* Esc closes the detail panel when it's open. */
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') {
+    var panel = document.getElementById('game-detail-panel');
+    if (panel && panel.classList.contains('is-open')) {
+      closeDetailPanel();
+    }
+  }
+});
+
 (function () {
   'use strict';
 
