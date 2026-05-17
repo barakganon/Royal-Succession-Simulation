@@ -30,6 +30,7 @@ from models.db_models import (
     db, DynastyDB, PersonDB, HistoryLogEntryDB
 )
 from models.banking_system import BankingSystem
+from models.project_system import ProjectSystem
 from utils.theme_manager import get_all_theme_names, get_theme
 from utils.llm_prompts import build_turn_story_prompt, generate_turn_story_fallback
 
@@ -39,6 +40,7 @@ INTERRUPT_REASONS = [
     'monarch_death',
     'heir_majority',
     'project_complete',
+    'project_stalled',
     'war_declared',
     'attack_received',
     'major_world_event',
@@ -113,9 +115,31 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
     start_year = dynasty.current_simulation_year
     interrupt = None
     years_advanced = 0
+    stalled_project_ids: list = []  # populated if a project stalls this turn
+    ps = ProjectSystem(db.session)
 
     while years_advanced < years_to_advance and interrupt is None:
         current_year = start_year + years_advanced
+
+        # --- Project tick (Sprint 2 Story 2-3) ---
+        # Runs BEFORE lifecycle so that a stalled project halts the turn at
+        # the year of stalling — births/deaths in the same year are deferred
+        # to the next turn so the player's report has a single clear cause.
+        try:
+            stall_interrupts = ps.tick_projects(dynasty_id, current_year)
+        except Exception as tick_exc:
+            logger.error(
+                f"tick_projects failed for dynasty {dynasty_id} year {current_year}: {tick_exc}",
+                exc_info=True,
+            )
+            stall_interrupts = []
+        if stall_interrupts:
+            stalled_project_ids = [t[2] for t in stall_interrupts]
+            interrupt = ('project_stalled', current_year)
+            years_advanced += 1
+            dynasty.current_simulation_year = current_year + 1
+            break
+
         try:
             # Process world events
             process_world_events(dynasty, current_year, theme_config)
@@ -148,6 +172,24 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
         except Exception as year_exc:
             logger.error(f"Error processing year {current_year} for dynasty {dynasty_id}: {year_exc}", exc_info=True)
             # Continue to next year rather than aborting entire turn
+
+        # --- Project completion check (Sprint 2 Story 2-3) ---
+        # Runs AFTER lifecycle so a monarch_death halts the loop first; if
+        # interrupt is set, skip completion (any due projects are picked up
+        # on the next turn).
+        if interrupt is None:
+            try:
+                due = [
+                    p for p in ps.get_active_projects(dynasty_id)
+                    if p.completion_year <= current_year
+                ]
+                for project in due:
+                    ps.complete_project(project.id)
+            except Exception as complete_exc:
+                logger.error(
+                    f"complete_project failed for dynasty {dynasty_id} year {current_year}: {complete_exc}",
+                    exc_info=True,
+                )
 
         years_advanced += 1
         dynasty.current_simulation_year = current_year + 1
@@ -240,6 +282,7 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
         'end_year': dynasty.current_simulation_year,
         'years_advanced': years_advanced,
         'interrupt_reason': interrupt[0],
+        'stalled_project_ids': stalled_project_ids,
         'events': [
             {
                 'type': e.event_type or 'event',
