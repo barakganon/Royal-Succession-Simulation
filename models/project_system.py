@@ -11,11 +11,11 @@ is final.
 """
 
 import logging
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Tuple
 
 from sqlalchemy.orm import Session
 
-from models.db_models import db, DynastyDB, PersonDB, Project
+from models.db_models import DynastyDB, PersonDB, Project
 
 logger = logging.getLogger('royal_succession.project_system')
 
@@ -204,7 +204,7 @@ class ProjectSystem:
             raise
         return project
 
-    def tick_projects(self, dynasty_id: int, year: int) -> List[Tuple]:
+    def tick_projects(self, dynasty_id: int, year: int) -> List[Tuple[str, int, int]]:
         active = self.get_active_projects(dynasty_id)
         if not active:
             return []
@@ -235,6 +235,10 @@ class ProjectSystem:
         project = self.session.get(Project, project_id)
         if project is None:
             raise ValueError(f"Project {project_id} not found")
+        if project.status != 'active':
+            raise ValueError(
+                f"Project {project_id} cannot be completed from status {project.status!r}"
+            )
 
         project.status = 'completed'
         monarch = (
@@ -245,14 +249,15 @@ class ProjectSystem:
         if monarch is not None:
             project.completed_by_monarch_id = monarch.id
 
-        effect_fn = EFFECT_DISPATCHER.get(project.project_type)
-        if effect_fn is not None:
+        # Strict dispatcher lookup — a missing entry is a contract violation
+        # (the catalogue and dispatcher are constructed in lockstep) and must
+        # fail loudly rather than silently complete with no effect.
+        try:
+            effect_fn = EFFECT_DISPATCHER[project.project_type]
             effect_fn(self.session, project)
-        else:
-            logger.warning(
-                "No effect dispatcher for project_type %r (project %s)",
-                project.project_type, project.id,
-            )
+        except Exception:
+            self.session.rollback()
+            raise
 
         try:
             self.session.commit()
@@ -265,8 +270,17 @@ class ProjectSystem:
         project = self.session.get(Project, project_id)
         if project is None:
             raise ValueError(f"Project {project_id} not found")
+        if project.status in ('completed', 'cancelled'):
+            raise ValueError(
+                f"Project {project_id} cannot be cancelled from status {project.status!r}"
+            )
+        if current_year < project.started_year:
+            raise ValueError(
+                f"current_year ({current_year}) precedes started_year "
+                f"({project.started_year}) for project {project_id}"
+            )
 
-        years_elapsed = max(0, current_year - project.started_year)
+        years_elapsed = current_year - project.started_year
         dynasty = self.session.get(DynastyDB, project.dynasty_id)
         dynasty.current_wealth += int(0.5 * years_elapsed * project.yearly_cost_gold)
         dynasty.current_iron += int(0.5 * years_elapsed * project.yearly_cost_iron)

@@ -34,6 +34,30 @@ All items below are pre-existing issues in `blueprints/dynasty.py` surfaced duri
 
 - **`living_persons` snapshot excludes newly-created persons** [`models/turn_processor.py:99-102`] — persons created by `process_marriage_check` or `process_childbirth_check` are never added to the in-loop snapshot; new spouses and children receive no lifecycle processing in the same turn they're created. Pre-existing simulation accuracy gap; fix when rewriting lifecycle iteration in Sprint 6 or later.
 
+## Deferred from: code review of 2-2-project-system-logic (2026-05-17)
+
+- **`requires_building` field in catalogue not enforced by `start_project`** [`models/project_system.py:PROJECT_TYPE_CATALOGUE`] — Story 2-3 owns building-gate enforcement; until then `recruit_cavalry` can start without Stables.
+- **`slot` field in catalogue not consumed by `start_project`** [`models/project_system.py:PROJECT_TYPE_CATALOGUE`] — Sprint 3 (UI) surfaces the 3-project-slot constraint; backend currently allows unlimited active projects.
+- **`start_project` accepts arbitrary kwargs (no whitelist)** [`models/project_system.py:start_project`] — typos like `target_territoy_id` silently swallowed. Sprint 11 type-strict kwargs cleanup.
+- **`start_project` doesn't pre-validate `target_*` FK existence** [`models/project_system.py:start_project`] — DB FK rejects on commit but error is opaque. Story 2-3 may add eager validation for nicer UX.
+- **No history-log entries from tick/complete/cancel** [`models/project_system.py`] — Story 2-4 (chronicle hook) owns multi-monarch completion line; Story 2-3 wires the chronicle for tick/stall events.
+- **No `resume_project` method — stalled is permanent** [`models/project_system.py`] — intentional for now; Sprint 5 succession drama or Sprint 11 economy fixes may add resume.
+- **All-or-nothing affordability (no partial-pay)** [`models/project_system.py:tick_projects`] — game-design decision; revisit if telemetry shows it's frustrating.
+- **Affordability uses `<` (no buffer)** [`models/project_system.py:start_project,tick_projects`] — dynasty with exactly year-1 cost can start a project that immediately drains to zero. Sprint 11 if economy balance needs a buffer.
+- **`build_walls` / `build_cathedral` are gold-only** [`models/project_system.py:PROJECT_TYPE_CATALOGUE`] — placeholder until Sprint 6 wires a stone resource on DynastyDB.
+- **`tick_projects` iteration order is DB-insertion order** [`models/project_system.py:tick_projects`] — non-deterministic fairness across SQLite/Postgres if dynasty has multiple projects competing for last resources. Story 2-3 may add `ORDER BY started_year` (FIFO).
+- **`cancel_project` doesn't emit a chronicle line** [`models/project_system.py:cancel_project`] — Story 2-4 chronicle hook will add a cancel-line variant.
+- **No fractional-year refund tests** [`tests/unit/test_project_system.py`] — e.g. cancel after 3 of 5 ticks of a 100g/yr project = 150g refund. Add when Story 2-3 wires cancel into UI.
+- **`PROJECT_TYPE_CATALOGUE` returns mutable dict by reference** [`models/project_system.py`] — no `MappingProxyType` / freeze. Constants in this codebase aren't frozen by convention; caller responsibility.
+- **No `ProjectSystemError` base class** [`models/project_system.py`] — premature abstraction; revisit when a 2nd exception type is needed.
+- **No method-level docstrings on ProjectSystem methods** [`models/project_system.py`] — Sprint 11 documentation pass.
+- **`caplog`-based dispatcher test is fragile to log format** [`tests/unit/test_project_system.py:test_complete_sets_status_and_invokes_dispatcher`] — replace with mock dispatcher in Sprint 11 test cleanup.
+- **`_make_monarch` always `gender='MALE'`** [`tests/unit/test_project_system.py`] — extend when Sprint 5 succession drama needs female-monarch coverage.
+- **Monarch-succession test simulates inheritance manually** [`tests/unit/test_project_system.py:test_complete_sets_completed_by_to_current_monarch_not_initiator`] — acceptable until Sprint 5 wires the real flow into a fixture.
+- **Multi-dynasty isolation not explicitly tested in 2-2** [`tests/unit/test_project_system.py`] — only one dynasty per test; partial coverage via `get_active_projects` filter. Full multi-dynasty integration in Story 2-3.
+- **`completion_year = started_year + duration_years` semantic (1-year project finishes in `started_year+1`)** [`models/project_system.py:start_project`] — pinned by tests; not changing. Could be confusing for game balance docs.
+- **No `pytest.xfail` on `test_tick_ignores_food_cost`** [`tests/unit/test_project_system.py`] — documented design choice (food is forward-compat); Sprint 6 will replace with real food-drain assertions.
+
 ## Deferred from: code review of 2-1-project-db-model (2026-05-16)
 
 - **`project_type` and `status` as free-form strings, not `db.Enum`** [`models/db_models.py:Project`] — typos like `'build_wals'` or `'actve'` will persist silently. Define `ProjectType` / `ProjectStatus` enums when Story 2-2 finalizes the catalogue.

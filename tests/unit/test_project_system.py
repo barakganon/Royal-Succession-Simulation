@@ -121,7 +121,7 @@ class TestProjectSystem:
     # tick_projects
     # ------------------------------------------------------------------
     def test_tick_drains_yearly_cost(self, session):
-        _, dynasty = _make_user_and_dynasty(session, wealth=200, timber=100)
+        _, dynasty = _make_user_and_dynasty(session, wealth=200, iron=100, timber=100)
         _make_monarch(session, dynasty)
         ps = ProjectSystem(session)
         ps.start_project(dynasty.id, 'build_farm', 1300)
@@ -129,6 +129,8 @@ class TestProjectSystem:
         session.refresh(dynasty)
         assert dynasty.current_wealth == 170  # 200 - 30
         assert dynasty.current_timber == 80   # 100 - 20
+        # build_farm has no iron cost — iron must remain unchanged.
+        assert dynasty.current_iron == 100
 
     def test_tick_stalls_project_and_emits_interrupt(self, session):
         # build_farm: 30g + 20 timber per year. Start with exactly one year's
@@ -285,6 +287,96 @@ class TestProjectSystem:
     # ------------------------------------------------------------------
     def test_dispatcher_covers_every_catalogue_entry(self):
         # Every project_type in the catalogue must have a registered effect
-        # dispatcher (even if just a stub) — otherwise complete_project would
-        # log a warning rather than apply an effect.
+        # dispatcher (even if just a stub). complete_project now raises
+        # KeyError if a dispatcher entry is missing, so a future catalogue
+        # addition without a paired dispatcher entry would fail loudly.
         assert set(EFFECT_DISPATCHER) == set(PROJECT_TYPE_CATALOGUE)
+        for project_type, fn in EFFECT_DISPATCHER.items():
+            assert callable(fn), f"dispatcher entry {project_type!r} is not callable"
+
+    # ------------------------------------------------------------------
+    # State-machine guards (added during code review)
+    # ------------------------------------------------------------------
+    def test_complete_rejects_already_completed_project(self, session):
+        _, dynasty = _make_user_and_dynasty(session)
+        _make_monarch(session, dynasty)
+        ps = ProjectSystem(session)
+        project = ps.start_project(dynasty.id, 'build_farm', 1300)
+        ps.complete_project(project.id)
+        with pytest.raises(ValueError, match="cannot be completed from status"):
+            ps.complete_project(project.id)
+
+    def test_complete_rejects_cancelled_project(self, session):
+        _, dynasty = _make_user_and_dynasty(session)
+        _make_monarch(session, dynasty)
+        ps = ProjectSystem(session)
+        project = ps.start_project(dynasty.id, 'build_farm', 1300)
+        ps.cancel_project(project.id, current_year=1300)
+        with pytest.raises(ValueError, match="cannot be completed from status"):
+            ps.complete_project(project.id)
+
+    def test_complete_rejects_stalled_project(self, session):
+        # A stalled project should not silently complete and grant its effect
+        # without the dynasty having paid the full cost.
+        _, dynasty = _make_user_and_dynasty(session, wealth=30, timber=20)
+        _make_monarch(session, dynasty)
+        ps = ProjectSystem(session)
+        project = ps.start_project(dynasty.id, 'build_farm', 1300)
+        ps.tick_projects(dynasty.id, 1300)  # funds year 1
+        ps.tick_projects(dynasty.id, 1301)  # stalls
+        session.refresh(project)
+        assert project.status == 'stalled'
+        with pytest.raises(ValueError, match="cannot be completed from status"):
+            ps.complete_project(project.id)
+
+    def test_cancel_rejects_already_cancelled_project(self, session):
+        _, dynasty = _make_user_and_dynasty(session, wealth=300)
+        _make_monarch(session, dynasty)
+        ps = ProjectSystem(session)
+        project = ps.start_project(dynasty.id, 'build_walls', 1300)
+        ps.tick_projects(dynasty.id, 1300)
+        ps.cancel_project(project.id, current_year=1301)
+        with pytest.raises(ValueError, match="cannot be cancelled from status"):
+            ps.cancel_project(project.id, current_year=1302)
+
+    def test_cancel_rejects_completed_project(self, session):
+        _, dynasty = _make_user_and_dynasty(session)
+        _make_monarch(session, dynasty)
+        ps = ProjectSystem(session)
+        project = ps.start_project(dynasty.id, 'build_farm', 1300)
+        ps.complete_project(project.id)
+        with pytest.raises(ValueError, match="cannot be cancelled from status"):
+            ps.cancel_project(project.id, current_year=1302)
+
+    def test_cancel_rejects_time_travel(self, session):
+        _, dynasty = _make_user_and_dynasty(session)
+        _make_monarch(session, dynasty)
+        ps = ProjectSystem(session)
+        project = ps.start_project(dynasty.id, 'build_walls', 1305)
+        with pytest.raises(ValueError, match="precedes started_year"):
+            ps.cancel_project(project.id, current_year=1300)
+
+    def test_complete_effect_failure_rolls_back(self, session, monkeypatch):
+        # If a dispatcher effect_fn raises, the session should be rolled back
+        # and the project's status should NOT have been committed as 'completed'.
+        from models import project_system as ps_module
+
+        def boom(_session, _project):
+            raise RuntimeError("simulated effect failure")
+
+        _, dynasty = _make_user_and_dynasty(session)
+        _make_monarch(session, dynasty)
+        ps = ProjectSystem(session)
+        project = ps.start_project(dynasty.id, 'build_farm', 1300)
+
+        original = ps_module.EFFECT_DISPATCHER['build_farm']
+        ps_module.EFFECT_DISPATCHER['build_farm'] = boom
+        try:
+            with pytest.raises(RuntimeError, match="simulated effect failure"):
+                ps.complete_project(project.id)
+            # session rolled back — re-load and confirm status is still 'active'
+            session.expire_all()
+            reloaded = session.get(Project, project.id)
+            assert reloaded.status == 'active'
+        finally:
+            ps_module.EFFECT_DISPATCHER['build_farm'] = original

@@ -1,6 +1,6 @@
 # Story 2-2: project_system.py Core Logic
 
-Status: review
+Status: done
 
 ## Story
 
@@ -211,3 +211,49 @@ claude-opus-4-7[1m] (direct execution)
 | 2026-05-17 | test(project-system): 20 unit tests for lifecycle, stall interrupt, refund math, dispatcher coverage |
 | 2026-05-17 | pytest: 251 passed, 0 failed, 0 skipped |
 | 2026-05-17 | Story status → review |
+| 2026-05-17 | Code review (3 layers): Acceptance Auditor clean; 7 patches applied (3 state-machine bugs + 1 contract drift + 1 effect-fn rollback + 2 cosmetic), ~30 deferred, ~6 dismissed |
+
+### Review Findings
+
+_Code review run 2026-05-17 — 3 parallel adversarial layers (Blind Hunter, Edge Case Hunter, Acceptance Auditor)._
+
+**Patches (applied):**
+
+- [x] [Review][Patch] AC5/Task 3 contract drift: `complete_project` was `EFFECT_DISPATCHER.get(...)` + warning; spec said strict `KeyError`. Now uses `[]` indexing so a future catalogue addition without a paired dispatcher entry fails loudly [`models/project_system.py:complete_project`]
+- [x] [Review][Patch] State guard: `complete_project` now raises `ValueError` if project status is not `'active'` — prevents double-completion / completing a stalled or cancelled project [`models/project_system.py:complete_project`]
+- [x] [Review][Patch] State guard: `cancel_project` now raises `ValueError` if project is already `'completed'` or `'cancelled'` — prevents double-refund [`models/project_system.py:cancel_project`]
+- [x] [Review][Patch] Time-travel guard: `cancel_project` raises if `current_year < project.started_year` — prior code silently clamped to 0 [`models/project_system.py:cancel_project`]
+- [x] [Review][Patch] `complete_project` wraps `effect_fn` invocation in try/except + rollback so a failing effect doesn't leave the session in a partially-committed state [`models/project_system.py:complete_project`]
+- [x] [Review][Patch] Dead imports cleanup: removed unused `Optional`, `db` (only used via models internally); tightened `List[Tuple]` to `List[Tuple[str, int, int]]` on tick_projects return type [`models/project_system.py:imports,tick_projects`]
+- [x] [Review][Patch] Tests strengthened: `test_tick_drains_yearly_cost` now also asserts iron unchanged (regression guard); `test_dispatcher_covers_every_catalogue_entry` now also asserts every dispatcher entry is callable; **7 new state-guard tests** added [`tests/unit/test_project_system.py`]
+
+**Deferred (Story 2-3 / Sprint 11 / cosmetic):**
+
+- [x] [Review][Defer] `requires_building` field in catalogue is decorative — not enforced by `start_project`. Story 2-3 wires the building check.
+- [x] [Review][Defer] `slot` field in catalogue is decorative — not consumed. Sprint 3 (UI) will surface the 3-slot constraint.
+- [x] [Review][Defer] `start_project` doesn't validate that `target_*` IDs reference existing rows — DB FK will reject on commit (caught at commit time, not pre-validated). Story 2-3 may add eager validation if UX wants nicer errors.
+- [x] [Review][Defer] `start_project` accepts arbitrary kwargs (typos like `target_territoy_id` silently swallowed) — Sprint 11 type-strict kwargs cleanup.
+- [x] [Review][Defer] No history-log entries written by tick/complete/cancel — Story 2-4 (chronicle hook) and Story 2-3 (turn-processor wiring) own the chronicle integration.
+- [x] [Review][Defer] No `resume_project` method — stalled is currently permanent. Sprint 5 succession drama might add resume; for now intentional.
+- [x] [Review][Defer] Single commit at end of `tick_projects` is intentionally atomic per-dynasty per-tick; per-project savepoints rejected as over-engineering.
+- [x] [Review][Defer] `_make_monarch` always sets `gender='MALE'` — extend when Sprint 5 succession drama needs female-monarch coverage.
+- [x] [Review][Defer] `caplog`-based dispatcher test is fragile to log format — replace with mock dispatcher in Sprint 11 test cleanup.
+- [x] [Review][Defer] Monarch-succession test simulates inheritance manually rather than via real flow — acceptable until Sprint 5 wires the real flow into a fixture.
+- [x] [Review][Defer] `cancel_project` doesn't invoke a dispatcher (no chronicle entry for cancellation) — Story 2-4 chronicle hook will add a cancel-line variant.
+- [x] [Review][Defer] No fractional-year refund tests (e.g. cancel after 3 ticks of a 100g/yr project = 150g refund) — add when Story 2-3 wires cancel into the UI.
+- [x] [Review][Defer] `tick_projects` per-project iteration order is DB-insertion order (non-deterministic across backends) — Story 2-3 may add `ORDER BY started_year` for fairness.
+- [x] [Review][Defer] Multi-dynasty isolation not explicitly tested (only one dynasty per test) — partially covered by `get_active_projects` filter test; full multi-dynasty test added in Story 2-3 integration tests.
+- [x] [Review][Defer] No `ProjectSystemError` base class — premature; revisit when 2nd exception type is needed.
+- [x] [Review][Defer] No method-level docstrings — Sprint 11 documentation pass.
+- [x] [Review][Defer] `PROJECT_TYPE_CATALOGUE` returns mutable dict by reference (no `MappingProxyType` / freeze) — caller responsibility; constants in this codebase aren't frozen by convention.
+- [x] [Review][Defer] All-or-nothing affordability (not partial-pay) is deliberate game design — Sprint 11 retro if telemetry shows it's frustrating.
+- [x] [Review][Defer] Affordability check uses `<` (not `<=`); a dynasty with exactly year-1 cost can start a project that immediately drains to zero — no buffer policy. Sprint 11 if economy balance needs it.
+- [x] [Review][Defer] `build_walls` / `build_cathedral` have only gold cost (no iron/timber) — placeholder balance; tweak when Sprint 6 wires stone resource.
+- [x] [Review][Defer] No `pytest.xfail` on `test_tick_ignores_food_cost` — this is a documented design choice (food is forward-compat schema), not a known bug. Sprint 6 will replace this test with real food-drain assertions.
+- [x] [Review][Defer] `completion_year = started_year + duration_years` (1-year project completes in `started_year + 1`, not the same year) — semantic convention pinned by tests and not changed.
+
+**Dismissed (paranoid / out-of-context):**
+
+- 6 items: dynasty deleted between fetch and tick (single-process Flask), race conditions on affordability check (no concurrent writers), non-JSON-serializable params (caller responsibility), uuid4 collisions in test helper (cosmically improbable), negative catalogue values (constant is module-private), `models/__init__.py` auto-load (was never proposed).
+
+**Acceptance Auditor:** ✅ All 8 ACs satisfied. Out-of-scope boundaries honored (no `db_models.py`, `turn_processor.py`, blueprint, real-effect, chronicle, or UI changes). One contract drift on dispatcher-miss behavior was patched.
