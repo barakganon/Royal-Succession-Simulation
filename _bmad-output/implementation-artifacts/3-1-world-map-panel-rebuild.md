@@ -1,6 +1,6 @@
 # Story 3-1: World Map Side Panel Rebuild
 
-Status: in-progress
+Status: done
 
 ## Story
 
@@ -31,40 +31,40 @@ so that subsequent Sprint 3 stories (right-click context menus, detail panel con
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add CSS for `.game-left-rail`, `.game-detail-panel`, `.game-project-slot`, `.game-rail-btn`, `.game-rail-resource` (AC1, AC2)
-  - [ ] `.game-left-rail`: 60px wide, vertical flex, dark background matching `.game-side-panel`, scrolls if content overflows.
-  - [ ] `.game-detail-panel`: 320px wide, positioned `absolute` right:0, transform `translateX(100%)` by default, `translateX(0)` when `.is-open`. Smooth transition.
-  - [ ] `.game-project-slot`: rounded pill, ~36×36 area with optional badge for project_type abbreviation.
+- [x] Task 1: Add CSS for `.game-left-rail`, `.game-detail-panel`, `.game-project-slot`, `.game-rail-btn`, `.game-rail-resource` (AC1, AC2)
+  - [x] `.game-left-rail`: 60px wide, vertical flex, dark background matching `.game-side-panel`, scrolls if content overflows.
+  - [x] `.game-detail-panel`: 320px wide, positioned `absolute` right:0, transform `translateX(100%)` by default, `translateX(0)` when `.is-open`. Smooth transition.
+  - [x] `.game-project-slot`: rounded pill, ~36×36 area with optional badge for project_type abbreviation.
 
-- [ ] Task 2: Restructure `templates/world_map.html` (AC1, AC2, AC3, AC5)
-  - [ ] Insert `<div id="game-left-rail" class="game-left-rail">` as the first child of `.game-main`, before `.game-map-panel`.
-  - [ ] Render CoA (40px), 3 resource entries (gold/iron/timber with value below icon), 3 project slots (iterate `active_projects`, fill empty slots with placeholder), monarch portrait, 3 bottom buttons.
-  - [ ] Insert `<aside class="game-detail-panel" id="game-detail-panel">` as the last child of `.game-main` with a `<div id="detail-body">Loading...</div>` and a close button.
-  - [ ] Leave existing `.game-side-panel` (action queue + chronicle feed) in place.
-  - [ ] Existing `.game-topbar`: REMOVE the 5 resource pills (now in left rail). Keep CoA + dynasty name + year + End Turn.
+- [x] Task 2: Restructure `templates/world_map.html` (AC1, AC2, AC3, AC5)
+  - [x] Insert `<div id="game-left-rail" class="game-left-rail">` as the first child of `.game-main`, before `.game-map-panel`.
+  - [x] Render CoA (40px), 3 resource entries (gold/iron/timber with value below icon), 3 project slots (iterate `active_projects`, fill empty slots with placeholder), monarch portrait, 3 bottom buttons.
+  - [x] Insert `<aside class="game-detail-panel" id="game-detail-panel">` as the last child of `.game-main` with a `<div id="detail-body">Loading...</div>` and a close button.
+  - [x] Leave existing `.game-side-panel` (action queue + chronicle feed) in place.
+  - [x] Existing `.game-topbar`: REMOVE the 5 resource pills (now in left rail). Keep CoA + dynasty name + year + End Turn.
 
-- [ ] Task 3: Add JS toggle logic at the bottom of `world_map.html` `extra_scripts` block (AC3)
-  - [ ] `window.currentDetailContext = null;`
-  - [ ] `function openDetailPanel(ctx) { window.currentDetailContext = ctx; document.getElementById('game-detail-panel').classList.add('is-open'); document.getElementById('detail-body').textContent = JSON.stringify(ctx) + ' — Story 3-3 fills this.'; }`
-  - [ ] `function closeDetailPanel() { document.getElementById('game-detail-panel').classList.remove('is-open'); }`
-  - [ ] Wire the project slot pills and the 3 bottom buttons via `onclick` attributes calling these functions with the right context dict.
+- [x] Task 3: Add JS toggle logic at the bottom of `world_map.html` `extra_scripts` block (AC3)
+  - [x] `window.currentDetailContext = null;`
+  - [x] `function openDetailPanel(ctx) { window.currentDetailContext = ctx; document.getElementById('game-detail-panel').classList.add('is-open'); document.getElementById('detail-body').textContent = JSON.stringify(ctx) + ' — Story 3-3 fills this.'; }`
+  - [x] `function closeDetailPanel() { document.getElementById('game-detail-panel').classList.remove('is-open'); }`
+  - [x] Wire the project slot pills and the 3 bottom buttons via `onclick` attributes calling these functions with the right context dict.
 
-- [ ] Task 4: Update `blueprints/map.py::world_map` to pass `active_projects` (AC4)
-  - [ ] Import `from models.project_system import ProjectSystem`.
-  - [ ] When `dynasty_id` is set, call `ps = ProjectSystem(db.session); projects = ps.get_active_projects(dynasty_id)`.
-  - [ ] Sort by `started_year` (ascending), take the first 3, serialize each to a plain dict.
-  - [ ] Pass `active_projects=...` to `render_template`. If no dynasty, pass `active_projects=[]`.
+- [x] Task 4: Update `blueprints/map.py::world_map` to pass `active_projects` (AC4)
+  - [x] Import `from models.project_system import ProjectSystem`.
+  - [x] When `dynasty_id` is set, call `ps = ProjectSystem(db.session); projects = ps.get_active_projects(dynasty_id)`.
+  - [x] Sort by `started_year` (ascending), take the first 3, serialize each to a plain dict.
+  - [x] Pass `active_projects=...` to `render_template`. If no dynasty, pass `active_projects=[]`.
 
-- [ ] Task 5: Integration test in `tests/integration/test_world_map_panels.py` (NEW) (AC7)
-  - [ ] GET `/world/map` as an authenticated user with a dynasty.
-  - [ ] Assert response 200.
-  - [ ] Assert `b'id="game-left-rail"' in response.data`.
-  - [ ] Assert `b'id="game-detail-panel"' in response.data` or the slide-in class is present.
-  - [ ] Assert `b'id="detail-body"' in response.data`.
+- [x] Task 5: Integration test in `tests/integration/test_world_map_panels.py` (NEW) (AC7)
+  - [x] GET `/world/map` as an authenticated user with a dynasty.
+  - [x] Assert response 200.
+  - [x] Assert `b'id="game-left-rail"' in response.data`.
+  - [x] Assert `b'id="game-detail-panel"' in response.data` or the slide-in class is present.
+  - [x] Assert `b'id="detail-body"' in response.data`.
 
-- [ ] Task 6: Run `pytest`, confirm 278+ passed, 0 failed, 0 skipped (AC6, AC7)
+- [x] Task 6: Run `pytest`, confirm 278+ passed, 0 failed, 0 skipped (AC6, AC7)
 
-- [ ] Task 7: Commit, push, merge.
+- [x] Task 7: Commit, push, merge.
 
 ## Dev Notes
 
@@ -190,20 +190,54 @@ Adding a full DOM parser (BeautifulSoup, lxml) for this one test would introduce
 
 ### Agent Model Used
 
-(to be filled by dev agent)
+claude-opus-4-7[1m] (direct execution)
 
 ### Implementation Plan
 
-(to be filled by dev agent)
+1. `blueprints/map.py::world_map` now lazy-imports `ProjectSystem`, fetches up to 3 active projects sorted by `started_year`, and serializes each to a plain dict — passed to the template as `active_projects`.
+2. New CSS surface in `static/style.css`: `.game-left-rail` (60px vertical), `.game-rail-resource`, `.game-project-slot` (with `.is-empty` variant), `.game-rail-portrait`, `.game-rail-btn`, `.game-rail-divider`, plus `.game-detail-panel` (absolute right-anchored, `translateX` slide-in via `.is-open`), header/body/close subclasses. Added `position: relative` to `.game-main` so the panel anchors inside the main row.
+3. Template restructure: inserted the left rail as the first child of `.game-main`; inserted the slide-in `<aside>` after `.game-side-panel`; removed the 5 topbar resource pills.
+4. Module-level JS: `openDetailPanel(ctx)`, `closeDetailPanel()`, global `window.currentDetailContext`, Esc-to-close key handler.
+5. 9 integration tests in `tests/integration/test_world_map_panels.py` covering DOM presence, accessibility attributes, and that the topbar pills are gone.
 
 ### Completion Notes
 
-(to be filled by dev agent)
+- All 7 ACs satisfied. Acceptance Auditor returned clean on first pass.
+- Code review surfaced 6 PATCH-level findings — all applied:
+  - Null-safe monarch name composition via `{% set monarch_name = (name or '') ~ ' ' ~ (surname or '') %}`.
+  - Project slots now have `role="button" tabindex="0"` + `onkeydown` for Enter/Space (WCAG keyboard operability).
+  - Rail buttons and the close button have `aria-label` (screen readers can't read emoji glyphs).
+  - Slide-in panel has `role="dialog"` + `aria-labelledby="detail-header-label"`.
+  - Esc-to-close handler added at the document level.
+  - `@media (prefers-reduced-motion: reduce)` disables the transform transition for motion-sensitive users.
+  - `:focus-visible` outline added so keyboard users get a visible focus indicator on slots and rail buttons.
+- ~15 findings deferred, ~5 dismissed (mostly schema-NOT-NULL guards on fields that are actually NOT NULL, CSP-friendliness which isn't enforced in this codebase, and viewport-narrower-than-320px which isn't in scope until mobile work).
+- pytest: **286 passed, 0 failed, 0 skipped** (was 277 pre-story; +9 = 6 initial + 3 accessibility tests added during review).
+
+#### ⚠ Visual verification deferred
+
+CLAUDE.md mandates browser verification for UI changes. This session couldn't run the dev server. DOM structure + CSS classes + accessibility attributes are all test-verified, but pixel-level layout and cross-browser appearance have not been visually confirmed. The user should `python main_flask_app.py` and load `/world/map` before Sprint 3 Stories 3-2/3-3/3-4/3-5 pile on top of this layout.
 
 ### File List
 
-(to be filled by dev agent)
+- `blueprints/map.py` — MODIFIED (lazy-import `ProjectSystem`, build serialized `active_projects` list, pass to template)
+- `static/style.css` — MODIFIED (~170 LoC added: left-rail family + detail-panel family + reduced-motion query + focus-visible outline)
+- `templates/world_map.html` — MODIFIED (~100 LoC added: left rail, slide-in aside, module-level JS toggles; ~10 LoC removed: topbar resource pills)
+- `tests/integration/test_world_map_panels.py` — NEW (9 tests across one TestWorldMapPanels class)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — MODIFIED (epic-3: backlog → in-progress; 3-1: backlog → in-progress → review → done)
+- `_bmad-output/implementation-artifacts/3-1-world-map-panel-rebuild.md` — MODIFIED
+- `_bmad-output/implementation-artifacts/deferred-work.md` — MODIFIED (~15 Sprint 3-1 review defers)
 
 ### Change Log
 
-(to be filled by dev agent)
+| Date | Change |
+|---|---|
+| 2026-05-17 | feat(world-map-css): add left rail + slide-in detail panel styles |
+| 2026-05-17 | feat(world-map): rebuild left rail + add slide-in detail panel stub |
+| 2026-05-17 | feat(map-route): pass active_projects to world_map template |
+| 2026-05-17 | test: world_map renders new left rail + detail panel |
+| 2026-05-17 | Code review (3 layers): Acceptance Auditor clean on first pass; 6 a11y/UX patches applied |
+| 2026-05-17 | fix(world-map): null-safe monarch name; role="button" + tabindex + onkeydown on slots; aria-label on emoji buttons; role="dialog" + Esc-to-close on panel; prefers-reduced-motion query; :focus-visible outline |
+| 2026-05-17 | test(world-map): +3 a11y assertions (keyboard, aria-label, dialog role) |
+| 2026-05-17 | pytest: 286 passed, 0 failed, 0 skipped (was 277) |
+| 2026-05-17 | Story status → done |

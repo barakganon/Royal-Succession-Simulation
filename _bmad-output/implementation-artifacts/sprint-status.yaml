@@ -110,7 +110,7 @@ development_status:
   # Audit existing world_map.html canvas + tooltip code; implement left rail (60px
   # icon strip: CoA, resources, 3 project slots, monarch portrait, chronicle/world/war
   # buttons); stub right detail panel as slide-in <aside>.
-  3-1-world-map-panel-rebuild: in-progress
+  3-1-world-map-panel-rebuild: done
 
   # Story 3-2: Right-click context menu + cost-preview submenu
   # Vanilla JS right-click on hex → context menu with territory name + actions;

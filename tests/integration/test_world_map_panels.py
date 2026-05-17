@@ -66,3 +66,24 @@ class TestWorldMapPanels:
         # Sanity: removing the topbar pills must not have stripped the name.
         response = wmp_client.get('/world/map')
         assert b'House Rail' in response.data
+
+    def test_project_slots_are_keyboard_operable(self, wmp_client):
+        # AC1 + review patch: slots use <div role="button" tabindex="0">
+        # with onkeydown, not just onclick.
+        response = wmp_client.get('/world/map')
+        assert b'role="button"' in response.data
+        assert b'tabindex="0"' in response.data
+        assert b'onkeydown=' in response.data
+
+    def test_nav_buttons_have_aria_labels(self, wmp_client):
+        # AC1 + review patch: emoji-only nav buttons need accessible names.
+        response = wmp_client.get('/world/map')
+        assert b'aria-label="Open chronicle"' in response.data
+        assert b'aria-label="Open world overview"' in response.data
+        assert b'aria-label="Open war overview"' in response.data
+
+    def test_detail_panel_has_dialog_role(self, wmp_client):
+        # AC2 + review patch: the slide-in is a dialog for screen readers.
+        response = wmp_client.get('/world/map')
+        assert b'role="dialog"' in response.data
+        assert b'aria-labelledby="detail-header-label"' in response.data

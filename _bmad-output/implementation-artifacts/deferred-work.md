@@ -34,6 +34,24 @@ All items below are pre-existing issues in `blueprints/dynasty.py` surfaced duri
 
 - **`living_persons` snapshot excludes newly-created persons** [`models/turn_processor.py:99-102`] — persons created by `process_marriage_check` or `process_childbirth_check` are never added to the in-loop snapshot; new spouses and children receive no lifecycle processing in the same turn they're created. Pre-existing simulation accuracy gap; fix when rewriting lifecycle iteration in Sprint 6 or later.
 
+## Deferred from: code review of 3-1-world-map-panel-rebuild (2026-05-17)
+
+- **Inline `onclick=` / `onkeydown=` attributes in world_map.html** — CSP-hostile (forces `unsafe-inline`). Pre-existing codebase pattern; consider extracting to event listeners + data-attributes when CSP is enforced in Sprint 11.
+- **`window.currentDetailContext` / `window.openDetailPanel` / `window.closeDetailPanel` pollute global namespace** [`templates/world_map.html`] — required because the inline `onclick=` attributes can't reach IIFE-scoped functions. Same fix-point as the CSP item above.
+- **SVG strings rendered with `| safe`** [`templates/world_map.html`] — `coat_of_arms_svg` and `portrait_svg` are server-generated; if any future feature lets a user submit SVG, this is an XSS vector. Sprint 11 security pass.
+- **z-index `50` magic number on `.game-detail-panel`** [`static/style.css`] — no documented stacking-context contract. Add a constants comment block when more overlays land.
+- **`:` width 320px on detail panel may overflow narrow viewports** [`static/style.css`] — mobile responsiveness not in scope until a dedicated mobile sprint.
+- **`.game-left-rail` `overflow-y: auto` produces a Windows-style scrollbar that eats half the 60px column** [`static/style.css`] — add `scrollbar-width: thin` when this surfaces in cross-platform QA.
+- **No focus trap inside `.game-detail-panel`** [`templates/world_map.html`] — only the close button is focusable in the stub; Story 3-3 must add a focus trap when it wires real content with multiple focusable children.
+- **Test count of `'game-project-slot is-empty'` substrings is class-order-brittle** [`tests/integration/test_world_map_panels.py`] — works today because the template emits a stable class order; revisit if the slot template grows conditional classes.
+- **`projects.sort(key=lambda p: p.started_year)` no `or 0` fallback** [`blueprints/map.py:world_map`] — `started_year` is `nullable=False` per Story 2-1; unreachable in practice.
+- **No assertion that `active_projects` filtering is dynasty-scoped beyond `get_active_projects(dynasty_id)`** [`blueprints/map.py:world_map`] — `get_active_projects` already filters by `dynasty_id`; defense-in-depth would re-check at the route, but is redundant.
+- **Lazy `from models.project_system import ProjectSystem` inside the route** [`blueprints/map.py:world_map`] — matches existing lazy-import pattern in the same file (Story 1-3 used the same convention for `EconomySystem`).
+- **`projects[:3]` cap not surfaced as a constant** [`blueprints/map.py:world_map`, `templates/world_map.html` `range(3)`] — two hard-codes for "3 slots". Lift to `PROJECT_SLOT_COUNT` constant when Sprint 4 introduces the free-action split.
+- **No test for the populated-slot case (active_projects has 1/2/3 entries)** [`tests/integration/test_world_map_panels.py`] — would require building a real Project row in the test setup; Story 3-3 will exercise this path more naturally when it fills the detail body.
+- **`project_type[:2] | upper` slice may render `BU` for `build_farm` rather than the more semantic `BF` or `FA`** [`templates/world_map.html`] — Story 3-3 should wire `_PROJECT_LABELS` from Story 2-4 for human-readable abbreviations.
+- **No "missing assets" fallback if SVG strings are empty but non-null** [`templates/world_map.html`] — `{% if ... and dynasty.coat_of_arms_svg %}` covers None; doesn't cover empty-string SVG. Rare; defer.
+
 ## Deferred from: code review of 2-4-multi-generation-story-hook (2026-05-17)
 
 - **`_llm_available()` duplicated in `models/project_system.py` and `models/turn_processor.py`** — intentional to avoid a circular import (turn_processor already imports project_system). Sprint 11 cleanup should lift both into `utils/llm_guard.py`.

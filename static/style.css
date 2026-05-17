@@ -987,6 +987,18 @@ body.game-page { overflow: hidden; }
   transform: translateX(0);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .game-detail-panel {
+    transition: none;
+  }
+}
+
+.game-project-slot:focus-visible,
+.game-rail-btn:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
 .game-detail-panel-header {
   display: flex;
   align-items: center;

@@ -74,14 +74,20 @@
         {% if active_projects and i < active_projects|length %}
           {% set p = active_projects[i] %}
           <div class="game-project-slot"
+               role="button" tabindex="0"
+               aria-label="Project {{ p.project_type }}, year {{ p.started_year }} to {{ p.completion_year }}"
                title="{{ p.project_type }} ({{ p.started_year }}–{{ p.completion_year }})"
-               onclick="openDetailPanel({type:'project', id:{{ p.id }}})">
+               onclick="openDetailPanel({type:'project', id:{{ p.id }}})"
+               onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openDetailPanel({type:'project', id:{{ p.id }}});}">
             {{ p.project_type[:2] | upper }}
           </div>
         {% else %}
           <div class="game-project-slot is-empty"
+               role="button" tabindex="0"
+               aria-label="Empty project slot {{ i + 1 }}"
                title="Empty project slot {{ i + 1 }}"
-               onclick="openDetailPanel({type:'project_slot', index:{{ i }}})">
+               onclick="openDetailPanel({type:'project_slot', index:{{ i }}})"
+               onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openDetailPanel({type:'project_slot', index:{{ i }}});}">
             {{ i + 1 }}
           </div>
         {% endif %}
@@ -89,8 +95,13 @@
 
       <div class="game-rail-divider"></div>
 
-      <!-- Monarch portrait -->
-      <div class="game-rail-portrait" title="{{ current_monarch.name + ' ' + current_monarch.surname if current_monarch else 'No monarch' }}">
+      <!-- Monarch portrait — null-safe name composition -->
+      {% if current_monarch %}
+        {% set monarch_name = (current_monarch.name or '') ~ ' ' ~ (current_monarch.surname or '') %}
+      {% else %}
+        {% set monarch_name = 'No monarch' %}
+      {% endif %}
+      <div class="game-rail-portrait" title="{{ monarch_name | trim }}" aria-label="Current monarch: {{ monarch_name | trim }}">
         {% if current_monarch and current_monarch.portrait_svg %}
           {{ current_monarch.portrait_svg | safe }}
         {% else %}
@@ -101,9 +112,15 @@
       <div class="game-rail-divider"></div>
 
       <!-- Nav buttons (Chronicle / World / War) -->
-      <button class="game-rail-btn" title="Chronicle" onclick="openDetailPanel({type:'chronicle'})">&#x1F4D6;</button>
-      <button class="game-rail-btn" title="World" onclick="openDetailPanel({type:'world'})">&#x1F30D;</button>
-      <button class="game-rail-btn" title="War" onclick="openDetailPanel({type:'war'})">&#9876;</button>
+      <button class="game-rail-btn" type="button"
+              aria-label="Open chronicle"
+              title="Chronicle" onclick="openDetailPanel({type:'chronicle'})">&#x1F4D6;</button>
+      <button class="game-rail-btn" type="button"
+              aria-label="Open world overview"
+              title="World" onclick="openDetailPanel({type:'world'})">&#x1F30D;</button>
+      <button class="game-rail-btn" type="button"
+              aria-label="Open war overview"
+              title="War" onclick="openDetailPanel({type:'war'})">&#9876;</button>
 
     </div><!-- /game-left-rail -->
 
@@ -201,10 +218,13 @@
     </div><!-- /game-side-panel -->
 
     <!-- ─────────── SLIDE-IN DETAIL PANEL (Sprint 3 Story 3-1 stub) ─────────── -->
-    <aside class="game-detail-panel" id="game-detail-panel" aria-hidden="true">
+    <aside class="game-detail-panel" id="game-detail-panel" aria-hidden="true"
+           role="dialog" aria-labelledby="detail-header-label">
       <div class="game-detail-panel-header">
         <span id="detail-header-label">Detail</span>
-        <button class="game-detail-panel-close" type="button" onclick="closeDetailPanel()" title="Close">&times;</button>
+        <button class="game-detail-panel-close" type="button"
+                aria-label="Close detail panel"
+                onclick="closeDetailPanel()" title="Close">&times;</button>
       </div>
       <div class="game-detail-panel-body" id="detail-body">
         Select a project slot, a hex, or a nav button to see details.
@@ -246,6 +266,15 @@ function closeDetailPanel() {
   panel.setAttribute('aria-hidden', 'true');
   window.currentDetailContext = null;
 }
+/* Esc closes the detail panel when it's open. */
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') {
+    var panel = document.getElementById('game-detail-panel');
+    if (panel && panel.classList.contains('is-open')) {
+      closeDetailPanel();
+    }
+  }
+});
 
 (function () {
   'use strict';
