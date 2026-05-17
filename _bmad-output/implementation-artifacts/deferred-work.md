@@ -34,6 +34,22 @@ All items below are pre-existing issues in `blueprints/dynasty.py` surfaced duri
 
 - **`living_persons` snapshot excludes newly-created persons** [`models/turn_processor.py:99-102`] — persons created by `process_marriage_check` or `process_childbirth_check` are never added to the in-loop snapshot; new spouses and children receive no lifecycle processing in the same turn they're created. Pre-existing simulation accuracy gap; fix when rewriting lifecycle iteration in Sprint 6 or later.
 
+## Deferred from: code review of 2-3-wire-projects-and-migrate-actions (2026-05-17)
+
+- **`Building.is_under_construction` referenced in `economy_system.py` but never declared on the Building model** [`models/db_models.py:Building`, `models/economy_system.py:639,748,784,815`] — pre-existing inconsistency surfaced during Story 2-3. Either the column was added via manual DB migration and the model is out of date, OR `economy_system.construct_building` has been silently erroring. Add the column declaration to the model OR remove the legacy `is_under_construction` machinery entirely (the project-completion path no longer needs it). Sprint 11 cleanup candidate.
+- **No territory ownership check in `start_project`** [`models/project_system.py:start_project`] — accepts any `target_territory_id`. Pre-existing pattern from legacy `submit_actions`; tighten in Sprint 4 free-action validation or Sprint 11 cleanup.
+- **No ownership check at project completion** [`models/project_system.py:_effect_*`] — territory may have changed hands mid-project; gameplay exploit. Defer to Sprint 5 succession drama / war-system rework.
+- **`_effect_recruit_infantry` hardcodes `UnitType.LEVY_SPEARMEN`, quality=1.0, morale=1.0, maintenance_cost=1, food_consumption=1** [`models/project_system.py`] — old `MilitarySystem.recruit_unit` had similar simplifications; fold in real military balance in Sprint 11.
+- **No upper bound on `development_level` in `_effect_develop_territory`** [`models/project_system.py`] — old `develop_territory` was also unbounded; cap when designing development tier rewards.
+- **5 catalogue entries reachable via routes but still NO-OP at completion** [`models/project_system.py:EFFECT_DISPATCHER`] — `recruit_cavalry`, `build_walls`, `build_cathedral`, `envoy_mission`, `march_army_cross_realm` complete with `[stub]` logs. Wire effects when gameplay decisions land (Sprint 4+).
+- **No resource refund / pause-vs-cancel semantics on stall** [`models/project_system.py:tick_projects`] — stalled rows just sit there; UX for resume/cancel is Sprint 3 (Epic 3 UI).
+- **`stalled_project_ids` always present in `turn_summary`** [`models/turn_processor.py`] — even on non-stall turns. Harmless; callers check `interrupt_reason` first.
+- **`_BUILDING_TYPE_TO_PROJECT_TYPE` / `_UNIT_TYPE_TO_PROJECT_TYPE` defined inside `submit_actions`** [`blueprints/dynasty.py`] — module-level constants would be cleaner; Sprint 11 cleanup.
+- **`construction_year` semantics differ between effects** [`models/project_system.py:_effect_recruit_infantry,_effect_build_farm`] — `_effect_build_farm` uses `started_year`, `_effect_recruit_infantry` uses `completion_year`. Both arguably correct (a building was started THEN; a unit came into being AT completion) but document the convention.
+- **`test_complete_sets_status_and_invokes_dispatcher` switched to `envoy_mission`** [`tests/unit/test_project_system.py`] — fragile to a future real-effect wiring of envoy_mission. Replace caplog string-match with a mock dispatcher when Sprint 11 test cleanup runs.
+- **`_make_territory` helper duplicates Region/Province creation** [`tests/unit/test_project_system.py`] — lift to a shared conftest helper if more tests need it.
+- **Bare `except Exception` in turn_processor tick/completion wiring** [`models/turn_processor.py`] — matches existing file pattern; tighten when Sprint 11 logging pass runs.
+
 ## Deferred from: code review of 2-2-project-system-logic (2026-05-17)
 
 - **`requires_building` field in catalogue not enforced by `start_project`** [`models/project_system.py:PROJECT_TYPE_CATALOGUE`] — Story 2-3 owns building-gate enforcement; until then `recruit_cavalry` can start without Stables.

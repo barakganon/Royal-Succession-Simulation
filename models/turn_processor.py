@@ -134,10 +134,11 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
             )
             stall_interrupts = []
         if stall_interrupts:
+            # Don't advance years_advanced/current_simulation_year on stall —
+            # the stalled year wasn't actually lived through (no lifecycle ran).
+            # Matches the monarch_death pattern of halting mid-year.
             stalled_project_ids = [t[2] for t in stall_interrupts]
             interrupt = ('project_stalled', current_year)
-            years_advanced += 1
-            dynasty.current_simulation_year = current_year + 1
             break
 
         try:

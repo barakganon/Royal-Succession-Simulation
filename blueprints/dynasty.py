@@ -534,6 +534,10 @@ def submit_actions(dynasty_id):
         'walls': 'build_walls',
         'cathedral': 'build_cathedral',
     }
+    _UNIT_TYPE_TO_PROJECT_TYPE = {
+        'infantry': 'recruit_infantry',
+        'cavalry': 'recruit_cavalry',
+    }
 
     ap_used = 0
     results = []
@@ -542,9 +546,17 @@ def submit_actions(dynasty_id):
         params = action.get('params', {})
         try:
             if action_type == 'recruit':
+                unit_type = params.get('unit_type', 'infantry')
+                project_type = _UNIT_TYPE_TO_PROJECT_TYPE.get(unit_type)
+                if project_type is None:
+                    results.append({
+                        'type': action_type, 'success': False,
+                        'error': f"Unknown unit_type for project mapping: {unit_type!r}",
+                    })
+                    continue
                 ps = ProjectSystem(db.session)
                 project = ps.start_project(
-                    dynasty_id, 'recruit_infantry', dynasty.current_simulation_year,
+                    dynasty_id, project_type, dynasty.current_simulation_year,
                     target_territory_id=params.get('territory_id'),
                     params={'size': int(params.get('size', 100))},
                 )
@@ -553,19 +565,11 @@ def submit_actions(dynasty_id):
                 building_type = params.get('building_type', 'farm')
                 project_type = _BUILDING_TYPE_TO_PROJECT_TYPE.get(building_type)
                 if project_type is None:
-                    if building_type == 'market':
-                        # Sprint 11-3 / Sprint 4 will add 'build_market' to the catalogue.
-                        logger.warning(
-                            "Mapping building_type='market' to 'build_farm' "
-                            "(no build_market catalogue entry yet)"
-                        )
-                        project_type = 'build_farm'
-                    else:
-                        results.append({
-                            'type': action_type, 'success': False,
-                            'error': f"Unknown building_type for project mapping: {building_type!r}",
-                        })
-                        continue
+                    results.append({
+                        'type': action_type, 'success': False,
+                        'error': f"Unknown building_type for project mapping: {building_type!r}",
+                    })
+                    continue
                 ps = ProjectSystem(db.session)
                 project = ps.start_project(
                     dynasty_id, project_type, dynasty.current_simulation_year,

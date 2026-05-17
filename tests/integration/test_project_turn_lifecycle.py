@@ -150,6 +150,128 @@ class TestBuildProjectFullLifecycle:
             assert territory.development_level == 3
 
 
+class TestProjectStalledPath:
+    """AC8 / Task 5: a project that runs out of resources mid-build emits
+    a project_stalled interrupt that halts the turn loop."""
+
+    def test_stalled_project_halts_turn_loop(self, app, db, session):
+        # build_walls: 5 years × 100g/yr. Give dynasty only enough for year 1.
+        # After the first tick year 1 has paid; year 2's tick should stall.
+        with app.test_client() as client:
+            _register_and_login(app, db, client, username="stall_user")
+            with app.app_context():
+                user = db.session.query(User).filter_by(username="stall_user").first()
+                dynasty = DynastyDB(
+                    user_id=user.id,
+                    name="House Stall",
+                    theme_identifier_or_json=VALID_THEME_KEY,
+                    current_wealth=100,  # exactly year 1's build_walls cost
+                    current_iron=0,
+                    current_timber=0,
+                    start_year=1300,
+                    current_simulation_year=1300,
+                )
+                db.session.add(dynasty)
+                db.session.commit()
+                monarch = PersonDB(
+                    dynasty_id=dynasty.id, name="Aldric", surname="Stall",
+                    gender="MALE", birth_year=1270,
+                    is_noble=True, is_monarch=True, reign_start_year=1300,
+                )
+                db.session.add(monarch)
+                region = Region(name="Stall Region", description="x")
+                db.session.add(region)
+                db.session.commit()
+                province = Province(
+                    region_id=region.id, name="Stall Province",
+                    primary_terrain=TerrainType.PLAINS,
+                )
+                db.session.add(province)
+                db.session.commit()
+                territory = Territory(
+                    province_id=province.id, name="Stall Hold",
+                    terrain_type=TerrainType.PLAINS,
+                    x_coordinate=0.0, y_coordinate=0.0,
+                    controller_dynasty_id=dynasty.id,
+                    development_level=1,
+                )
+                db.session.add(territory)
+                db.session.commit()
+                dynasty_id = dynasty.id
+                territory_id = territory.id
+
+            response = client.post(
+                f'/dynasty/{dynasty_id}/submit_actions',
+                data=json.dumps([{
+                    'type': 'build',
+                    'params': {'territory_id': territory_id, 'building_type': 'walls'},
+                }]),
+                content_type='application/json',
+                follow_redirects=True,
+            )
+            assert response.status_code == 200
+            with app.app_context():
+                projects = db.session.query(Project).filter_by(
+                    dynasty_id=dynasty_id, project_type='build_walls',
+                ).all()
+                assert len(projects) == 1
+                # After year 1 tick the project funded; year 2's tick stalled.
+                # The turn report halt should mean simulation year advanced to
+                # exactly 1301 (year 1 lived through, year 2 was the stall year
+                # which is NOT counted as advanced per AC1 fix).
+                assert projects[0].status == 'stalled'
+                d = db.session.get(DynastyDB, dynasty_id)
+                # year 1's 100g was drained, dynasty is at 0
+                assert d.current_wealth == 0
+                # 1300 (start) → ticked year 1300 successfully → year 1301 stall.
+                # current_simulation_year should be 1301 (stalled year not counted).
+                assert d.current_simulation_year == 1301
+
+
+class TestActionMappingRejections:
+    """AC4-aligned: invalid building_type / unit_type returns failure, no
+    silent substitution or data corruption."""
+
+    def test_build_market_is_rejected_not_silently_remapped(self, project_client, app, db):
+        client, (dynasty_id, _, territory_id) = project_client
+        response = client.post(
+            f'/dynasty/{dynasty_id}/submit_actions',
+            data=json.dumps([{
+                'type': 'build',
+                'params': {'territory_id': territory_id, 'building_type': 'market'},
+            }]),
+            content_type='application/json',
+            follow_redirects=True,
+        )
+        assert response.status_code == 200
+        # No build_farm project should have been silently created from the
+        # 'market' request.
+        with app.app_context():
+            projects = db.session.query(Project).filter_by(
+                dynasty_id=dynasty_id,
+            ).all()
+            assert projects == []
+
+    def test_recruit_cavalry_maps_to_recruit_cavalry_project(self, project_client, app, db):
+        client, (dynasty_id, _, territory_id) = project_client
+        # recruit_cavalry needs 80g + 10 iron — dynasty has 500g, 200 iron, fine.
+        response = client.post(
+            f'/dynasty/{dynasty_id}/submit_actions',
+            data=json.dumps([{
+                'type': 'recruit',
+                'params': {'territory_id': territory_id, 'unit_type': 'cavalry', 'size': 50},
+            }]),
+            content_type='application/json',
+            follow_redirects=True,
+        )
+        assert response.status_code == 200
+        with app.app_context():
+            projects = db.session.query(Project).filter_by(
+                dynasty_id=dynasty_id, project_type='recruit_cavalry',
+            ).all()
+            assert len(projects) == 1
+
+
 class TestInstantActionsStillWork:
     def test_march_action_still_instant(self, project_client, app, db):
         """AC5: march remains instant — no Project row created."""
