@@ -140,6 +140,29 @@ def world_map():
     # --- Dynasty wealth shortcut ---
     gold = dynasty.current_wealth if dynasty else 0
 
+    # --- Active projects for the left-rail slot pills (Sprint 3 Story 3-1) ---
+    # Serialize to plain dicts because templates can't safely access raw ORM
+    # objects (project-context.md rule). Cap at 3 (the player's slot count)
+    # sorted by started_year for deterministic ordering.
+    active_projects = []
+    if dynasty_id:
+        try:
+            from models.project_system import ProjectSystem
+            ps = ProjectSystem(db.session)
+            projects = ps.get_active_projects(dynasty_id)
+            projects.sort(key=lambda p: p.started_year)
+            active_projects = [
+                {
+                    'id': p.id,
+                    'project_type': p.project_type,
+                    'started_year': p.started_year,
+                    'completion_year': p.completion_year,
+                }
+                for p in projects[:3]
+            ]
+        except Exception as e:
+            logger.warning(f"Could not load active projects for dynasty {dynasty_id}: {e}")
+
     return render_template(
         'world_map.html',
         dynasty=dynasty,
@@ -149,6 +172,7 @@ def world_map():
         economy=economy,
         current_monarch=current_monarch,
         gold=gold,
+        active_projects=active_projects,
     )
 
 
