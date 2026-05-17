@@ -34,6 +34,22 @@ All items below are pre-existing issues in `blueprints/dynasty.py` surfaced duri
 
 - **`living_persons` snapshot excludes newly-created persons** [`models/turn_processor.py:99-102`] — persons created by `process_marriage_check` or `process_childbirth_check` are never added to the in-loop snapshot; new spouses and children receive no lifecycle processing in the same turn they're created. Pre-existing simulation accuracy gap; fix when rewriting lifecycle iteration in Sprint 6 or later.
 
+## Deferred from: code review of 2-4-multi-generation-story-hook (2026-05-17)
+
+- **`_llm_available()` duplicated in `models/project_system.py` and `models/turn_processor.py`** — intentional to avoid a circular import (turn_processor already imports project_system). Sprint 11 cleanup should lift both into `utils/llm_guard.py`.
+- **Bare `except Exception` in `_llm_available()` silently returns False on config bugs** [`models/project_system.py`] — matches pre-existing pattern; a misconfigured Flask app context masquerades as "LLM unavailable" with no warning.
+- **Inline `genai.configure()` + hardcoded `"gemini-1.5-flash"` model name** [`models/project_system.py:_chronicle_multigen_completion`] — matches `turn_processor.py` pattern. Centralize when Sprint 11 introduces a shared LLM client wrapper.
+- **No LLM timeout configured** [`models/project_system.py`] — `model.generate_content` will hang indefinitely if the API stalls; pre-existing pattern. Sprint 11 LLM hardening.
+- **Three different config key names for the Google API key** — `FLASK_APP_GOOGLE_API_KEY_PRESENT`, `FLASK_APP_GOOGLE_API_KEY`, `GOOGLE_API_KEY`. Already on the deferred list from Story 1-4 (`turn_processor.py:200`).
+- **Network errors / rate-limit / quota collapse into one warning** [`models/project_system.py`] — no retry, no circuit breaker. Sprint 11 LLM hardening.
+- **`max_output_tokens=100` paired with "Write exactly 2-3 sentences" instruction may truncate** [`models/project_system.py`, `utils/llm_prompts.py:build_multigen_project_completion_prompt`] — intentional safety under 150-token chronicle budget; revisit if truncation observed in practice.
+- **`_PROJECT_LABELS` is module-level mutable dict** [`utils/llm_prompts.py`] — convention in this codebase. Freeze with `MappingProxyType` in Sprint 11 if needed.
+- **No prompt-injection sanitization on monarch / dynasty names** [`utils/llm_prompts.py`, `models/project_system.py`] — a user-controlled dynasty name with `"Ignore previous instructions and ..."` flows straight into the LLM. Real concern; Sprint 11 security pass should sanitize across all prompt builders.
+- **Hardcoded `'project_completed_multigen'` event_type string** [`models/project_system.py`, `tests/unit/test_project_system.py`] — no constant / enum; typo risk. Sprint 11 introduces an EventType enum.
+- **Fallback ignores `dynasty_name` parameter** [`utils/llm_prompts.py:generate_multigen_project_completion_fallback`] — true but harmless; master plan template doesn't use it. Remove or use.
+- **Hook fires before commit; the "queued" INFO log overstates if commit fails** [`models/project_system.py`] — cosmetic; outer commit failure produces its own warning.
+- **No fractional-year refund / partial-progress tests for ProjectSystem** — Story 2-3 deferred; not introduced by 2-4 but worth restating.
+
 ## Deferred from: code review of 2-3-wire-projects-and-migrate-actions (2026-05-17)
 
 - **`Building.is_under_construction` referenced in `economy_system.py` but never declared on the Building model** [`models/db_models.py:Building`, `models/economy_system.py:639,748,784,815`] — pre-existing inconsistency surfaced during Story 2-3. Either the column was added via manual DB migration and the model is out of date, OR `economy_system.construct_building` has been silently erroring. Add the column declaration to the model OR remove the legacy `is_under_construction` machinery entirely (the project-completion path no longer needs it). Sprint 11 cleanup candidate.

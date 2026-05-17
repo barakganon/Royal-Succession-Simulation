@@ -1,4 +1,9 @@
-from utils.llm_prompts import build_turn_story_prompt, generate_turn_story_fallback
+from utils.llm_prompts import (
+    build_multigen_project_completion_prompt,
+    build_turn_story_prompt,
+    generate_multigen_project_completion_fallback,
+    generate_turn_story_fallback,
+)
 
 
 class TestBuildTurnStoryPrompt:
@@ -83,3 +88,71 @@ class TestGenerateTurnStoryFallback:
     def test_returns_non_empty_for_no_events_death(self):
         result = self._call(events=[], interrupt_reason='monarch_death')
         assert len(result) > 20
+
+
+class TestMultigenProjectCompletionPrompt:
+    def _kwargs(self, **overrides):
+        kwargs = dict(
+            project_type='build_cathedral',
+            initiator_name='Aldric I',
+            completer_name='Eldred III',
+            dynasty_name='Anjou',
+            started_year=1300,
+            completion_year=1315,
+        )
+        kwargs.update(overrides)
+        return kwargs
+
+    def test_prompt_includes_both_names(self):
+        result = build_multigen_project_completion_prompt(**self._kwargs())
+        assert 'Aldric I' in result
+        assert 'Eldred III' in result
+
+    def test_prompt_mentions_both_years(self):
+        result = build_multigen_project_completion_prompt(**self._kwargs())
+        assert '1300' in result
+        assert '1315' in result
+
+    def test_prompt_uses_human_project_label(self):
+        result = build_multigen_project_completion_prompt(**self._kwargs())
+        assert 'Cathedral' in result
+
+
+class TestMultigenProjectCompletionFallback:
+    def _kwargs(self, **overrides):
+        kwargs = dict(
+            project_type='build_cathedral',
+            initiator_name='Aldric I',
+            completer_name='Eldred III',
+            dynasty_name='Anjou',
+            started_year=1300,
+            completion_year=1315,
+        )
+        kwargs.update(overrides)
+        return kwargs
+
+    def test_template_matches_master_plan(self):
+        # "What X began ... Y finished ... the [label] stands."
+        result = generate_multigen_project_completion_fallback(**self._kwargs())
+        assert result.startswith('What Aldric I began')
+        assert 'Eldred III finished' in result
+        assert result.endswith('the Cathedral stands.')
+
+    def test_label_render_for_known_types(self):
+        for project_type, expected_label in [
+            ('build_cathedral', 'Cathedral'),
+            ('build_walls', 'Walls'),
+            ('build_farm', 'Farm'),
+            ('develop_territory', 'territory development'),
+            ('recruit_infantry', 'levy'),
+        ]:
+            result = generate_multigen_project_completion_fallback(
+                **self._kwargs(project_type=project_type)
+            )
+            assert f'the {expected_label} stands.' in result
+
+    def test_label_render_for_unknown_type_falls_back_to_humanized(self):
+        result = generate_multigen_project_completion_fallback(
+            **self._kwargs(project_type='build_alien_spaceship')
+        )
+        assert 'the build alien spaceship stands.' in result

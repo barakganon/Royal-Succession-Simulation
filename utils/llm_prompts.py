@@ -177,3 +177,56 @@ def generate_turn_story_fallback(dynasty_name, start_year, end_year, events, mon
         f'beneath the banner of {dynasty_name}. '
         f'{monarch_name} ruled with measured hand, and the realm held its breath.'
     )
+
+
+# ---------------------------------------------------------------------------
+# Multi-generation project completion (Sprint 2 Story 2-4)
+# ---------------------------------------------------------------------------
+_PROJECT_LABELS = {
+    'build_farm': 'Farm',
+    'build_walls': 'Walls',
+    'build_cathedral': 'Cathedral',
+    'develop_territory': 'territory development',
+    'recruit_infantry': 'levy',
+    'recruit_cavalry': 'cavalry',
+    'envoy_mission': 'envoy mission',
+    'march_army_cross_realm': 'cross-realm march',
+}
+
+
+def _project_label(project_type: str) -> str:
+    return _PROJECT_LABELS.get(project_type, project_type.replace('_', ' '))
+
+
+def build_multigen_project_completion_prompt(project_type: str, initiator_name: str,
+                                             completer_name: str, dynasty_name: str,
+                                             started_year: int, completion_year: int) -> str:
+    """Prompt for the multi-generational project completion chronicle line.
+
+    max_tokens=100. Style: medieval chronicler, 2-3 sentences.
+    Fallback: generate_multigen_project_completion_fallback().
+    """
+    label = _project_label(project_type)
+    years = completion_year - started_year
+    return (
+        f"You are a medieval chronicler of {dynasty_name}. "
+        f"The {label} project was begun by {initiator_name} in the year {started_year} "
+        f"and finally completed by {completer_name} in the year {completion_year} "
+        f"({years} years later, under a different ruler). "
+        f"Write exactly 2-3 sentences in the style of a medieval chronicle — formal, "
+        f"dramatic, third-person. Mention both rulers by name. Do not use modern language."
+    )
+
+
+def generate_multigen_project_completion_fallback(project_type: str, initiator_name: str,
+                                                  completer_name: str, dynasty_name: str,
+                                                  started_year: int, completion_year: int) -> str:
+    """Rule-based fallback when LLM is unavailable.
+
+    Returns the master-plan template: "What X began, Y finished — the [label] stands."
+    """
+    label = _project_label(project_type)
+    return (
+        f"What {initiator_name} began in {started_year}, "
+        f"{completer_name} finished in {completion_year} — the {label} stands."
+    )
