@@ -15,7 +15,10 @@ from typing import Callable, Dict, List, Tuple
 
 from sqlalchemy.orm import Session
 
-from models.db_models import DynastyDB, PersonDB, Project
+from models.db_models import (
+    Building, BuildingType, DynastyDB, MilitaryUnit, PersonDB,
+    Project, Territory, UnitType,
+)
 
 logger = logging.getLogger('royal_succession.project_system')
 
@@ -110,9 +113,13 @@ PROJECT_TYPE_CATALOGUE: Dict[str, Dict] = {
 
 
 # ---------------------------------------------------------------------------
-# Effect dispatcher — invoked by complete_project. Story 2-3 replaces the
-# stub bodies with real subsystem calls (MilitarySystem.recruit_unit,
-# EconomySystem.construct_building, etc.).
+# Effect dispatcher — invoked by complete_project.
+#
+# Story 2-3 wires three real effects (recruit_infantry, build_farm,
+# develop_territory) that mutate game state without re-charging resources
+# (tick_projects already drained the full cost over the project's duration).
+# The other catalogue entries remain NO-OP stubs until later sprints decide
+# their gameplay mechanics.
 # ---------------------------------------------------------------------------
 def _stub_effect(session: Session, project: Project) -> None:
     logger.info(
@@ -121,8 +128,83 @@ def _stub_effect(session: Session, project: Project) -> None:
     )
 
 
+def _effect_recruit_infantry(session: Session, project: Project) -> None:
+    params = project.get_params()
+    size = int(params.get('size', 100))
+    unit = MilitaryUnit(
+        dynasty_id=project.dynasty_id,
+        unit_type=UnitType.LEVY_SPEARMEN,
+        size=size,
+        territory_id=project.target_territory_id,
+        quality=1.0,
+        morale=1.0,
+        maintenance_cost=1,
+        food_consumption=1,
+        created_year=project.completion_year,
+    )
+    session.add(unit)
+    logger.info(
+        "Project %s completed: recruited %s LEVY_SPEARMEN at territory %s for dynasty %s",
+        project.id, size, project.target_territory_id, project.dynasty_id,
+    )
+
+
+def _effect_build_farm(session: Session, project: Project) -> None:
+    if project.target_territory_id is None:
+        logger.warning(
+            "build_farm project %s has no target_territory_id — skipping building creation",
+            project.id,
+        )
+        return
+    # NB: Building model does not declare `is_under_construction` — though
+    # `economy_system.py` references it. That inconsistency is pre-existing
+    # and logged in deferred-work.md; the project-completion path simply
+    # creates the row in its finished state without touching that flag.
+    building = Building(
+        territory_id=project.target_territory_id,
+        building_type=BuildingType.FARM,
+        name='Farm',
+        level=1,
+        condition=1.0,
+        construction_year=project.started_year,
+    )
+    session.add(building)
+    logger.info(
+        "Project %s completed: built FARM in territory %s for dynasty %s",
+        project.id, project.target_territory_id, project.dynasty_id,
+    )
+
+
+def _effect_develop_territory(session: Session, project: Project) -> None:
+    if project.target_territory_id is None:
+        logger.warning(
+            "develop_territory project %s has no target_territory_id — skipping",
+            project.id,
+        )
+        return
+    territory = session.get(Territory, project.target_territory_id)
+    if territory is None:
+        logger.warning(
+            "develop_territory project %s targets missing territory %s",
+            project.id, project.target_territory_id,
+        )
+        return
+    territory.development_level = (territory.development_level or 1) + 1
+    logger.info(
+        "Project %s completed: territory %s development_level → %s",
+        project.id, territory.id, territory.development_level,
+    )
+
+
 EFFECT_DISPATCHER: Dict[str, Callable[[Session, Project], None]] = {
-    project_type: _stub_effect for project_type in PROJECT_TYPE_CATALOGUE
+    'recruit_infantry': _effect_recruit_infantry,
+    'recruit_cavalry': _stub_effect,
+    'build_farm': _effect_build_farm,
+    'build_walls': _stub_effect,
+    'build_cathedral': _stub_effect,
+    'develop_territory': _effect_develop_territory,
+    'envoy_mission': _stub_effect,
+    'march_army_cross_realm': _stub_effect,
 }
 
 

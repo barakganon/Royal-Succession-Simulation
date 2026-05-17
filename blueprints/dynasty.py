@@ -20,6 +20,9 @@ from models.game_manager import GameManager
 from models.economy_system import EconomySystem
 from models.military_system import MilitarySystem
 from models.diplomacy_system import DiplomacySystem
+from models.project_system import (
+    InsufficientResourcesError, ProjectSystem,
+)
 from models.turn_processor import process_dynasty_turn
 from utils.theme_manager import get_all_theme_names, generate_theme_from_story_llm, get_theme
 from visualization.heraldry_renderer import generate_coat_of_arms
@@ -523,6 +526,19 @@ def submit_actions(dynasty_id):
 
     actions = request.get_json() or []
 
+    # Sprint 2 Story 2-3: recruit/build/develop become multi-year projects
+    # via ProjectSystem.start_project. march/trade/war remain instant — Sprint 4
+    # (Story 4-1 free_action endpoint) will split them out as free actions.
+    _BUILDING_TYPE_TO_PROJECT_TYPE = {
+        'farm': 'build_farm',
+        'walls': 'build_walls',
+        'cathedral': 'build_cathedral',
+    }
+    _UNIT_TYPE_TO_PROJECT_TYPE = {
+        'infantry': 'recruit_infantry',
+        'cavalry': 'recruit_cavalry',
+    }
+
     ap_used = 0
     results = []
     for action in actions[:3]:
@@ -530,31 +546,59 @@ def submit_actions(dynasty_id):
         params = action.get('params', {})
         try:
             if action_type == 'recruit':
-                ms = MilitarySystem(db.session)
-                ms.recruit_unit(dynasty_id, params.get('unit_type', 'infantry'),
-                                int(params.get('size', 100)), params.get('territory_id'))
-                results.append({'type': action_type, 'success': True})
+                unit_type = params.get('unit_type', 'infantry')
+                project_type = _UNIT_TYPE_TO_PROJECT_TYPE.get(unit_type)
+                if project_type is None:
+                    results.append({
+                        'type': action_type, 'success': False,
+                        'error': f"Unknown unit_type for project mapping: {unit_type!r}",
+                    })
+                    continue
+                ps = ProjectSystem(db.session)
+                project = ps.start_project(
+                    dynasty_id, project_type, dynasty.current_simulation_year,
+                    target_territory_id=params.get('territory_id'),
+                    params={'size': int(params.get('size', 100))},
+                )
+                results.append({'type': action_type, 'success': True, 'project_id': project.id})
             elif action_type == 'build':
-                es = EconomySystem(db.session)
-                es.construct_building(params.get('territory_id'), params.get('building_type', 'farm'))
-                results.append({'type': action_type, 'success': True})
+                building_type = params.get('building_type', 'farm')
+                project_type = _BUILDING_TYPE_TO_PROJECT_TYPE.get(building_type)
+                if project_type is None:
+                    results.append({
+                        'type': action_type, 'success': False,
+                        'error': f"Unknown building_type for project mapping: {building_type!r}",
+                    })
+                    continue
+                ps = ProjectSystem(db.session)
+                project = ps.start_project(
+                    dynasty_id, project_type, dynasty.current_simulation_year,
+                    target_territory_id=params.get('territory_id'),
+                )
+                results.append({'type': action_type, 'success': True, 'project_id': project.id})
             elif action_type == 'develop':
-                es = EconomySystem(db.session)
-                es.develop_territory(params.get('territory_id'), dynasty_id)
-                results.append({'type': action_type, 'success': True})
+                ps = ProjectSystem(db.session)
+                project = ps.start_project(
+                    dynasty_id, 'develop_territory', dynasty.current_simulation_year,
+                    target_territory_id=params.get('territory_id'),
+                )
+                results.append({'type': action_type, 'success': True, 'project_id': project.id})
             elif action_type == 'march':
+                # Sprint 4 free-action split owns this — keeping instant.
                 army = Army.query.filter_by(id=params.get('army_id'), dynasty_id=dynasty_id).first()
                 if army:
                     army.territory_id = params.get('territory_id')
                     db.session.commit()
                 results.append({'type': action_type, 'success': bool(army)})
             elif action_type == 'trade':
+                # Sprint 4 free-action split owns this — keeping instant.
                 es = EconomySystem(db.session)
                 es.establish_trade_route(params.get('source_id'), params.get('target_id'),
                                          params.get('resource_type', 'food'),
                                          int(params.get('amount', 50)))
                 results.append({'type': action_type, 'success': True})
             elif action_type == 'war':
+                # Sprint 4 free-action split owns this — keeping instant.
                 ds = DiplomacySystem(db.session)
                 ds.declare_war(dynasty_id, params.get('target_dynasty_id'),
                                params.get('casus_belli', 'conquest'))
@@ -563,6 +607,9 @@ def submit_actions(dynasty_id):
                 results.append({'type': action_type, 'success': False, 'error': 'Unknown action type'})
                 continue
             ap_used += 1
+        except InsufficientResourcesError as e:
+            logger.warning(f"Action {action_type} failed for dynasty {dynasty_id}: {e}")
+            results.append({'type': action_type, 'success': False, 'error': str(e)})
         except Exception as e:
             logger.warning(f"Action {action_type} failed for dynasty {dynasty_id}: {e}")
             results.append({'type': action_type, 'success': False, 'error': str(e)})

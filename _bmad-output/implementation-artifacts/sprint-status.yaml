@@ -93,7 +93,7 @@ development_status:
   # tick_projects runs before lifecycle each year; migrate 6 submit_actions action
   # types into project-starter dispatchers; replace Building.is_under_construction
   # machinery with active Project of type build_*.
-  2-3-wire-projects-and-migrate-actions: backlog
+  2-3-wire-projects-and-migrate-actions: done
 
   # Story 2-4: Multi-generation chronicle hook
   # When project completes under different monarch than started it, generate
