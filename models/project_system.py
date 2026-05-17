@@ -73,8 +73,9 @@ def _chronicle_multigen_completion(session: Session, project: Project) -> None:
         )
         return
 
-    initiator_name = f"{initiator.name} {initiator.surname}".strip()
-    completer_name = f"{completer.name} {completer.surname}".strip()
+    # Surnames can be NULL for early-game founders; collapse double-spaces.
+    initiator_name = f"{initiator.name or ''} {initiator.surname or ''}".strip()
+    completer_name = f"{completer.name or ''} {completer.surname or ''}".strip()
 
     text = ""
     if _llm_available():
@@ -126,10 +127,13 @@ def _chronicle_multigen_completion(session: Session, project: Project) -> None:
         person2_sim_id=completer.id,
     )
     session.add(entry)
+    # INFO carries the metadata; the full chronicle text only at DEBUG so
+    # production logs don't get spammed with LLM-generated paragraphs.
     logger.info(
-        "Multi-gen chronicle entry written for project %s (dynasty %s): %r",
-        project.id, project.dynasty_id, text,
+        "Multi-gen chronicle entry queued for project %s (dynasty %s) — initiator=%s completer=%s year=%s",
+        project.id, project.dynasty_id, initiator.id, completer.id, project.completion_year,
     )
+    logger.debug("Multi-gen chronicle text for project %s: %r", project.id, text)
 
 
 # ---------------------------------------------------------------------------

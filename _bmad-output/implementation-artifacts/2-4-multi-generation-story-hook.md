@@ -1,6 +1,6 @@
 # Story 2-4: Multi-Generation Chronicle Hook
 
-Status: in-progress
+Status: done
 
 ## Story
 
@@ -24,34 +24,34 @@ so that "What Aldric I began, Eldred III finished — the Cathedral of the Saint
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add the two prompt functions to `utils/llm_prompts.py` (AC1, AC2)
-  - [ ] `build_multigen_project_completion_prompt(project_type, initiator_name, completer_name, dynasty_name, started_year, completion_year) -> str`
-  - [ ] `generate_multigen_project_completion_fallback(project_type, initiator_name, completer_name, dynasty_name, started_year, completion_year) -> str` — uses a module-level `_PROJECT_LABELS` dict to map project_type → human label.
+- [x] Task 1: Add the two prompt functions to `utils/llm_prompts.py` (AC1, AC2)
+  - [x] `build_multigen_project_completion_prompt(project_type, initiator_name, completer_name, dynasty_name, started_year, completion_year) -> str`
+  - [x] `generate_multigen_project_completion_fallback(project_type, initiator_name, completer_name, dynasty_name, started_year, completion_year) -> str` — uses a module-level `_PROJECT_LABELS` dict to map project_type → human label.
 
-- [ ] Task 2: Add `_chronicle_multigen_completion(session, project)` helper inside `models/project_system.py` (AC3, AC4, AC5)
-  - [ ] Resolve initiator and completer `PersonDB` rows.
-  - [ ] If either is None, log at DEBUG and return (AC4).
-  - [ ] If `initiator.id == completer.id`, return (AC3 negative branch).
-  - [ ] Try LLM via the same `_llm_available()` guard as `turn_processor.py` — copy the helper inline at module level. On any failure, use the fallback.
-  - [ ] Build the `HistoryLogEntryDB` row and add to session. Caller (`complete_project`) commits once at the end.
+- [x] Task 2: Add `_chronicle_multigen_completion(session, project)` helper inside `models/project_system.py` (AC3, AC4, AC5)
+  - [x] Resolve initiator and completer `PersonDB` rows.
+  - [x] If either is None, log at DEBUG and return (AC4).
+  - [x] If `initiator.id == completer.id`, return (AC3 negative branch).
+  - [x] Try LLM via the same `_llm_available()` guard as `turn_processor.py` — copy the helper inline at module level. On any failure, use the fallback.
+  - [x] Build the `HistoryLogEntryDB` row and add to session. Caller (`complete_project`) commits once at the end.
 
-- [ ] Task 3: Call `_chronicle_multigen_completion` from `complete_project` (AC3)
-  - [ ] Invoke AFTER `effect_fn(self.session, project)` returns successfully, BEFORE the final `self.session.commit()`.
+- [x] Task 3: Call `_chronicle_multigen_completion` from `complete_project` (AC3)
+  - [x] Invoke AFTER `effect_fn(self.session, project)` returns successfully, BEFORE the final `self.session.commit()`.
 
-- [ ] Task 4: Unit tests for `utils/llm_prompts.py` (AC6)
-  - [ ] `test_multigen_prompt_includes_both_names`
-  - [ ] `test_multigen_fallback_template_matches_master_plan`
-  - [ ] `test_multigen_fallback_project_label_for_known_types` (cathedral, walls, farm, develop_territory, recruit_infantry)
-  - [ ] `test_multigen_fallback_project_label_for_unknown_type` — uses `replace('_', ' ')`
+- [x] Task 4: Unit tests for `utils/llm_prompts.py` (AC6)
+  - [x] `test_multigen_prompt_includes_both_names`
+  - [x] `test_multigen_fallback_template_matches_master_plan`
+  - [x] `test_multigen_fallback_project_label_for_known_types` (cathedral, walls, farm, develop_territory, recruit_infantry)
+  - [x] `test_multigen_fallback_project_label_for_unknown_type` — uses `replace('_', ' ')`
 
-- [ ] Task 5: Unit tests for `models/project_system.py` (AC6)
-  - [ ] `test_complete_multigen_writes_history_entry` — start project with initiator A, replace monarch with B (manually), complete; assert one `HistoryLogEntryDB` row with `event_type='project_completed_multigen'`, `person1_sim_id=A.id`, `person2_sim_id=B.id`.
-  - [ ] `test_complete_same_monarch_no_multigen_entry` — start + complete with the same monarch; assert zero `HistoryLogEntryDB` rows with `event_type='project_completed_multigen'`.
-  - [ ] `test_complete_with_null_completer_skips_multigen` — kill the monarch before completion so no living monarch exists; assert no multi-gen entry, no exception.
+- [x] Task 5: Unit tests for `models/project_system.py` (AC6)
+  - [x] `test_complete_multigen_writes_history_entry` — start project with initiator A, replace monarch with B (manually), complete; assert one `HistoryLogEntryDB` row with `event_type='project_completed_multigen'`, `person1_sim_id=A.id`, `person2_sim_id=B.id`.
+  - [x] `test_complete_same_monarch_no_multigen_entry` — start + complete with the same monarch; assert zero `HistoryLogEntryDB` rows with `event_type='project_completed_multigen'`.
+  - [x] `test_complete_with_null_completer_skips_multigen` — kill the monarch before completion so no living monarch exists; assert no multi-gen entry, no exception.
 
-- [ ] Task 6: Run `pytest`, confirm 274+ passed, 0 failed, 0 skipped (AC6, AC7)
+- [x] Task 6: Run `pytest`, confirm 274+ passed, 0 failed, 0 skipped (AC6, AC7)
 
-- [ ] Task 7: Commit, push, merge.
+- [x] Task 7: Commit, push, merge.
 
 ## Dev Notes
 
@@ -169,20 +169,90 @@ Story 2-2 tests call `ps.complete_project(project.id)` directly. After Story 2-4
 
 ### Agent Model Used
 
-(to be filled by dev agent)
+claude-opus-4-7[1m] (direct execution)
 
 ### Implementation Plan
 
-(to be filled by dev agent)
+1. Added `build_multigen_project_completion_prompt` + `generate_multigen_project_completion_fallback` + `_PROJECT_LABELS` to `utils/llm_prompts.py`.
+2. Added `_llm_available()` + `_chronicle_multigen_completion(session, project)` helpers to `models/project_system.py`. Helper resolves the two PersonDB rows, calls LLM with the new prompt builder (with API-key guard), falls back to the template, and `session.add()`s a `HistoryLogEntryDB` row with `event_type='project_completed_multigen'`.
+3. `ProjectSystem.complete_project` invokes the helper AFTER the effect dispatcher runs and BEFORE the final commit. Wrapped in try/except + warning log so a failing chronicle hook never rolls back the actual completion.
+4. 6 unit tests in `tests/unit/test_llm_prompts.py` + 3 unit tests in `tests/unit/test_project_system.py`.
 
 ### Completion Notes
 
-(to be filled by dev agent)
+- All 6 ACs satisfied. Acceptance Auditor returned clean on first pass.
+- Code review surfaced 2 PATCH-level findings (null surname rendering, LLM-text log-spam) — both applied.
+- The "null surname" defensive guard turned out to be unreachable because `PersonDB.surname` is `nullable=False` at the schema level. Kept the `name or ''` defense as belt-and-braces, but removed the unreachable test.
+- 25+ findings deferred — mostly pre-existing patterns in `turn_processor.py` (hardcoded model name, no LLM timeout, multiple API-key names, bare exception catches) or upstream invariants that `start_project`/`complete_project` already enforce.
+- pytest: **277 passed, 0 failed, 0 skipped** (was 268 pre-story; +9 tests).
+- Story 2-4 closes Epic 2 (Project Model). All four stories (2-1, 2-2, 2-3, 2-4) shipped.
 
 ### File List
 
-(to be filled by dev agent)
+- `utils/llm_prompts.py` — MODIFIED (added 2 functions + `_PROJECT_LABELS` constant + `_project_label` helper, ~55 LoC)
+- `models/project_system.py` — MODIFIED (added `_llm_available`, `_chronicle_multigen_completion`, call from `complete_project`, ~110 LoC)
+- `tests/unit/test_llm_prompts.py` — MODIFIED (+ 6 tests across 2 new test classes)
+- `tests/unit/test_project_system.py` — MODIFIED (+ 3 tests for multigen branches)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — MODIFIED (2-4: backlog → done; epic-2: in-progress → done)
+- `_bmad-output/implementation-artifacts/2-4-multi-generation-story-hook.md` — MODIFIED (status, Dev Agent Record)
+- `_bmad-output/implementation-artifacts/deferred-work.md` — MODIFIED (~25 review-driven defers)
 
 ### Change Log
 
-(to be filled by dev agent)
+| Date | Change |
+|---|---|
+| 2026-05-17 | feat(llm-prompts): add multigen project completion prompt + fallback |
+| 2026-05-17 | feat(project-system): emit multigen chronicle entry when monarchs differ |
+| 2026-05-17 | test: multigen chronicle hook (6 prompt tests + 3 project_system tests) |
+| 2026-05-17 | Code review (3 layers): Acceptance Auditor clean; 2 patches applied (null-surname defense + DEBUG-level chronicle text log), ~25 deferred |
+| 2026-05-17 | fix(project-system): null-safe name composition + log LLM text at DEBUG |
+| 2026-05-17 | pytest: 277 passed, 0 failed, 0 skipped (was 268) |
+| 2026-05-17 | Story status → done; Epic 2 → done |
+
+### Review Findings
+
+_Code review run 2026-05-17 — 3 parallel adversarial layers._
+
+**Patches (applied):**
+
+- [x] [Review][Patch] Null-surname rendering: `f"{name} {surname}".strip()` would produce `"Aldric None"` if surname were NULL. Changed to `f"{name or ''} {surname or ''}".strip()`. Note: the case is unreachable in practice because `PersonDB.surname` is `nullable=False` at the schema level — kept as belt-and-braces defense; removed the unreachable test [`models/project_system.py:_chronicle_multigen_completion`]
+- [x] [Review][Patch] LLM text log-spam: full chronicle paragraph was logged at INFO with `%r`. Split into an INFO line with metadata only (project_id, dynasty_id, monarch IDs, year) and a DEBUG line with the full text [`models/project_system.py:_chronicle_multigen_completion`]
+
+**Deferred (~25):**
+
+- [x] [Review][Defer] `_llm_available()` duplicates `turn_processor.py:_llm_available()` — intentional to avoid circular import; consolidate in Sprint 11 via `utils/llm_guard.py`.
+- [x] [Review][Defer] Bare `except Exception` in `_llm_available()` silently returns False on config bugs — matches pre-existing pattern.
+- [x] [Review][Defer] Inline `genai.configure()` + hardcoded `"gemini-1.5-flash"` model name — matches `turn_processor.py` pattern; centralize in Sprint 11.
+- [x] [Review][Defer] Three API-key names (`FLASK_APP_GOOGLE_API_KEY_PRESENT`, `FLASK_APP_GOOGLE_API_KEY`, `GOOGLE_API_KEY`) — pre-existing inconsistency already in deferred-work.md from Story 1-4.
+- [x] [Review][Defer] `max_output_tokens=100` paired with "2-3 sentences" instruction may truncate mid-sentence — intentional safety net under 150-token chronicle budget.
+- [x] [Review][Defer] No LLM timeout configured — pre-existing pattern; SDK default applies.
+- [x] [Review][Defer] `response.text` raises on safety block / MAX_TOKENS — caught by outer except, falls back.
+- [x] [Review][Defer] Network errors / rate-limit / quota errors all collapse into one warning — no retry / circuit breaker; Sprint 11 LLM hardening.
+- [x] [Review][Defer] `_PROJECT_LABELS` is module-level mutable dict — convention in this codebase; freeze in Sprint 11 if needed.
+- [x] [Review][Defer] Em-dash (U+2014) in fallback text — `db.Text` handles unicode; rendering layer's problem.
+- [x] [Review][Defer] Fallback ignores `dynasty_name` parameter — true but harmless; master plan template doesn't use it.
+- [x] [Review][Defer] No prompt-injection sanitization on `initiator_name`/`completer_name`/`dynasty_name` — real concern; would need cross-prompt-builder rollout. Sprint 11 security pass.
+- [x] [Review][Defer] `_chronicle_multigen_completion` is module-level rather than a `ProjectSystem` method — matches `_effect_*` and `_stub_effect` pattern in the same module.
+- [x] [Review][Defer] Hardcoded `'project_completed_multigen'` string instead of a constant/enum — match pre-existing event_type string convention.
+- [x] [Review][Defer] No timeout on `model.generate_content` — pre-existing pattern.
+- [x] [Review][Defer] `google.generativeai` import cost paid on every multigen call — pre-existing lazy-import pattern.
+- [x] [Review][Defer] No `created_at` / no `ondelete=SET NULL` on initiated_by_monarch_id FK — Story 2-1 deferred-work covers FK ondelete; created_at is auto-set by HistoryLogEntryDB column default.
+- [x] [Review][Defer] `years = completion_year - started_year` no negative-value guard — `start_project` enforces `completion_year = started_year + duration_years` (positive); unreachable.
+- [x] [Review][Defer] Empty `project_type` string — unreachable; `start_project` rejects unknown types.
+- [x] [Review][Defer] `genai.configure` mutates global state across concurrent dynasties — pre-existing pattern; not threading-safe but app is single-process Flask.
+- [x] [Review][Defer] Hook fires before commit; if commit fails, the "queued" INFO log overstates — true but cosmetic; the warning log on the outer commit failure captures the real story.
+- [x] [Review][Defer] `test_complete_sets_status_and_invokes_dispatcher` and other 2-2 tests don't assert on HistoryLogEntryDB row counts — fine; no need to update.
+- [x] [Review][Defer] Substring-only prompt assertions — sufficient for Story 2-4 surface area; deeper validation would need golden-file comparisons.
+- [x] [Review][Defer] `test_template_matches_master_plan` over-couples to exact prose (`startswith`, `endswith`) — intentional pinning of the master-plan template; if copy needs to change, this is the test to update.
+- [x] [Review][Defer] Tests simulate monarch succession via direct ORM mutation rather than the real inheritance flow — acceptable until Sprint 5 wires real flow into a fixture.
+
+**Dismissed (~6):**
+
+- "`HistoryLogEntryDB.person2_sim_id` might not exist" — verified at `models/db_models.py:280`; the column has existed since the multi-agent game models landed.
+- "test name suffix wording" — class-scoped test names override spec literal naming; functionally equivalent.
+- Test of LLM happy path (would need mocking the SDK) — covered by integration smoke when `GOOGLE_API_KEY` is set in real environments; not a unit-test concern.
+- `import google.generativeai` happens inside the function — already gated by `_llm_available()` check, so import cost is only paid when the API is actually configured.
+- "Substring tests are weak" — covered as defer; not actionable as a patch here.
+- "`construction_year` semantic" — out of scope (project_system.py creates the row in `_effect_build_farm`, not in this story).
+
+**Acceptance Auditor:** ✅ 6/6 ACs satisfied. Dev Notes (HistoryLogEntryDB choice, no commit in helper, `_llm_available()` duplicated intentionally, token budget compliance, hook ordering, non-fatal chronicle errors) all honored. Out-of-scope (`db_models.py`, `ChronicleEntryDB`, `turn_processor.py`, UI) all respected.

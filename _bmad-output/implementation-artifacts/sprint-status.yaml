@@ -75,7 +75,7 @@ development_status:
 
   # ── EPIC 2: Project Model (Sprint 2) ───────────────────────────────────────
   # Goal: Multi-year projects replace instant actions. Three project slots replace 3 AP.
-  epic-2: in-progress
+  epic-2: done
 
   # Story 2-1: Project DB model + migration
   # Add Project table (db_models.py), DynastyDB.projects relationship, migration in
@@ -98,7 +98,7 @@ development_status:
   # Story 2-4: Multi-generation chronicle hook
   # When project completes under different monarch than started it, generate
   # chronicle line: "What [original] began, [current] finished — the [name] stands."
-  2-4-multi-generation-story-hook: in-progress
+  2-4-multi-generation-story-hook: done
 
   epic-2-retrospective: optional
 
