@@ -11,13 +11,18 @@ is final.
 """
 
 import logging
+import os
 from typing import Callable, Dict, List, Tuple
 
 from sqlalchemy.orm import Session
 
 from models.db_models import (
-    Building, BuildingType, DynastyDB, MilitaryUnit, PersonDB,
+    Building, BuildingType, DynastyDB, HistoryLogEntryDB, MilitaryUnit, PersonDB,
     Project, Territory, UnitType,
+)
+from utils.llm_prompts import (
+    build_multigen_project_completion_prompt,
+    generate_multigen_project_completion_fallback,
 )
 
 logger = logging.getLogger('royal_succession.project_system')
@@ -25,6 +30,106 @@ logger = logging.getLogger('royal_succession.project_system')
 
 class InsufficientResourcesError(Exception):
     """Raised by start_project when a dynasty cannot afford year 1's yearly cost."""
+
+
+def _llm_available() -> bool:
+    """Return True if the LLM API key is present in the running Flask app.
+
+    Duplicates models/turn_processor.py:_llm_available() rather than importing
+    it (would create a circular import — turn_processor already imports this
+    module). Sprint 11 cleanup can lift both into utils/llm_guard.py.
+    """
+    try:
+        from flask import current_app
+        return current_app.config.get('FLASK_APP_GOOGLE_API_KEY_PRESENT', False)
+    except Exception:
+        return False
+
+
+def _chronicle_multigen_completion(session: Session, project: Project) -> None:
+    """Emit a HistoryLogEntryDB if the project's initiator and completer differ.
+
+    Called from complete_project after the effect dispatcher runs and before
+    the final commit. No-op when:
+      - completed_by_monarch_id is None (interregnum at completion)
+      - initiator == completer (same-monarch completion is not multi-gen)
+    """
+    if project.initiated_by_monarch_id is None or project.completed_by_monarch_id is None:
+        logger.debug(
+            "Skipping multi-gen chronicle for project %s: initiator=%s completer=%s",
+            project.id, project.initiated_by_monarch_id, project.completed_by_monarch_id,
+        )
+        return
+    if project.initiated_by_monarch_id == project.completed_by_monarch_id:
+        return
+
+    dynasty = session.get(DynastyDB, project.dynasty_id)
+    initiator = session.get(PersonDB, project.initiated_by_monarch_id)
+    completer = session.get(PersonDB, project.completed_by_monarch_id)
+    if dynasty is None or initiator is None or completer is None:
+        logger.debug(
+            "Skipping multi-gen chronicle for project %s: missing dynasty/initiator/completer rows",
+            project.id,
+        )
+        return
+
+    initiator_name = f"{initiator.name} {initiator.surname}".strip()
+    completer_name = f"{completer.name} {completer.surname}".strip()
+
+    text = ""
+    if _llm_available():
+        try:
+            import google.generativeai as genai
+            from flask import current_app
+            api_key = (
+                current_app.config.get("FLASK_APP_GOOGLE_API_KEY")
+                or os.environ.get("GOOGLE_API_KEY")
+            )
+            if api_key:
+                genai.configure(api_key=api_key)
+                model = genai.GenerativeModel("gemini-1.5-flash")
+                prompt = build_multigen_project_completion_prompt(
+                    project_type=project.project_type,
+                    initiator_name=initiator_name,
+                    completer_name=completer_name,
+                    dynasty_name=dynasty.name,
+                    started_year=project.started_year,
+                    completion_year=project.completion_year,
+                )
+                response = model.generate_content(
+                    prompt,
+                    generation_config={"max_output_tokens": 100, "temperature": 0.8},
+                )
+                text = response.text.strip() if response.text else ""
+        except Exception as llm_exc:
+            logger.warning(
+                "LLM call for multi-gen chronicle failed (project %s): %s",
+                project.id, llm_exc,
+            )
+            text = ""
+    if not text:
+        text = generate_multigen_project_completion_fallback(
+            project_type=project.project_type,
+            initiator_name=initiator_name,
+            completer_name=completer_name,
+            dynasty_name=dynasty.name,
+            started_year=project.started_year,
+            completion_year=project.completion_year,
+        )
+
+    entry = HistoryLogEntryDB(
+        dynasty_id=project.dynasty_id,
+        year=project.completion_year,
+        event_string=text,
+        event_type='project_completed_multigen',
+        person1_sim_id=initiator.id,
+        person2_sim_id=completer.id,
+    )
+    session.add(entry)
+    logger.info(
+        "Multi-gen chronicle entry written for project %s (dynasty %s): %r",
+        project.id, project.dynasty_id, text,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -340,6 +445,17 @@ class ProjectSystem:
         except Exception:
             self.session.rollback()
             raise
+
+        # Multi-generation chronicle hook (Story 2-4). Runs AFTER the effect so
+        # the chronicle reflects the completed state. Errors here MUST NOT
+        # roll back the completion — chronicle is supplementary narrative.
+        try:
+            _chronicle_multigen_completion(self.session, project)
+        except Exception as chron_exc:
+            logger.warning(
+                "Multi-gen chronicle hook failed for project %s (non-fatal): %s",
+                project.id, chron_exc,
+            )
 
         try:
             self.session.commit()
