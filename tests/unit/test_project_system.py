@@ -1,7 +1,10 @@
 import uuid
 import pytest
 
-from models.db_models import DynastyDB, PersonDB, Project, User
+from models.db_models import (
+    Building, BuildingType, DynastyDB, MilitaryUnit, PersonDB, Project, Region,
+    Province, Territory, TerrainType, UnitType, User,
+)
 from models.project_system import (
     EFFECT_DISPATCHER,
     InsufficientResourcesError,
@@ -31,6 +34,32 @@ def _make_user_and_dynasty(session, name='Test Dynasty', year=1300,
     session.add(dynasty)
     session.commit()
     return user, dynasty
+
+
+def _make_territory(session, dynasty, name='Rouen', dev_level=1):
+    suffix = uuid.uuid4().hex[:6]
+    region = Region(name=f"Region_{suffix}", description="Test region")
+    session.add(region)
+    session.commit()
+    province = Province(
+        region_id=region.id,
+        name=f"Province_{suffix}",
+        primary_terrain=TerrainType.PLAINS,
+    )
+    session.add(province)
+    session.commit()
+    territory = Territory(
+        province_id=province.id,
+        name=f"{name}_{suffix}",
+        terrain_type=TerrainType.PLAINS,
+        x_coordinate=0.0,
+        y_coordinate=0.0,
+        controller_dynasty_id=dynasty.id,
+        development_level=dev_level,
+    )
+    session.add(territory)
+    session.commit()
+    return territory
 
 
 def _make_monarch(session, dynasty, name='Aldric I', birth_year=1270):
@@ -189,15 +218,18 @@ class TestProjectSystem:
     # complete_project
     # ------------------------------------------------------------------
     def test_complete_sets_status_and_invokes_dispatcher(self, session, caplog):
+        # envoy_mission is still a stub effect in Story 2-3 (no gameplay
+        # mechanic for diplomatic missions yet) — using it here keeps the
+        # test focused on the dispatcher invocation rather than on a
+        # specific real-effect's side effects.
         _, dynasty = _make_user_and_dynasty(session)
         _make_monarch(session, dynasty)
         ps = ProjectSystem(session)
-        project = ps.start_project(dynasty.id, 'build_farm', 1300)
+        project = ps.start_project(dynasty.id, 'envoy_mission', 1300)
         with caplog.at_level('INFO', logger='royal_succession.project_system'):
             completed = ps.complete_project(project.id)
         assert completed.status == 'completed'
         assert completed.completed_by_monarch_id is not None
-        # Stub effect should have logged a [stub] line.
         assert any('[stub]' in record.message for record in caplog.records)
 
     def test_complete_unknown_project_raises(self, session):
@@ -355,6 +387,63 @@ class TestProjectSystem:
         project = ps.start_project(dynasty.id, 'build_walls', 1305)
         with pytest.raises(ValueError, match="precedes started_year"):
             ps.cancel_project(project.id, current_year=1300)
+
+    # ------------------------------------------------------------------
+    # Real effect dispatchers (Story 2-3)
+    # ------------------------------------------------------------------
+    def test_effect_recruit_infantry_creates_unit(self, session):
+        _, dynasty = _make_user_and_dynasty(session)
+        _make_monarch(session, dynasty)
+        territory = _make_territory(session, dynasty)
+        ps = ProjectSystem(session)
+        project = ps.start_project(
+            dynasty.id, 'recruit_infantry', 1300,
+            target_territory_id=territory.id,
+            params={'size': 150},
+        )
+        ps.tick_projects(dynasty.id, 1300)
+        ps.complete_project(project.id)
+        units = session.query(MilitaryUnit).filter_by(
+            dynasty_id=dynasty.id, territory_id=territory.id,
+        ).all()
+        assert len(units) == 1
+        assert units[0].unit_type == UnitType.LEVY_SPEARMEN
+        assert units[0].size == 150
+
+    def test_effect_build_farm_creates_building(self, session):
+        _, dynasty = _make_user_and_dynasty(session)
+        _make_monarch(session, dynasty)
+        territory = _make_territory(session, dynasty)
+        ps = ProjectSystem(session)
+        project = ps.start_project(
+            dynasty.id, 'build_farm', 1300,
+            target_territory_id=territory.id,
+        )
+        ps.tick_projects(dynasty.id, 1300)
+        ps.tick_projects(dynasty.id, 1301)
+        ps.complete_project(project.id)
+        farms = session.query(Building).filter_by(
+            territory_id=territory.id,
+            building_type=BuildingType.FARM,
+        ).all()
+        assert len(farms) == 1
+        assert farms[0].level == 1
+        assert farms[0].construction_year == 1300
+
+    def test_effect_develop_territory_raises_dev_level(self, session):
+        _, dynasty = _make_user_and_dynasty(session)
+        _make_monarch(session, dynasty)
+        territory = _make_territory(session, dynasty, dev_level=2)
+        ps = ProjectSystem(session)
+        project = ps.start_project(
+            dynasty.id, 'develop_territory', 1300,
+            target_territory_id=territory.id,
+        )
+        for y in (1300, 1301, 1302):
+            ps.tick_projects(dynasty.id, y)
+        ps.complete_project(project.id)
+        session.refresh(territory)
+        assert territory.development_level == 3
 
     def test_complete_effect_failure_rolls_back(self, session, monkeypatch):
         # If a dispatcher effect_fn raises, the session should be rolled back
