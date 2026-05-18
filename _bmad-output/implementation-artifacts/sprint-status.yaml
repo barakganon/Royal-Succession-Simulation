@@ -39,7 +39,7 @@
 # - Each story should have a corresponding file: {story_key}.md in story_location
 
 generated: 2026-05-02
-last_updated: 2026-05-16  # updated: Story 1-4 done; Epic 1 complete
+last_updated: 2026-05-18  # updated: Story 3-2 done
 project: Royal-Succession-Simulation
 project_key: RSS
 tracking_system: file-system
@@ -115,7 +115,7 @@ development_status:
   # Story 3-2: Right-click context menu + cost-preview submenu
   # Vanilla JS right-click on hex → context menu with territory name + actions;
   # submenus show project type, duration, and resource cost preview before commit.
-  3-2-right-click-context-menu: backlog
+  3-2-right-click-context-menu: done
 
   # Story 3-3: Right detail panel + GeoJSON upgrade
   # Conditional templates per entity (territory / project slot / monarch portrait);

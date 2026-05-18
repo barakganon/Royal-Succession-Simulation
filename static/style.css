@@ -1031,6 +1031,131 @@ body.game-page { overflow: hidden; }
 }
 
 
+/* ─── Sprint 3 Story 3-2: right-click context menu + cost-preview submenu ─── */
+.game-context-menu {
+  position: absolute;
+  z-index: 60;  /* above .game-detail-panel (50) */
+  width: 200px;
+  background: var(--dark-card);
+  border: 1px solid var(--gold);
+  border-radius: 4px;
+  color: var(--text-light);
+  font-family: 'Crimson Text', serif;
+  font-size: .82rem;
+  display: none;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, .6);
+}
+.game-context-menu.is-open {
+  display: block;
+}
+
+.game-context-menu-header {
+  padding: .4rem .6rem;
+  border-bottom: 1px solid var(--dark-border);
+  background: rgba(0, 0, 0, .35);
+  border-radius: 3px 3px 0 0;
+}
+.game-context-menu-header .terr-name {
+  display: block;
+  font-family: 'Cinzel', serif;
+  font-weight: 700;
+  color: var(--gold);
+  font-size: .88rem;
+  line-height: 1.1;
+}
+.game-context-menu-header .terr-id {
+  display: block;
+  font-size: .68rem;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.game-context-menu-row {
+  position: relative;
+  padding: .35rem .6rem;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, .04);
+}
+.game-context-menu-row:last-child {
+  border-bottom: none;
+  border-radius: 0 0 3px 3px;
+}
+.game-context-menu-row:hover,
+.game-context-menu-row:focus-visible {
+  background: rgba(212, 175, 55, .12);
+  color: var(--gold);
+  outline: none;
+}
+.game-context-menu-row.cannot-afford {
+  color: var(--text-muted);
+}
+.game-context-menu-row.cannot-afford::before {
+  content: '⛔ ';
+  font-size: .7rem;
+  opacity: .7;
+}
+
+.game-context-submenu {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  margin-left: 2px;
+  width: 220px;
+  background: var(--dark-card);
+  border: 1px solid var(--gold);
+  border-radius: 4px;
+  padding: .5rem .6rem;
+  display: none;
+  color: var(--text-light);
+  font-family: 'Crimson Text', serif;
+  font-size: .78rem;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, .6);
+  z-index: 61;
+}
+.game-context-submenu.flip-left {
+  left: auto;
+  right: 100%;
+  margin-left: 0;
+  margin-right: 2px;
+}
+.game-context-menu-row:hover > .game-context-submenu,
+.game-context-menu-row:focus-within > .game-context-submenu {
+  display: block;
+}
+
+.game-context-submenu .submenu-label {
+  font-family: 'Cinzel', serif;
+  color: var(--gold);
+  font-size: .82rem;
+  margin-bottom: .25rem;
+}
+.game-context-submenu .submenu-duration {
+  color: var(--text-muted);
+  font-style: italic;
+  margin-bottom: .35rem;
+}
+.game-context-submenu .cost-line {
+  display: block;
+  margin: .12rem 0;
+}
+.game-context-submenu .cost-line.shortage {
+  color: #e07c7c;
+}
+.game-context-submenu .total-line {
+  display: block;
+  margin-top: .35rem;
+  padding-top: .3rem;
+  border-top: 1px solid var(--dark-border);
+  color: var(--text-light);
+}
+.game-context-submenu .requires-line {
+  display: block;
+  margin-top: .35rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+
 .game-map-panel {
   flex: 1;
   position: relative;

@@ -176,6 +176,51 @@ def world_map():
     )
 
 
+@map_bp.route('/game/<int:dynasty_id>/project_catalogue.json')
+@login_required
+def project_catalogue(dynasty_id):
+    """Serve the project type catalogue as JSON for the right-click menu.
+
+    Sprint 3 Story 3-2 — the world_map context menu populates its rows + cost
+    preview from this endpoint instead of inlining the catalogue in the
+    template. The data is canonical and shared with `models.project_system`.
+    """
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.user_id != current_user.id:
+        return jsonify({'error': 'Access denied'}), 403
+
+    from models.project_system import PROJECT_TYPE_CATALOGUE
+    from utils.llm_prompts import project_menu_label
+
+    # Canonical order (matches Story 3-2 spec); `march_army_cross_realm` is in
+    # the catalogue for completeness but omitted from the menu — Sprint 4
+    # wires that one as a free action initiated from an army token.
+    canonical_order = [
+        'build_farm',
+        'build_walls',
+        'build_cathedral',
+        'recruit_infantry',
+        'recruit_cavalry',
+        'develop_territory',
+        'envoy_mission',
+    ]
+    projects = []
+    for project_type in canonical_order:
+        meta = PROJECT_TYPE_CATALOGUE.get(project_type)
+        if meta is None:
+            continue
+        projects.append({
+            'project_type': project_type,
+            'label': project_menu_label(project_type),
+            'duration_years': meta['duration_years'],
+            'yearly_cost_gold': meta['yearly_cost_gold'],
+            'yearly_cost_iron': meta['yearly_cost_iron'],
+            'yearly_cost_timber': meta['yearly_cost_timber'],
+            'requires_building': meta['requires_building'],
+        })
+    return jsonify({'projects': projects})
+
+
 @map_bp.route('/territory/<int:territory_id>')
 @login_required
 def territory_details(territory_id):
