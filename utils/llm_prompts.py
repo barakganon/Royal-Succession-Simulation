@@ -198,6 +198,28 @@ def _project_label(project_type: str) -> str:
     return _PROJECT_LABELS.get(project_type, project_type.replace('_', ' '))
 
 
+# Sprint 3 Story 3-2: imperative menu labels (Build / Recruit / Develop ...).
+# Distinct from _PROJECT_LABELS — the chronicle wants noun phrases ("Farm
+# stands"), the right-click menu wants verb phrases ("Build Farm").
+_PROJECT_MENU_LABELS = {
+    'build_farm': 'Build Farm',
+    'build_walls': 'Build Walls',
+    'build_cathedral': 'Build Cathedral',
+    'develop_territory': 'Develop Territory',
+    'recruit_infantry': 'Recruit Infantry',
+    'recruit_cavalry': 'Recruit Cavalry',
+    'envoy_mission': 'Send Envoy',
+    'march_army_cross_realm': 'March Army',
+}
+
+
+def project_menu_label(project_type: str) -> str:
+    """Public accessor — imperative label for the right-click menu."""
+    return _PROJECT_MENU_LABELS.get(
+        project_type, project_type.replace('_', ' ').title()
+    )
+
+
 def build_multigen_project_completion_prompt(project_type: str, initiator_name: str,
                                              completer_name: str, dynasty_name: str,
                                              started_year: int, completion_year: int) -> str:
