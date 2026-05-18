@@ -593,7 +593,12 @@ document.addEventListener('keydown', function (e) {
 
   function _populateMenu(hex) {
     ctxTerrNameEl.textContent = hex.properties.name || 'Unknown';
-    ctxTerrIdEl.textContent = 'Territory #' + hex.properties.territory_id;
+    /* Guard against geojson features that lack territory_id (e.g. future
+     * non-territory features) — avoids the literal string 'Territory #undefined'. */
+    var tid = hex.properties.territory_id;
+    ctxTerrIdEl.textContent = (tid !== undefined && tid !== null)
+      ? ('Territory #' + tid)
+      : 'Territory #?';
     ctxRowsEl.innerHTML = '';
     var cat = window.__projectCatalogue && window.__projectCatalogue.projects;
     if (!cat || cat.length === 0) {
@@ -611,8 +616,32 @@ document.addEventListener('keydown', function (e) {
   function _showAt(pageX, pageY) {
     contextMenuEl.classList.add('is-open');
     contextMenuEl.setAttribute('aria-hidden', 'false');
-    contextMenuEl.style.left = pageX + 'px';
-    contextMenuEl.style.top = pageY + 'px';
+    /* Clamp position so the menu doesn't overflow the viewport at the
+     * right/bottom edges. Use the menu's own measured size after it is
+     * shown (display:block is applied via .is-open). */
+    var menuW = contextMenuEl.offsetWidth || 200;
+    var menuH = contextMenuEl.offsetHeight || 220;
+    var maxX = window.innerWidth - menuW - 4;
+    var maxY = window.innerHeight - menuH - 4;
+    var x = Math.min(pageX, Math.max(4, maxX));
+    var y = Math.min(pageY, Math.max(4, maxY));
+    contextMenuEl.style.left = x + 'px';
+    contextMenuEl.style.top = y + 'px';
+
+    /* Submenu flip: if a row's right edge + submenu width would overflow
+     * the viewport, flip the submenu to the left side via .flip-left. */
+    var rows = ctxRowsEl.querySelectorAll('.game-context-menu-row');
+    var submenuW = 220;
+    rows.forEach(function (row) {
+      var sub = row.querySelector('.game-context-submenu');
+      if (!sub) return;
+      var rect = row.getBoundingClientRect();
+      if (rect.right + submenuW > window.innerWidth - 4) {
+        sub.classList.add('flip-left');
+      } else {
+        sub.classList.remove('flip-left');
+      }
+    });
   }
 
   window.closeContextMenu = function () {
@@ -648,14 +677,15 @@ document.addEventListener('keydown', function (e) {
 
   canvas.addEventListener('contextmenu', function (e) {
     e.preventDefault();
+    /* AC4: a second right-click on a different hex closes the current
+     * menu before opening the new one. Closing first guarantees a clean
+     * state transition even if the new menu's fetch path is async. */
+    window.closeContextMenu();
     var rect = canvas.getBoundingClientRect();
     var mx = e.clientX - rect.left;
     var my = e.clientY - rect.top;
     var f = nearestHex(mx, my);
-    if (!f) {
-      window.closeContextMenu();
-      return;
-    }
+    if (!f) return;  /* preventDefault still suppresses native menu */
     _openContextMenu(f, e.pageX, e.pageY);
   });
 
