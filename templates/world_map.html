@@ -231,6 +231,16 @@
       </div>
     </aside>
 
+    <!-- ─────────── RIGHT-CLICK CONTEXT MENU (Sprint 3 Story 3-2) ─────────── -->
+    <div id="game-context-menu" class="game-context-menu"
+         role="menu" aria-hidden="true">
+      <div class="game-context-menu-header">
+        <span class="terr-name" id="ctx-terr-name">—</span>
+        <span class="terr-id" id="ctx-terr-id"></span>
+      </div>
+      <div id="ctx-rows"></div>
+    </div>
+
   </div><!-- /game-main -->
 
   <!-- ══════════════════════════════ BOTTOM BAR ══════════════════════════════ -->
@@ -503,6 +513,162 @@ document.addEventListener('keydown', function (e) {
 
   canvas.addEventListener('mouseleave', function () {
     tooltip.style.display = 'none';
+  });
+
+  /* ── Right-click → context menu (Sprint 3 Story 3-2) ── */
+  var contextMenuEl = document.getElementById('game-context-menu');
+  var ctxTerrNameEl = document.getElementById('ctx-terr-name');
+  var ctxTerrIdEl = document.getElementById('ctx-terr-id');
+  var ctxRowsEl = document.getElementById('ctx-rows');
+  /* Cached catalogue: fetched lazily on first right-click. */
+  window.__projectCatalogue = window.__projectCatalogue || null;
+  var lastChosenAction = null;
+  window.lastChosenAction = null;
+
+  function _renderRow(p, hex) {
+    var gold = {{ dynasty.current_wealth if dynasty else 0 }};
+    var iron = {{ dynasty.current_iron if dynasty else 0 }};
+    var timber = {{ dynasty.current_timber if dynasty else 0 }};
+    var cannotAfford =
+      gold < p.yearly_cost_gold ||
+      iron < p.yearly_cost_iron ||
+      timber < p.yearly_cost_timber;
+    var row = document.createElement('div');
+    row.className = 'game-context-menu-row' + (cannotAfford ? ' cannot-afford' : '');
+    row.setAttribute('role', 'menuitem');
+    row.setAttribute('tabindex', '0');
+    if (cannotAfford) row.setAttribute('aria-disabled', 'true');
+    row.textContent = p.label;
+    /* Submenu — cost preview */
+    var sub = document.createElement('div');
+    sub.className = 'game-context-submenu';
+    sub.setAttribute('aria-hidden', 'true');
+    var html =
+      '<span class="submenu-label">' + p.label + '</span>' +
+      '<span class="submenu-duration">' + p.duration_years + ' year' +
+      (p.duration_years === 1 ? '' : 's') + '</span>';
+    if (p.yearly_cost_gold > 0) {
+      var cls = gold < p.yearly_cost_gold ? ' shortage' : '';
+      html += '<span class="cost-line' + cls + '">&#x1F4B0; ' +
+        p.yearly_cost_gold + ' gold / yr' +
+        (gold < p.yearly_cost_gold ? ' (have ' + gold + ')' : '') +
+        '</span>';
+    }
+    if (p.yearly_cost_iron > 0) {
+      var cls2 = iron < p.yearly_cost_iron ? ' shortage' : '';
+      html += '<span class="cost-line' + cls2 + '">&#9881; ' +
+        p.yearly_cost_iron + ' iron / yr' +
+        (iron < p.yearly_cost_iron ? ' (have ' + iron + ')' : '') +
+        '</span>';
+    }
+    if (p.yearly_cost_timber > 0) {
+      var cls3 = timber < p.yearly_cost_timber ? ' shortage' : '';
+      html += '<span class="cost-line' + cls3 + '">&#x1FA77; ' +
+        p.yearly_cost_timber + ' timber / yr' +
+        (timber < p.yearly_cost_timber ? ' (have ' + timber + ')' : '') +
+        '</span>';
+    }
+    var totalParts = [];
+    if (p.yearly_cost_gold > 0) totalParts.push((p.yearly_cost_gold * p.duration_years) + ' gold');
+    if (p.yearly_cost_iron > 0) totalParts.push((p.yearly_cost_iron * p.duration_years) + ' iron');
+    if (p.yearly_cost_timber > 0) totalParts.push((p.yearly_cost_timber * p.duration_years) + ' timber');
+    if (totalParts.length > 0) {
+      html += '<span class="total-line">Total: ' + totalParts.join(' + ') +
+        ' over ' + p.duration_years + ' year' +
+        (p.duration_years === 1 ? '' : 's') + '</span>';
+    }
+    if (p.requires_building) {
+      html += '<span class="requires-line">Requires: ' + p.requires_building + '</span>';
+    }
+    sub.innerHTML = html;
+    row.appendChild(sub);
+    row.addEventListener('click', function () {
+      lastChosenAction = { territory_id: hex.properties.territory_id, project_type: p.project_type };
+      window.lastChosenAction = lastChosenAction;
+      console.log('Story 3-2: chosen', lastChosenAction);
+      closeContextMenu();
+    });
+    return row;
+  }
+
+  function _populateMenu(hex) {
+    ctxTerrNameEl.textContent = hex.properties.name || 'Unknown';
+    ctxTerrIdEl.textContent = 'Territory #' + hex.properties.territory_id;
+    ctxRowsEl.innerHTML = '';
+    var cat = window.__projectCatalogue && window.__projectCatalogue.projects;
+    if (!cat || cat.length === 0) {
+      var empty = document.createElement('div');
+      empty.className = 'game-context-menu-row';
+      empty.textContent = '(no projects available)';
+      ctxRowsEl.appendChild(empty);
+      return;
+    }
+    cat.forEach(function (p) {
+      ctxRowsEl.appendChild(_renderRow(p, hex));
+    });
+  }
+
+  function _showAt(pageX, pageY) {
+    contextMenuEl.classList.add('is-open');
+    contextMenuEl.setAttribute('aria-hidden', 'false');
+    contextMenuEl.style.left = pageX + 'px';
+    contextMenuEl.style.top = pageY + 'px';
+  }
+
+  window.closeContextMenu = function () {
+    contextMenuEl.classList.remove('is-open');
+    contextMenuEl.setAttribute('aria-hidden', 'true');
+  };
+
+  function _openContextMenu(hex, pageX, pageY) {
+    if (window.__projectCatalogue) {
+      _populateMenu(hex);
+      _showAt(pageX, pageY);
+      return;
+    }
+    if (!dynastyId) {
+      _populateMenu(hex);
+      _showAt(pageX, pageY);
+      return;
+    }
+    fetch('/game/' + dynastyId + '/project_catalogue.json')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        window.__projectCatalogue = data;
+        _populateMenu(hex);
+        _showAt(pageX, pageY);
+      })
+      .catch(function (err) {
+        console.error('project_catalogue fetch failed', err);
+        window.__projectCatalogue = { projects: [] };
+        _populateMenu(hex);
+        _showAt(pageX, pageY);
+      });
+  }
+
+  canvas.addEventListener('contextmenu', function (e) {
+    e.preventDefault();
+    var rect = canvas.getBoundingClientRect();
+    var mx = e.clientX - rect.left;
+    var my = e.clientY - rect.top;
+    var f = nearestHex(mx, my);
+    if (!f) {
+      window.closeContextMenu();
+      return;
+    }
+    _openContextMenu(f, e.pageX, e.pageY);
+  });
+
+  /* Click outside the menu (and outside any submenu) closes it. */
+  document.addEventListener('click', function (e) {
+    if (!contextMenuEl.classList.contains('is-open')) return;
+    if (contextMenuEl.contains(e.target)) return;
+    window.closeContextMenu();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && contextMenuEl.classList.contains('is-open')) {
+      window.closeContextMenu();
+    }
   });
 
   /* ── Click → select hex + action queue ── */
