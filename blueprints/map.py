@@ -163,6 +163,38 @@ def world_map():
         except Exception as e:
             logger.warning(f"Could not load active projects for dynasty {dynasty_id}: {e}")
 
+    # --- Active wars involving the player dynasty (Sprint 3 Story 3-3 AC6) ---
+    # Used by the slide-in detail panel's "war" view. Serialized to plain
+    # dicts (template never sees raw ORM objects).
+    active_wars = []
+    if dynasty_id:
+        try:
+            from sqlalchemy import or_
+            wars = (
+                War.query
+                .filter(
+                    War.is_active == True,
+                    or_(
+                        War.attacker_dynasty_id == dynasty_id,
+                        War.defender_dynasty_id == dynasty_id,
+                    ),
+                )
+                .all()
+            )
+            for w in wars:
+                attacker = DynastyDB.query.get(w.attacker_dynasty_id)
+                defender = DynastyDB.query.get(w.defender_dynasty_id)
+                active_wars.append({
+                    'id': w.id,
+                    'attacker_dynasty_id': w.attacker_dynasty_id,
+                    'attacker_name': attacker.name if attacker else 'Unknown',
+                    'defender_dynasty_id': w.defender_dynasty_id,
+                    'defender_name': defender.name if defender else 'Unknown',
+                    'start_year': w.start_year,
+                })
+        except Exception as e:
+            logger.warning(f"Could not load active wars for dynasty {dynasty_id}: {e}")
+
     return render_template(
         'world_map.html',
         dynasty=dynasty,
@@ -173,6 +205,7 @@ def world_map():
         current_monarch=current_monarch,
         gold=gold,
         active_projects=active_projects,
+        active_wars=active_wars,
     )
 
 
