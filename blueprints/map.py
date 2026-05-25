@@ -163,6 +163,38 @@ def world_map():
         except Exception as e:
             logger.warning(f"Could not load active projects for dynasty {dynasty_id}: {e}")
 
+    # --- Active wars involving the player dynasty (Sprint 3 Story 3-3 AC6) ---
+    # Used by the slide-in detail panel's "war" view. Serialized to plain
+    # dicts (template never sees raw ORM objects).
+    active_wars = []
+    if dynasty_id:
+        try:
+            from sqlalchemy import or_
+            wars = (
+                War.query
+                .filter(
+                    War.is_active == True,
+                    or_(
+                        War.attacker_dynasty_id == dynasty_id,
+                        War.defender_dynasty_id == dynasty_id,
+                    ),
+                )
+                .all()
+            )
+            for w in wars:
+                attacker = DynastyDB.query.get(w.attacker_dynasty_id)
+                defender = DynastyDB.query.get(w.defender_dynasty_id)
+                active_wars.append({
+                    'id': w.id,
+                    'attacker_dynasty_id': w.attacker_dynasty_id,
+                    'attacker_name': attacker.name if attacker else 'Unknown',
+                    'defender_dynasty_id': w.defender_dynasty_id,
+                    'defender_name': defender.name if defender else 'Unknown',
+                    'start_year': w.start_year,
+                })
+        except Exception as e:
+            logger.warning(f"Could not load active wars for dynasty {dynasty_id}: {e}")
+
     return render_template(
         'world_map.html',
         dynasty=dynasty,
@@ -173,6 +205,7 @@ def world_map():
         current_monarch=current_monarch,
         gold=gold,
         active_projects=active_projects,
+        active_wars=active_wars,
     )
 
 
@@ -219,6 +252,125 @@ def project_catalogue(dynasty_id):
             'requires_building': meta['requires_building'],
         })
     return jsonify({'projects': projects})
+
+
+@map_bp.route('/territory/<int:territory_id>/details.json')
+@login_required
+def territory_details_json(territory_id):
+    """Serve territory detail data as JSON for the slide-in detail panel.
+
+    Sprint 3 Story 3-3 AC2. Any logged-in player may inspect any hex; the
+    `is_player_owned` flag is derived from the current_user's dynasties so
+    the frontend can render an "OWNED" badge / action affordances.
+
+    Returns 404 if the territory does not exist.
+    """
+    from models.db_models import Building, MilitaryUnit, Project
+
+    territory = Territory.query.get_or_404(territory_id)
+
+    # Resolve player ownership against ALL of the current user's dynasties
+    # (a user can in theory own more than one — same convention as the
+    # existing territory_details route below).
+    user_dynasty_ids = {
+        d.id for d in DynastyDB.query.filter_by(user_id=current_user.id).all()
+    }
+    is_player_owned = (
+        territory.controller_dynasty_id is not None
+        and territory.controller_dynasty_id in user_dynasty_ids
+    )
+
+    # Controller dict (or null when the hex is unclaimed).
+    controller = None
+    if territory.controller_dynasty_id is not None:
+        controller_dyn = DynastyDB.query.get(territory.controller_dynasty_id)
+        if controller_dyn is not None:
+            controller = {'id': controller_dyn.id, 'name': controller_dyn.name}
+
+    terrain_val = (
+        territory.terrain_type.value
+        if hasattr(territory.terrain_type, 'value')
+        else str(territory.terrain_type)
+    )
+
+    buildings = Building.query.filter_by(territory_id=territory_id).all()
+    buildings_payload = [
+        {
+            'building_type': (
+                b.building_type.value
+                if hasattr(b.building_type, 'value')
+                else str(b.building_type)
+            ),
+            'name': b.name,
+            'level': b.level,
+            'condition': float(b.condition) if b.condition is not None else 1.0,
+        }
+        for b in buildings
+    ]
+
+    # Garrison = ALL military units physically in the territory whose dynasty
+    # matches the controller dynasty. (Foreign units present here would be a
+    # besieging army; spec doesn't ask us to surface those separately yet.)
+    if territory.controller_dynasty_id is not None:
+        garrison_units = (
+            MilitaryUnit.query
+            .filter_by(territory_id=territory_id)
+            .filter_by(dynasty_id=territory.controller_dynasty_id)
+            .all()
+        )
+    else:
+        garrison_units = []
+    garrison_payload = [
+        {
+            'unit_type': (
+                u.unit_type.value
+                if hasattr(u.unit_type, 'value')
+                else str(u.unit_type)
+            ),
+            'size': int(u.size or 0),
+            'morale': float(u.morale) if u.morale is not None else 1.0,
+            'quality': float(u.quality) if u.quality is not None else 1.0,
+        }
+        for u in garrison_units
+    ]
+
+    # Active player-owned project targeting this territory (earliest by
+    # started_year) — mirrors the GeoJSON enrichment rule.
+    active_project_payload = None
+    if user_dynasty_ids:
+        proj = (
+            Project.query
+            .filter(Project.status == 'active')
+            .filter(Project.dynasty_id.in_(user_dynasty_ids))
+            .filter(Project.target_territory_id == territory_id)
+            .order_by(Project.started_year.asc())
+            .first()
+        )
+        if proj is not None:
+            active_project_payload = {
+                'id': proj.id,
+                'project_type': proj.project_type,
+                'started_year': proj.started_year,
+                'completion_year': proj.completion_year,
+            }
+
+    return jsonify({
+        'territory': {
+            'id': territory.id,
+            'name': territory.name,
+            'terrain_type': terrain_val,
+            'population': int(getattr(territory, 'population', 0) or 0),
+            'development_level': int(getattr(territory, 'development_level', 0) or 0),
+            'is_capital': bool(getattr(territory, 'is_capital', False)),
+            'base_tax': int(getattr(territory, 'base_tax', 0) or 0),
+            'fortification_level': int(getattr(territory, 'fortification_level', 0) or 0),
+            'controller': controller,
+            'is_player_owned': is_player_owned,
+        },
+        'buildings': buildings_payload,
+        'garrison': garrison_payload,
+        'active_project': active_project_payload,
+    })
 
 
 @map_bp.route('/territory/<int:territory_id>')
