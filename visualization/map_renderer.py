@@ -610,7 +610,7 @@ def generate_geojson(dynasty_id: int, session, hex_mode: bool = False) -> dict:
     Returns:
         GeoJSON FeatureCollection dict
     """
-    from models.db_models import Territory, DynastyDB, Army
+    from models.db_models import Territory, DynastyDB, Army, Building, MilitaryUnit, Project
 
     # Pre-build dynasty name cache
     dynasty_names: Dict[int, str] = {}
@@ -622,6 +622,34 @@ def generate_geojson(dynasty_id: int, session, hex_mode: bool = False) -> dict:
     for army in session.query(Army).filter_by(is_active=True).all():
         if army.territory_id is not None:
             army_counts[army.territory_id] = army_counts.get(army.territory_id, 0) + 1
+
+    # Hex-mode aggregations (only needed when we'll emit the extra panel fields)
+    buildings_by_territory: Dict[int, list] = {}
+    units_by_territory: Dict[int, list] = {}
+    active_project_by_territory: Dict[int, "Project"] = {}
+    if hex_mode:
+        # Buildings — one query, group in Python (counts are tiny per territory).
+        for b in session.query(Building).all():
+            buildings_by_territory.setdefault(b.territory_id, []).append(b)
+
+        # Military units — one query, group in Python.
+        for u in session.query(MilitaryUnit).all():
+            if u.territory_id is not None:
+                units_by_territory.setdefault(u.territory_id, []).append(u)
+
+        # Active projects targeting a territory, owned by the player dynasty only.
+        # If multiple, keep the earliest by started_year so the GeoJSON is stable.
+        if dynasty_id is not None:
+            project_q = (
+                session.query(Project)
+                .filter(Project.status == 'active')
+                .filter(Project.dynasty_id == dynasty_id)
+                .filter(Project.target_territory_id.isnot(None))
+                .order_by(Project.started_year.asc())
+            )
+            for p in project_q.all():
+                # First-seen wins because we ordered ascending by started_year.
+                active_project_by_territory.setdefault(p.target_territory_id, p)
 
     features = []
     for t in session.query(Territory).all():
@@ -659,6 +687,41 @@ def generate_geojson(dynasty_id: int, session, hex_mode: bool = False) -> dict:
             properties['development_level'] = getattr(t, 'development_level', 1)
             properties['base_tax'] = getattr(t, 'base_tax', 0)
             properties['fortification_level'] = getattr(t, 'fortification_level', 0)
+
+            # --- Story 3-3 detail-panel enrichment ----------------------------
+            # Buildings (compact list for the detail panel summary).
+            terr_buildings = buildings_by_territory.get(t.id, [])
+            properties['buildings'] = [
+                {
+                    'building_type': (
+                        b.building_type.value
+                        if hasattr(b.building_type, 'value')
+                        else str(b.building_type)
+                    ),
+                    'name': b.name,
+                    'level': b.level,
+                }
+                for b in terr_buildings
+            ]
+
+            # Garrison: sum unit sizes for the controller dynasty.
+            terr_units = units_by_territory.get(t.id, [])
+            garrison_total = 0
+            hostile_garrison_total = 0
+            for u in terr_units:
+                if u.dynasty_id is None:
+                    continue
+                if owner_id is not None and u.dynasty_id == owner_id:
+                    garrison_total += int(u.size or 0)
+                elif owner_id is None or u.dynasty_id != owner_id:
+                    hostile_garrison_total += int(u.size or 0)
+            properties['garrison_total'] = garrison_total
+            properties['hostile_garrison_total'] = hostile_garrison_total
+
+            # Active player-owned project targeting this territory (if any).
+            project = active_project_by_territory.get(t.id)
+            properties['active_project_type'] = project.project_type if project else None
+            properties['active_project_id'] = project.id if project else None
 
         feature = {
             'type': 'Feature',

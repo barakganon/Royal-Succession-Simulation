@@ -39,7 +39,7 @@
 # - Each story should have a corresponding file: {story_key}.md in story_location
 
 generated: 2026-05-02
-last_updated: 2026-05-18  # updated: Story 3-2 done
+last_updated: 2026-05-25  # updated: Story 3-3 done
 project: Royal-Succession-Simulation
 project_key: RSS
 tracking_system: file-system
@@ -121,7 +121,7 @@ development_status:
   # Conditional templates per entity (territory / project slot / monarch portrait);
   # update /game/<id>/map.geojson to include per-hex building list, garrison summary,
   # active project; add overlay modes (threats, projects) to canvas renderer.
-  3-3-detail-panel-and-geojson: backlog
+  3-3-detail-panel-and-geojson: done
 
   # Story 3-4: Border drawing + pan/zoom + overlay tabs
   # Thicker ink-style strokes between hexes of different controller_dynasty_id;

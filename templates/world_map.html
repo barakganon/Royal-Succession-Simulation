@@ -132,6 +132,8 @@
         <button class="btn btn-secondary action-btn-sm active" id="btn-terrain" onclick="setOverlay('terrain')">Terrain</button>
         <button class="btn btn-secondary action-btn-sm" id="btn-armies" onclick="setOverlay('armies')">Armies</button>
         <button class="btn btn-secondary action-btn-sm" id="btn-economy" onclick="setOverlay('economy')">Economy</button>
+        <button class="btn btn-secondary action-btn-sm" id="btn-threats" onclick="setOverlay('threats')">Threats</button>
+        <button class="btn btn-secondary action-btn-sm" id="btn-projects" onclick="setOverlay('projects')">Projects</button>
       </div>
 
       <!-- Canvas -->
@@ -254,7 +256,212 @@
 
 {% block extra_scripts %}
 <script>
-/* ── Sprint 3 Story 3-1: detail-panel toggle (module-level so onclick= can reach it) ── */
+/* ── Sprint 3 Story 3-3: server-side data seeds for detail panel ── */
+var activeProjectsArr = {{ active_projects | tojson }};
+window.__activeProjectsById = {};
+activeProjectsArr.forEach(function (p) { window.__activeProjectsById[p.id] = p; });
+window.__monarchData = {{ current_monarch | tojson }};
+window.__recentEvents = {{ recent_events | tojson }};
+window.__activeWars = {{ active_wars | default([]) | tojson }};
+var currentSimYear = {{ dynasty.current_simulation_year if dynasty else 0 }};
+
+/* ── Small HTML-escape helper (used for any text injected via innerHTML) ── */
+function _detailEsc(s) {
+  if (s === null || s === undefined) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/* ── Per-type renderers ── */
+function _renderTerritoryCard(data) {
+  if (!data || !data.territory) {
+    return '<div class="detail-error">Could not load territory details.</div>';
+  }
+  var t = data.territory;
+  var ownerName = t.controller ? _detailEsc(t.controller.name) : 'Unclaimed';
+  var badgeClass, badgeText;
+  if (!t.controller) {
+    badgeClass = 'unclaimed';
+    badgeText = 'Unclaimed';
+  } else if (t.is_player_owned) {
+    badgeClass = 'own';
+    badgeText = 'Your Realm';
+  } else {
+    badgeClass = 'foreign';
+    badgeText = 'Foreign';
+  }
+
+  var html = '<div class="detail-card">';
+  html += '<h3 class="detail-title">' + _detailEsc(t.name) + '</h3>';
+  html += '<p class="detail-subtitle">' + _detailEsc(t.terrain_type || '—') +
+          ' · Pop ' + (t.population || 0) + '</p>';
+
+  html += '<div class="detail-row"><span class="detail-label">Controller</span>' +
+          '<span class="detail-value">' + ownerName +
+          ' <span class="detail-badge ' + badgeClass + '">' + badgeText + '</span></span></div>';
+  html += '<div class="detail-row"><span class="detail-label">Development</span>' +
+          '<span class="detail-value">' + (t.development_level || 0) + '</span></div>';
+  html += '<div class="detail-row"><span class="detail-label">Fortification</span>' +
+          '<span class="detail-value">' + (t.fortification_level || 0) + '</span></div>';
+  if (t.is_capital) {
+    html += '<div class="detail-row"><span class="detail-label">Capital</span>' +
+            '<span class="detail-value">&#9733; Yes</span></div>';
+  }
+
+  // Buildings
+  html += '<div class="detail-section">';
+  html += '<h4 class="detail-section-heading">Buildings</h4>';
+  var buildings = data.buildings || [];
+  if (buildings.length === 0) {
+    html += '<div class="detail-empty">No buildings</div>';
+  } else {
+    html += '<ul class="detail-list detail-buildings">';
+    buildings.forEach(function (b) {
+      html += '<li><span>' + _detailEsc(b.name || b.building_type) + '</span>' +
+              '<span>L' + (b.level || 1) + '</span></li>';
+    });
+    html += '</ul>';
+  }
+  html += '</div>';
+
+  // Garrison
+  html += '<div class="detail-section">';
+  html += '<h4 class="detail-section-heading">Garrison</h4>';
+  var garrison = data.garrison || [];
+  if (garrison.length === 0) {
+    html += '<div class="detail-empty">No garrison</div>';
+  } else {
+    html += '<ul class="detail-list detail-garrison">';
+    garrison.forEach(function (u) {
+      html += '<li><span>' + _detailEsc(u.unit_type) + '</span>' +
+              '<span>&times; ' + (u.size || 0) + '</span></li>';
+    });
+    html += '</ul>';
+  }
+  html += '</div>';
+
+  // Active project
+  if (data.active_project) {
+    var ap = data.active_project;
+    html += '<div class="detail-section">';
+    html += '<h4 class="detail-section-heading">Active Project</h4>';
+    html += '<div class="detail-project-progress">' + _detailEsc(ap.project_type) +
+            ' · ' + ap.started_year + ' &rarr; ' + ap.completion_year + '</div>';
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function _renderProjectCard(ctx) {
+  var p = window.__activeProjectsById ? window.__activeProjectsById[ctx.id] : null;
+  if (!p) {
+    return '<div class="detail-card">' +
+           '<h3 class="detail-title">Project #' + _detailEsc(ctx.id) + '</h3>' +
+           '<p class="detail-empty">Not currently active or not yours.</p>' +
+           '</div>';
+  }
+  var yearsRemaining = Math.max(0, (p.completion_year || 0) - currentSimYear);
+  var html = '<div class="detail-card">';
+  html += '<h3 class="detail-title">' + _detailEsc(p.project_type) + '</h3>';
+  html += '<p class="detail-subtitle">Project #' + _detailEsc(p.id) + '</p>';
+  html += '<div class="detail-row"><span class="detail-label">Started</span>' +
+          '<span class="detail-value">' + _detailEsc(p.started_year) + '</span></div>';
+  html += '<div class="detail-row"><span class="detail-label">Completes</span>' +
+          '<span class="detail-value">' + _detailEsc(p.completion_year) + '</span></div>';
+  html += '<div class="detail-row"><span class="detail-label">Years remaining</span>' +
+          '<span class="detail-value detail-project-progress">' + yearsRemaining + '</span></div>';
+  html += '</div>';
+  return html;
+}
+
+function _renderProjectSlot(ctx) {
+  return '<div class="detail-card">' +
+         '<h3 class="detail-title">Empty Slot</h3>' +
+         '<p class="detail-empty">Right-click a territory and choose a project to fill this slot.</p>' +
+         '</div>';
+}
+
+function _renderMonarchCard() {
+  var m = window.__monarchData;
+  if (!m) {
+    return '<div class="detail-card">' +
+           '<h3 class="detail-title">No Monarch</h3>' +
+           '<p class="detail-empty">&mdash;</p>' +
+           '</div>';
+  }
+  var name = ((m.name || '') + ' ' + (m.surname || '')).trim() || 'Unnamed';
+  var html = '<div class="detail-card">';
+  html += '<h3 class="detail-title">' + _detailEsc(name) + '</h3>';
+  html += '<p class="detail-subtitle">Current Monarch</p>';
+  if (m.age !== undefined && m.age !== null) {
+    html += '<div class="detail-row"><span class="detail-label">Age</span>' +
+            '<span class="detail-value">' + _detailEsc(m.age) + '</span></div>';
+  }
+  if (m.traits && m.traits.length) {
+    html += '<div class="detail-section">';
+    html += '<h4 class="detail-section-heading">Traits</h4>';
+    html += '<ul class="detail-list">';
+    m.traits.forEach(function (tr) {
+      html += '<li><span>' + _detailEsc(tr) + '</span></li>';
+    });
+    html += '</ul></div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function _renderChronicleCard() {
+  var events = window.__recentEvents || [];
+  var html = '<div class="detail-card">';
+  html += '<h3 class="detail-title">Chronicle</h3>';
+  if (events.length === 0) {
+    html += '<p class="detail-empty">No events recorded yet.</p>';
+  } else {
+    html += '<ul class="detail-list">';
+    events.forEach(function (ev) {
+      html += '<li><span>' + _detailEsc(ev.year || '') + '</span>' +
+              '<span>' + _detailEsc(ev.text || '') + '</span></li>';
+    });
+    html += '</ul>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function _renderWorldCard() {
+  return '<div class="detail-card">' +
+         '<h3 class="detail-title">World</h3>' +
+         '<p class="detail-empty">World overview &mdash; coming in Story 3-4 (border drawing + pan/zoom).</p>' +
+         '</div>';
+}
+
+function _renderWarCard() {
+  var wars = window.__activeWars || [];
+  var html = '<div class="detail-card">';
+  html += '<h3 class="detail-title">Active Wars</h3>';
+  if (wars.length === 0) {
+    html += '<p class="detail-empty">No active wars.</p>';
+  } else {
+    html += '<ul class="detail-list">';
+    wars.forEach(function (w) {
+      var att = w.attacker_name || ('Dynasty #' + w.attacker_dynasty_id);
+      var def = w.defender_name || ('Dynasty #' + w.defender_dynasty_id);
+      html += '<li><span>Year ' + _detailEsc(w.start_year) + '</span>' +
+              '<span>' + _detailEsc(att) + ' vs. ' + _detailEsc(def) + '</span></li>';
+    });
+    html += '</ul>';
+  }
+  html += '</div>';
+  return html;
+}
+
+/* ── Sprint 3 Story 3-1/3-3: detail-panel toggle (module-level so onclick= can reach it) ── */
 window.currentDetailContext = null;
 function openDetailPanel(ctx) {
   window.currentDetailContext = ctx;
@@ -267,7 +474,56 @@ function openDetailPanel(ctx) {
   if (label) {
     label.textContent = (ctx && ctx.type) ? ('Detail · ' + ctx.type) : 'Detail';
   }
-  body.textContent = JSON.stringify(ctx) + ' — Story 3-3 will fill this with the real detail view.';
+
+  var type = ctx && ctx.type;
+  switch (type) {
+    case 'territory':
+      // Loading placeholder while fetching.
+      body.innerHTML = '<div class="detail-empty">Loading territory&hellip;</div>';
+      if (ctx.id === undefined || ctx.id === null) {
+        body.innerHTML = '<div class="detail-error">No territory id provided.</div>';
+        break;
+      }
+      fetch('/territory/' + encodeURIComponent(ctx.id) + '/details.json', {
+        credentials: 'same-origin',
+        headers: { 'Accept': 'application/json' }
+      })
+        .then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function (data) {
+          // Guard: panel may have been closed (and ctx changed) by the
+          // time the fetch resolves. Only render if context is unchanged.
+          if (window.currentDetailContext !== ctx) return;
+          body.innerHTML = _renderTerritoryCard(data);
+        })
+        .catch(function (err) {
+          if (window.currentDetailContext !== ctx) return;
+          body.innerHTML = '<div class="detail-error">Could not load territory details.</div>';
+        });
+      break;
+    case 'project':
+      body.innerHTML = _renderProjectCard(ctx);
+      break;
+    case 'project_slot':
+      body.innerHTML = _renderProjectSlot(ctx);
+      break;
+    case 'monarch':
+      body.innerHTML = _renderMonarchCard();
+      break;
+    case 'chronicle':
+      body.innerHTML = _renderChronicleCard();
+      break;
+    case 'world':
+      body.innerHTML = _renderWorldCard();
+      break;
+    case 'war':
+      body.innerHTML = _renderWarCard();
+      break;
+    default:
+      body.innerHTML = '<div class="detail-empty">Select a project slot, a hex, or a nav button to see details.</div>';
+  }
 }
 function closeDetailPanel() {
   var panel = document.getElementById('game-detail-panel');
@@ -308,7 +564,7 @@ document.addEventListener('keydown', function (e) {
   /* ── Data ── */
   var features = [];
   var selectedTerritoryId = null;
-  var overlay = 'terrain';   // terrain | armies | economy
+  var overlay = 'terrain';   // terrain | armies | economy | threats | projects
 
   /* ── Action queue state ── */
   var pendingActionType = null;
@@ -417,6 +673,17 @@ document.addEventListener('keydown', function (e) {
       return;
     }
 
+    /* Pre-compute the max hostile garrison for the threats overlay so we can
+     * scale per-hex red intensity proportionally. Falls back to 1 to avoid
+     * div-by-zero (and the formula collapses to neutral grey when all 0). */
+    var maxHostile = 0;
+    if (overlay === 'threats') {
+      features.forEach(function (f) {
+        var h = (f.properties && f.properties.hostile_garrison_total) || 0;
+        if (h > maxHostile) maxHostile = h;
+      });
+    }
+
     features.forEach(function (f) {
       var p = f.properties;
       var col = p.col !== undefined ? p.col : 0;
@@ -431,8 +698,26 @@ document.addEventListener('keydown', function (e) {
         fill = terrainColor(p.terrain_type);
       } else if (overlay === 'armies') {
         fill = armyColor(p);
-      } else {
+      } else if (overlay === 'economy') {
         fill = economyColor(p.development_level);
+      } else if (overlay === 'threats') {
+        var hostile = p.hostile_garrison_total || 0;
+        if (hostile <= 0 || maxHostile <= 0) {
+          fill = '#1f2530';  // neutral dark grey
+        } else {
+          var r = 40 + Math.round(180 * (hostile / maxHostile));
+          if (r > 220) r = 220;
+          fill = 'rgb(' + r + ',20,20)';
+        }
+      } else if (overlay === 'projects') {
+        if (p.active_project_type) {
+          fill = 'rgba(212, 175, 55, 0.55)';  // gold
+        } else {
+          // Dimmer terrain — append low-alpha overlay later via stroke.
+          fill = terrainColor(p.terrain_type);
+        }
+      } else {
+        fill = terrainColor(p.terrain_type);
       }
 
       var isSelected = p.territory_id === selectedTerritoryId;
@@ -718,7 +1003,10 @@ document.addEventListener('keydown', function (e) {
       p.name + ' (' + (p.terrain_type || '?') + ') · Pop: ' + (p.population || 0) +
       (p.is_capital ? ' ★ Capital' : '');
 
-    // If a pending action is selected, queue it
+    // If a pending action is selected, queue it. In that case the click is
+    // "consumed" by the action — do NOT also pop the detail panel (Story 3-3
+    // review: panel would cover the map mid-flow and surprise the player).
+    var consumedByAction = false;
     if (pendingActionType && apUsed < AP_TOTAL) {
       actionQueue.push({ type: pendingActionType, territory_id: p.territory_id, territory_name: p.name });
       apUsed++;
@@ -726,14 +1014,22 @@ document.addEventListener('keydown', function (e) {
       document.getElementById('pending-action').textContent = '';
       renderQueue();
       renderAP();
+      consumedByAction = true;
+    }
+
+    // Sprint 3 Story 3-3 AC4: left-click opens detail panel ONLY when not
+    // queueing an action.
+    if (!consumedByAction) {
+      openDetailPanel({ type: 'territory', id: p.territory_id });
     }
   });
 
   /* ── Overlay buttons ── */
   window.setOverlay = function (mode) {
     overlay = mode;
-    ['terrain','armies','economy'].forEach(function (m) {
-      document.getElementById('btn-' + m).classList.toggle('active', m === mode);
+    ['terrain','armies','economy','threats','projects'].forEach(function (m) {
+      var btn = document.getElementById('btn-' + m);
+      if (btn) btn.classList.toggle('active', m === mode);
     });
     drawAll();
   };
