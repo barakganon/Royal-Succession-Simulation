@@ -128,11 +128,18 @@ def world_map():
             if monarch:
                 current_year = dynasty.current_simulation_year if dynasty else 0
                 age = (current_year - monarch.birth_year) if monarch.birth_year else 0
+                # Story 3-3 review: wire traits into the monarch payload so
+                # the detail panel's Traits section is no longer dead code.
+                try:
+                    traits = monarch.get_traits()
+                except Exception:
+                    traits = []
                 current_monarch = {
                     'name': monarch.name,
                     'surname': monarch.surname,
                     'age': age,
                     'portrait_svg': monarch.portrait_svg or '',
+                    'traits': traits,
                 }
         except Exception as e:
             logger.warning(f"Could not load monarch for dynasty {dynasty_id}: {e}")

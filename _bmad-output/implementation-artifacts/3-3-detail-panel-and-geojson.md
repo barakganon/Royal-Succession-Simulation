@@ -1,6 +1,6 @@
 # Story 3-3: Right Detail Panel + GeoJSON Upgrade
 
-Status: in-progress
+Status: done
 
 ## Story
 
@@ -148,16 +148,58 @@ claude-opus-4-7[1m] (worktree-A + worktree-B sub-agents + main session integrato
 
 ### Implementation Plan
 
-(populated after worktrees merge)
+Story 3-3 was split into two parallel **worktree sub-agents** working against the spec's JSON contract:
+
+- **Worktree A (backend, `wt/3-3-backend`)** — 4 commits: GeoJSON enrichment (`generate_geojson` adds `buildings` / `garrison_total` / `hostile_garrison_total` / `active_project_type` / `active_project_id` for `hex_mode=True`); new `/territory/<int:id>/details.json` route in `blueprints/map.py` with `is_player_owned` derived from the current user's dynasties; `active_wars` list passed to the `world_map` route. Backend tests: 4 unit + 5 integration = 9 tests.
+- **Worktree B (frontend, `wt/3-3-frontend`)** — 3 commits: conditional detail panel renderer in `templates/world_map.html` switching on `ctx.type` across all 7 spec'd branches (territory / project / project_slot / monarch / chronicle / world / war); new Threats and Projects overlay buttons + `setOverlay` / `drawAll` mode branches; left-click → detail panel; CSS for detail card / row / badge / list / empty / error / project-progress. Frontend tests: 6.
+
+Integration: both worktree branches merged into `feature/detail-panel-and-geojson` with `--no-ff` and zero conflicts (orthogonal file sets).
 
 ### Completion Notes
 
-(populated after worktrees merge)
+- All 8 ACs satisfied (Acceptance Auditor: 8/8 PASS, 0 PARTIAL, 0 FAIL).
+- Worktree-A: 291 → 300 (+9). Worktree-B: 291 → 297 (+6). Integrated: 306 (+15 net).
+- 2 PATCH-level review findings applied as a single follow-up commit:
+  - **`m.traits` dead-code fix**: `_renderMonarchCard` referenced `m.traits` but the route never serialized them. Wired `traits = monarch.get_traits()` into the `current_monarch` payload in `blueprints/map.py` so the panel's Traits section actually renders.
+  - **AC4 UX guard**: left-click was always calling `openDetailPanel`, even when the click was being consumed by a pending-action queue (Recruit/Build/March destination). Added `consumedByAction` flag so the panel only opens when the click is informational.
+- ~13 findings deferred to `deferred-work.md` (perf scans, N+1 wars, project tie-breaker, stale globals, garrison size-0, etc.).
+- pytest under deterministic order: **306 passed, 0 failed, 0 skipped** (was 291; +15).
+- Pre-existing intermittent flake on `test_develop_action_raises_development_level` (Story 2-3 test) reproduces under pytest-randomly ordering but not under `-p no:randomly`. Unrelated to this story; logged in deferred-work.
+
+#### ⚠ Visual verification deferred
+
+Session can't run the dev server. Test-verified: DOM structure, JSON shapes, JS handler text, ARIA, CSS classes. Visual aspects pending the user's `python main_flask_app.py` check at `/world/map`:
+
+- Left-click a hex → detail panel slides in with the territory card (terrain, owner, buildings, garrison, active project if any).
+- Clicking each left-rail nav button (Chronicle 📖 / World 🌍 / War ⚔) renders the right panel.
+- Clicking a project slot pill shows the project card (years remaining) or empty-slot placeholder.
+- Clicking the monarch portrait shows the monarch card with traits (now wired).
+- Threats overlay: red-scaled hexes per `hostile_garrison_total`.
+- Projects overlay: gold-tinted hexes where player has an active project.
+- Pending Build/Recruit/March → click destination hex → action queues without the panel popping up.
 
 ### File List
 
-(populated after worktrees merge)
+- `visualization/map_renderer.py` — MODIFIED (~65 LoC added: aggregations + new properties)
+- `blueprints/map.py` — MODIFIED (~160 LoC added: `/territory/<id>/details.json` + active_wars block + monarch traits patch)
+- `templates/world_map.html` — MODIFIED (~300 LoC added: switch dispatcher + 7 `_renderXCard` helpers + 2 overlay branches + Jinja seeds + left-click guard patch)
+- `static/style.css` — MODIFIED (~145 LoC added: detail card / row / badge / list family)
+- `tests/unit/test_map_renderer.py` — NEW (4 unit tests for AC1)
+- `tests/integration/test_territory_details_endpoint.py` — NEW (5 integration tests for AC2)
+- `tests/integration/test_detail_panel_render.py` — NEW (6 integration tests for AC3 / AC5)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — MODIFIED (3-3: backlog → in-progress → done)
+- `_bmad-output/implementation-artifacts/3-3-detail-panel-and-geojson.md` — MODIFIED
+- `_bmad-output/implementation-artifacts/deferred-work.md` — MODIFIED (~13 Story 3-3 defers)
 
 ### Change Log
 
-(populated after worktrees merge)
+| Date | Change |
+|---|---|
+| 2026-05-25 | spec(3-3) committed (JSON contract for both worktrees) |
+| 2026-05-25 | wt/3-3-backend: 4 commits (GeoJSON enrichment + /details.json + active_wars + tests) |
+| 2026-05-25 | wt/3-3-frontend: 3 commits (CSS + conditional panel + overlays + tests) |
+| 2026-05-25 | Merged both worktrees into feature/detail-panel-and-geojson (zero conflicts) |
+| 2026-05-25 | Code review (3 layers): Acceptance Auditor 8/8 PASS; Blind + Edge Hunters surfaced 2 must-fix + ~11 defers |
+| 2026-05-25 | fix(world-map): wire monarch traits into route + guard left-click panel-open on pending action |
+| 2026-05-25 | pytest: 306 passed, 0 failed, 0 skipped (was 291) |
+| 2026-05-25 | Story status → done |

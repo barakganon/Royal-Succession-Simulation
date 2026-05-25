@@ -1003,7 +1003,10 @@ document.addEventListener('keydown', function (e) {
       p.name + ' (' + (p.terrain_type || '?') + ') · Pop: ' + (p.population || 0) +
       (p.is_capital ? ' ★ Capital' : '');
 
-    // If a pending action is selected, queue it
+    // If a pending action is selected, queue it. In that case the click is
+    // "consumed" by the action — do NOT also pop the detail panel (Story 3-3
+    // review: panel would cover the map mid-flow and surprise the player).
+    var consumedByAction = false;
     if (pendingActionType && apUsed < AP_TOTAL) {
       actionQueue.push({ type: pendingActionType, territory_id: p.territory_id, territory_name: p.name });
       apUsed++;
@@ -1011,10 +1014,14 @@ document.addEventListener('keydown', function (e) {
       document.getElementById('pending-action').textContent = '';
       renderQueue();
       renderAP();
+      consumedByAction = true;
     }
 
-    // Sprint 3 Story 3-3 AC4: left-click also opens the detail panel for the hex.
-    openDetailPanel({ type: 'territory', id: p.territory_id });
+    // Sprint 3 Story 3-3 AC4: left-click opens detail panel ONLY when not
+    // queueing an action.
+    if (!consumedByAction) {
+      openDetailPanel({ type: 'territory', id: p.territory_id });
+    }
   });
 
   /* ── Overlay buttons ── */
