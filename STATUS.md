@@ -1,11 +1,12 @@
 # Royal Succession Simulation - Development Status
-Last updated: 2026-05-03
-Last commit: feat(turn-report): interrupt banner + years-passed stat (Story 1-3)
+Last updated: 2026-05-29
+Last commit: Merge feature/borders-panzoom-overlays — borders + pan/zoom + overlay tabs (Story 3-4)
 
 ---
 
 ## Current State
-**Tests:** 212 passed · 0 skipped · 0 failed
+**Tests:** 312 passed · 0 skipped · 0 failed
+**Story 3-4 (Map borders + pan/zoom + overlay tabs):** done — branch `feature/borders-panzoom-overlays` (3 worktree agents: canvas JS / tabs+CSS / tests). Epic 3 stories 3-1…3-4 done; 3-5 (animated turn pass + routing cleanup) next.
 **App:** imports cleanly, all 6 blueprints registered
 **main_flask_app.py:** 290 lines — app setup + blueprint registration only
 
