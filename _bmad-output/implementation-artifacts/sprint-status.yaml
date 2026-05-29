@@ -39,7 +39,7 @@
 # - Each story should have a corresponding file: {story_key}.md in story_location
 
 generated: 2026-05-02
-last_updated: 2026-05-29  # updated: Story 3-5 done — Epic 3 complete
+last_updated: 2026-05-29  # updated: Epic 3 retrospective done; map-render correct-course merged
 project: Royal-Succession-Simulation
 project_key: RSS
 tracking_system: file-system
@@ -135,7 +135,7 @@ development_status:
   # delete templates/action_phase.html + action_phase route (→ 404).
   3-5-animated-turn-routing-cleanup: done
 
-  epic-3-retrospective: optional
+  epic-3-retrospective: done
 
   # ── EPIC 4: Free Actions Split (Sprint 4) ──────────────────────────────────
   # Goal: Distinguish decisions (instant) from commitments (project, slot-consuming).
