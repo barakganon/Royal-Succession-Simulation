@@ -101,8 +101,10 @@ class TestCreateDynastyAndView:
         assert b'created successfully' in response.data
 
     def test_dynasty_appears_in_dashboard(self, game_client, app, db):
+        # Story 3-5 AC3: users with a dynasty are routed to the map; ?manage=1
+        # escapes back to the dashboard where their dynasties are listed.
         _create_dynasty(game_client)
-        response = game_client.get('/dashboard')
+        response = game_client.get('/dashboard?manage=1')
         assert response.status_code == 200
         assert b'Loop Dynasty' in response.data
 
