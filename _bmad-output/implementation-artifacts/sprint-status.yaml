@@ -39,7 +39,7 @@
 # - Each story should have a corresponding file: {story_key}.md in story_location
 
 generated: 2026-05-02
-last_updated: 2026-05-29  # updated: Story 3-4 done
+last_updated: 2026-05-29  # updated: Story 3-5 created (ready-for-dev)
 project: Royal-Succession-Simulation
 project_key: RSS
 tracking_system: file-system
@@ -133,7 +133,7 @@ development_status:
   # On End Turn click: fetch turn summary, play events as toasts with delays before
   # redirecting; redirect auth.dashboard → world_map for users with active dynasty;
   # delete templates/action_phase.html + action_phase route (→ 404).
-  3-5-animated-turn-routing-cleanup: backlog
+  3-5-animated-turn-routing-cleanup: ready-for-dev
 
   epic-3-retrospective: optional
 
