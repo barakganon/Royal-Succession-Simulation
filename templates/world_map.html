@@ -437,7 +437,7 @@ function _renderChronicleCard() {
 function _renderWorldCard() {
   return '<div class="detail-card">' +
          '<h3 class="detail-title">World</h3>' +
-         '<p class="detail-empty">World overview &mdash; coming in Story 3-4 (border drawing + pan/zoom).</p>' +
+         '<p class="detail-empty">World overview &mdash; other realms and their news arrive in a later chronicle update.</p>' +
          '</div>';
 }
 
@@ -561,6 +561,15 @@ document.addEventListener('keydown', function (e) {
     drawAll();
   }
 
+  /* ── Pan / zoom transform state (Story 3-4) ──
+   * The hex+border layer is drawn under ctx.setTransform(scale,0,0,scale,panX,panY).
+   * Screen-fixed UI text ("No territory data" etc.) is drawn with the identity
+   * transform. screenToWorld() inverts the transform for hit-testing. */
+  var scale = 1, panX = 0, panY = 0;
+  var MIN_SCALE = 0.3, MAX_SCALE = 3.0;
+
+  function screenToWorld(mx, my) { return { x: (mx - panX) / scale, y: (my - panY) / scale }; }
+
   /* ── Data ── */
   var features = [];
   var selectedTerritoryId = null;
@@ -661,11 +670,15 @@ document.addEventListener('keydown', function (e) {
 
   /* ── Draw loop ── */
   function drawAll() {
+    /* Identity transform for the full-canvas clear + background fill so the
+     * backdrop always covers the viewport regardless of pan/zoom. */
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#0a1520';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     if (features.length === 0) {
+      /* Screen-fixed message — keep identity transform. */
       ctx.fillStyle = '#556';
       ctx.font = '16px Cinzel, serif';
       ctx.textAlign = 'center';
@@ -683,6 +696,9 @@ document.addEventListener('keydown', function (e) {
         if (h > maxHostile) maxHostile = h;
       });
     }
+
+    /* World-space transform: pan + zoom applies to the hex grid and borders. */
+    ctx.setTransform(scale, 0, 0, scale, panX, panY);
 
     features.forEach(function (f) {
       var p = f.properties;
@@ -755,12 +771,99 @@ document.addEventListener('keydown', function (e) {
         ctx.fillText(label, cx, cy + 3);
       }
     });
+
+    /* Realm borders are drawn last, while the world transform is still active,
+     * so they overlay every fill mode. */
+    drawBorders();
+  }
+
+  /* ── Realm borders (Story 3-4) ──
+   * Stroke a thick dark edge wherever a hex borders a DIFFERENT owner (or the
+   * map edge). Neighbours are found by CENTER geometry rather than an axial
+   * formula because this file's hexCenter() uses a non-standard offset layout.
+   *
+   * For each hex centre C and edge midpoint M, the neighbour across that edge
+   * has its centre at approximately C + 2*(M - C). We match the feature whose
+   * world centre is nearest that candidate point within R*0.6.
+   *
+   * De-dup: an internal edge between two owned hexes is shared by both. We draw
+   * it only from the hex with the smaller territory_id (or when no neighbour
+   * exists, i.e. the map edge). */
+  function drawBorders() {
+    if (features.length === 0) return;
+
+    // Build a (col,row) -> feature lookup and a centre list for nearest search.
+    var byColRow = {};
+    var centres = [];   // [{ wx, wy, f }]
+    features.forEach(function (f) {
+      var p = f.properties;
+      var col = p.col !== undefined ? p.col : 0;
+      var row = p.row !== undefined ? p.row : 0;
+      byColRow[col + ',' + row] = f;
+      var c = hexCenter(col, row);
+      centres.push({ wx: c.x + offsetX, wy: c.y + offsetY, f: f });
+    });
+
+    function nearestCentreFeature(tx, ty, maxDist) {
+      var best = null, bestDist = Infinity;
+      for (var i = 0; i < centres.length; i++) {
+        var dx = centres[i].wx - tx, dy = centres[i].wy - ty;
+        var d = Math.sqrt(dx * dx + dy * dy);
+        if (d < bestDist) { bestDist = d; best = centres[i].f; }
+      }
+      return (best && bestDist <= maxDist) ? best : null;
+    }
+
+    ctx.strokeStyle = '#2b2114';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+
+    centres.forEach(function (entry) {
+      var f = entry.f;
+      var p = f.properties;
+      var cx = entry.wx, cy = entry.wy;
+      var verts = hexPath(cx, cy);   // 6 vertices, angles PI/3 * i
+
+      for (var i = 0; i < 6; i++) {
+        var v1 = verts[i];
+        var v2 = verts[(i + 1) % 6];
+        // Edge midpoint, then candidate neighbour centre = C + 2*(M - C).
+        var mx = (v1[0] + v2[0]) / 2;
+        var my = (v1[1] + v2[1]) / 2;
+        var candX = cx + 2 * (mx - cx);
+        var candY = cy + 2 * (my - cy);
+        var neighbour = nearestCentreFeature(candX, candY, R * 0.6);
+
+        var isEdge = !neighbour;
+        var differentOwner = neighbour &&
+          (neighbour.properties.owner_dynasty_id !== p.owner_dynasty_id);
+
+        if (!isEdge && !differentOwner) continue;   // shared internal, same owner
+
+        // De-dup internal edges between two differing owners: draw from the
+        // lower territory_id only. Map-edge edges (no neighbour) always draw.
+        if (neighbour) {
+          var myId = p.territory_id;
+          var nbId = neighbour.properties.territory_id;
+          if (myId !== undefined && nbId !== undefined && !(myId < nbId)) continue;
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(v1[0], v1[1]);
+        ctx.lineTo(v2[0], v2[1]);
+        ctx.stroke();
+      }
+    });
   }
 
   /* ── Tooltip / hover ── */
   var tooltip = document.getElementById('hex-tooltip');
 
   function nearestHex(mx, my) {
+    /* Callers pass screen coords (from getBoundingClientRect()); convert to
+     * world space first so hit-testing stays correct under pan/zoom. The
+     * threshold R is in world units (matches the hex radius). */
+    var w = screenToWorld(mx, my);
     var best = null, bestDist = Infinity;
     features.forEach(function (f) {
       var p = f.properties;
@@ -769,9 +872,8 @@ document.addEventListener('keydown', function (e) {
       var c = hexCenter(col, row);
       var cx = c.x + offsetX;
       var cy = c.y + offsetY;
-      var dx = mx - cx, dy = my - cy;
+      var dx = w.x - cx, dy = w.y - cy;
       var dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < best) { best = dist; bestDist = dist; }
       if (dist < bestDist) { bestDist = dist; best = f; }
     });
     return (bestDist <= R) ? best : null;
@@ -798,6 +900,89 @@ document.addEventListener('keydown', function (e) {
 
   canvas.addEventListener('mouseleave', function () {
     tooltip.style.display = 'none';
+  });
+
+  /* ── Wheel zoom — cursor-anchored (Story 3-4) ── */
+  canvas.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var rect = canvas.getBoundingClientRect();
+    var mx = e.clientX - rect.left;
+    var my = e.clientY - rect.top;
+    // World point currently under the cursor — must stay fixed after zoom.
+    var w = screenToWorld(mx, my);
+    var factor = e.deltaY < 0 ? 1.1 : (1 / 1.1);
+    var newScale = scale * factor;
+    if (newScale < MIN_SCALE) newScale = MIN_SCALE;
+    if (newScale > MAX_SCALE) newScale = MAX_SCALE;
+    scale = newScale;
+    // Re-anchor: panX/panY so that w maps back to (mx,my).
+    panX = mx - w.x * scale;
+    panY = my - w.y * scale;
+    tooltip.style.display = 'none';
+    drawAll();
+  }, { passive: false });
+
+  /* ── Middle-button drag → pan (Story 3-4) ── */
+  var isPanning = false;
+  var lastPanX = 0, lastPanY = 0;
+
+  canvas.addEventListener('mousedown', function (e) {
+    if (e.button !== 1) return;   // middle button only
+    e.preventDefault();
+    isPanning = true;
+    lastPanX = e.clientX;
+    lastPanY = e.clientY;
+    canvas.classList.add('is-panning');
+    tooltip.style.display = 'none';
+  });
+
+  canvas.addEventListener('mousemove', function (e) {
+    if (!isPanning) return;
+    var dx = e.clientX - lastPanX;
+    var dy = e.clientY - lastPanY;
+    lastPanX = e.clientX;
+    lastPanY = e.clientY;
+    panX += dx;
+    panY += dy;
+    tooltip.style.display = 'none';   // hide tooltip while dragging
+    drawAll();
+  });
+
+  function _endPan() {
+    if (!isPanning) return;
+    isPanning = false;
+    canvas.classList.remove('is-panning');
+  }
+  canvas.addEventListener('mouseup', function (e) {
+    if (e.button === 1) _endPan();
+  });
+  canvas.addEventListener('mouseleave', _endPan);
+
+  /* ── Double-click → recenter on the nearest hex (Story 3-4) ──
+   * Double-click suppression: the single-click handler bails when e.detail >= 2
+   * (the click that completes a dblclick) AND a short suppress-timer set here
+   * swallows the trailing single-click event that some browsers still deliver
+   * after the dblclick — preventing the detail panel from popping during a
+   * recenter gesture. */
+  var suppressClickUntil = 0;
+  canvas.addEventListener('dblclick', function (e) {
+    e.preventDefault();
+    var rect = canvas.getBoundingClientRect();
+    var mx = e.clientX - rect.left;
+    var my = e.clientY - rect.top;
+    var f = nearestHex(mx, my);
+    if (!f) return;
+    var p = f.properties;
+    var col = p.col !== undefined ? p.col : 0;
+    var row = p.row !== undefined ? p.row : 0;
+    var c = hexCenter(col, row);
+    var wx = c.x + offsetX;
+    var wy = c.y + offsetY;
+    // Place the world point (wx,wy) at the canvas centre at the current scale.
+    panX = canvas.width / 2 - wx * scale;
+    panY = canvas.height / 2 - wy * scale;
+    suppressClickUntil = Date.now() + 350;
+    drawAll();
   });
 
   /* ── Right-click → context menu (Sprint 3 Story 3-2) ── */
@@ -988,6 +1173,10 @@ document.addEventListener('keydown', function (e) {
 
   /* ── Click → select hex + action queue ── */
   canvas.addEventListener('click', function (e) {
+    // Suppress the click that completes a double-click (e.detail >= 2) and the
+    // trailing single-click some browsers deliver after a dblclick recenter.
+    if (e.detail >= 2) return;
+    if (Date.now() < suppressClickUntil) return;
     var rect = canvas.getBoundingClientRect();
     var mx = e.clientX - rect.left;
     var my = e.clientY - rect.top;
