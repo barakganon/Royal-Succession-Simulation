@@ -692,6 +692,7 @@ document.addEventListener('keydown', function (e) {
   function resizeCanvas() {
     canvas.width  = panel.clientWidth;
     canvas.height = panel.clientHeight;
+    if (!_fitted && features.length > 0) { fitToView(); _fitted = true; }
     drawAll();
   }
 
@@ -717,9 +718,13 @@ document.addEventListener('keydown', function (e) {
 
   /* ── Hex geometry ── */
   function hexCenter(col, row) {
-    var x = R * sqrt3 * col + (row % 2) * R * sqrt3 / 2;
-    var y = R * 1.5 * row;
-    return { x: x, y: y };
+    // `col`/`row` are PIXEL positions on the generated map plane (the server's
+    // x_coordinate / y_coordinate), NOT staggered hex-grid indices. Use them
+    // directly — the hex shape and size come from R at draw time, and the
+    // fit-to-view transform (see fitToView) scales the whole plane into view.
+    // (Previously these were multiplied by R·√3 / R·1.5 as if grid indices,
+    // which exploded real coords ~48× off-screen and left the map blank.)
+    return { x: col, y: row };
   }
 
   function hexPath(cx, cy) {
@@ -800,6 +805,34 @@ document.addEventListener('keydown', function (e) {
     var pad = R * 2;
     offsetX = pad - minX;
     offsetY = pad - minY;
+  }
+
+  /* ── Fit-to-view ── Compute an initial scale + pan so the bounding box of
+   * all hexes fills the canvas, regardless of the map plane's coordinate
+   * magnitude. Runs once when feature data and canvas size are first both
+   * available; user pan/zoom afterwards is preserved. */
+  var _fitted = false;
+  function fitToView() {
+    if (features.length === 0 || !canvas.width || !canvas.height) return;
+    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    features.forEach(function (f) {
+      var p = f.properties;
+      var c = hexCenter(p.col || 0, p.row || 0);
+      var x = c.x + offsetX, y = c.y + offsetY;
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    });
+    var worldW = (maxX - minX) + R * 4;   // pad by ~2 hexes each side
+    var worldH = (maxY - minY) + R * 4;
+    var s = Math.min(canvas.width / worldW, canvas.height / worldH);
+    if (s < MIN_SCALE) s = MIN_SCALE;
+    if (s > MAX_SCALE) s = MAX_SCALE;
+    scale = s;
+    var wcx = (minX + maxX) / 2, wcy = (minY + maxY) / 2;
+    panX = canvas.width / 2 - wcx * scale;
+    panY = canvas.height / 2 - wcy * scale;
   }
 
   /* ── Draw loop ── */
