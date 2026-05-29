@@ -1366,19 +1366,64 @@ body.game-page { overflow: hidden; }
   min-width: 140px;
 }
 
-.map-overlay-btns {
+.overlay-tab-bar {
   position: absolute;
-  top: .5rem;
-  left: .5rem;
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
-  gap: .3rem;
+  gap: 0;
   z-index: 5;
+  padding: .35rem .5rem;
+  background: linear-gradient(to top, rgba(13, 13, 26, .92), rgba(13, 13, 26, .55) 70%, transparent);
+  border-top: 1px solid var(--dark-border);
+}
+
+.overlay-tab-bar .action-btn-sm {
+  flex: 1 1 0;
+  border-radius: 0;
+  border-color: var(--dark-border);
+  background: var(--midnight);
+  color: var(--text-muted);
+  border-right-width: 0;
+}
+
+.overlay-tab-bar .action-btn-sm:first-child {
+  border-top-left-radius: 4px;
+  border-bottom-left-radius: 4px;
+}
+
+.overlay-tab-bar .action-btn-sm:last-child {
+  border-right-width: 1px;
+  border-top-right-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+
+.overlay-tab-bar .action-btn-sm:hover {
+  color: var(--gold-light);
+  border-color: var(--gold);
+}
+
+.overlay-tab-bar .action-btn-sm.active {
+  background: var(--gold);
+  border-color: var(--gold-light);
+  color: var(--midnight);
+  font-weight: 600;
 }
 
 .action-btn-sm {
   font-size: .75rem;
   padding: .25rem .5rem;
   font-family: 'Cinzel', serif;
+}
+
+/* Pan/zoom cursor affordances (JS toggles .is-panning) */
+.game-map-panel canvas {
+  cursor: grab;
+}
+
+.game-map-panel canvas.is-panning {
+  cursor: grabbing;
 }
 
 /* ── Victory Screen ── */

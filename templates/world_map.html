@@ -127,20 +127,20 @@
     <!-- ─────────── MAP PANEL ─────────── -->
     <div class="game-map-panel" id="map-panel">
 
-      <!-- Map overlay mode buttons -->
-      <div class="map-overlay-btns">
+      <!-- Canvas -->
+      <canvas id="hexCanvas"></canvas>
+
+      <!-- Hover tooltip -->
+      <div class="hex-tooltip" id="hex-tooltip"></div>
+
+      <!-- Map overlay mode tabs (bottom strip) -->
+      <div class="overlay-tab-bar">
         <button class="btn btn-secondary action-btn-sm active" id="btn-terrain" onclick="setOverlay('terrain')">Terrain</button>
         <button class="btn btn-secondary action-btn-sm" id="btn-armies" onclick="setOverlay('armies')">Armies</button>
         <button class="btn btn-secondary action-btn-sm" id="btn-economy" onclick="setOverlay('economy')">Economy</button>
         <button class="btn btn-secondary action-btn-sm" id="btn-threats" onclick="setOverlay('threats')">Threats</button>
         <button class="btn btn-secondary action-btn-sm" id="btn-projects" onclick="setOverlay('projects')">Projects</button>
       </div>
-
-      <!-- Canvas -->
-      <canvas id="hexCanvas"></canvas>
-
-      <!-- Hover tooltip -->
-      <div class="hex-tooltip" id="hex-tooltip"></div>
     </div>
 
     <!-- ─────────── SIDE PANEL ─────────── -->
