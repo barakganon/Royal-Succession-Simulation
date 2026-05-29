@@ -7,7 +7,7 @@ import datetime
 import logging
 from functools import wraps
 
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session as flask_session
+from flask import Blueprint, render_template, redirect, url_for, flash, request, session as flask_session, current_app
 from flask_login import login_required, current_user
 
 from flask import jsonify
@@ -142,6 +142,30 @@ def create_dynasty():
 
         # Initialize founder and spouse
         initialize_dynasty_founder(new_dynasty.id, theme_config, start_year, succession_rule)
+
+        # Bootstrap a starting map so the world map isn't empty for a freshly
+        # created dynasty. Runs only outside tests — the test suite creates
+        # territories explicitly where it needs them, and a full map-gen on
+        # every test dynasty would be slow and change territory-count fixtures.
+        # Guarded so a generation failure never blocks dynasty creation.
+        if not current_app.config.get('TESTING'):
+            try:
+                from models.map_system import MapGenerator, TerritoryManager
+                if Territory.query.filter_by(controller_dynasty_id=new_dynasty.id).count() == 0:
+                    MapGenerator(db.session).generate_procedural_map(
+                        regions_count=2, provinces_per_region=2,
+                        territories_per_province=4, map_width=900, map_height=700)
+                    tm = TerritoryManager(db.session)
+                    starting = Territory.query.filter_by(controller_dynasty_id=None).limit(6).all()
+                    for idx, terr in enumerate(starting):
+                        tm.assign_territory(terr.id, new_dynasty.id, is_capital=(idx == 0))
+                    db.session.commit()
+                    logger.info(
+                        f"Generated starting map ({len(starting)} territories) "
+                        f"for dynasty {new_dynasty.id}")
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Starting-map generation failed for dynasty {new_dynasty.id}: {e}")
 
         flash(f'Dynasty "{dynasty_name}" created successfully!', 'success')
         return redirect(url_for('dynasty.view_dynasty', dynasty_id=new_dynasty.id))
