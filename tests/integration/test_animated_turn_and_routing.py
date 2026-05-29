@@ -106,7 +106,7 @@ class TestAnimatedTurnAndRouting:
         assert b"endTurn" in body
 
     def test_advance_turn_xhr_summary_has_expected_keys(self, atr_client, app, db):
-        """When advance_turn's XHR summary is non-null it carries year/events keys."""
+        """When advance_turn's XHR summary is non-null it carries the contract keys."""
         dynasty_id = _get_dynasty_id(app, db, "atr_user")
         assert dynasty_id is not None
         with patch('models.turn_processor.process_death_check', return_value=False):
@@ -118,5 +118,7 @@ class TestAnimatedTurnAndRouting:
         assert payload is not None
         summary = payload.get('summary')
         if summary is not None:
-            assert 'year' in summary
+            # Contract keys (see Story 3-5 AC1): start_year/end_year, not a flat 'year'.
+            assert 'start_year' in summary
+            assert 'end_year' in summary
             assert 'events' in summary
