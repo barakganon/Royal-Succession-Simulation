@@ -39,7 +39,7 @@
 # - Each story should have a corresponding file: {story_key}.md in story_location
 
 generated: 2026-05-02
-last_updated: 2026-05-29  # updated: Story 3-4 created (ready-for-dev)
+last_updated: 2026-05-29  # updated: Story 3-4 done
 project: Royal-Succession-Simulation
 project_key: RSS
 tracking_system: file-system
@@ -127,7 +127,7 @@ development_status:
   # Thicker ink-style strokes between hexes of different controller_dynasty_id;
   # canvas transform-matrix pan/zoom (middle-drag, scroll, double-click re-centre);
   # overlay tab switcher (terrain / armies / threats / projects).
-  3-4-borders-panzoom-overlays: ready-for-dev
+  3-4-borders-panzoom-overlays: done
 
   # Story 3-5: Animated turn pass + routing + delete action_phase
   # On End Turn click: fetch turn summary, play events as toasts with delays before
