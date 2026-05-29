@@ -83,6 +83,16 @@ class DynastyDB(db.Model):
     # Cumulative epic fantasy story — one paragraph appended per turn
     epic_story_text = db.Column(db.Text, default='', nullable=True)
 
+    # Free-action (Story 4-1) succession state.
+    # designated_heir_id points at the PersonDB chosen as heir; use_alter=True
+    # keeps the circular DynastyDB<->PersonDB FK cycle resolvable (mirrors founder_person_db_id).
+    designated_heir_id = db.Column(
+        db.Integer,
+        db.ForeignKey('person_db.id', use_alter=True, name='fk_dynasty_designated_heir'),
+        nullable=True,
+    )
+    succession_law = db.Column(db.String(40), nullable=True)
+
     # Relationships to related simulation data for this dynasty
     # 'dynamic' allows for querying, e.g., dynasty.persons.filter_by(...).all()
     # 'cascade="all, delete-orphan"' means if a DynastyDB is deleted, its associated persons and history logs are also deleted.

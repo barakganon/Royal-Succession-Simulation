@@ -148,6 +148,17 @@ class DatabaseInitializer:
                             conn.execute(text("ALTER TABLE dynasty ADD COLUMN epic_story_text TEXT DEFAULT ''"))
                             conn.commit()
                         self.logger.info("Added epic_story_text column to dynasty table.")
+                    # Free-action (Story 4-1) succession columns
+                    if 'designated_heir_id' not in dynasty_cols:
+                        with db.engine.connect() as conn:
+                            conn.execute(text("ALTER TABLE dynasty ADD COLUMN designated_heir_id INTEGER"))
+                            conn.commit()
+                        self.logger.info("Added designated_heir_id column to dynasty table.")
+                    if 'succession_law' not in dynasty_cols:
+                        with db.engine.connect() as conn:
+                            conn.execute(text("ALTER TABLE dynasty ADD COLUMN succession_law VARCHAR(40)"))
+                            conn.commit()
+                        self.logger.info("Added succession_law column to dynasty table.")
                 # Create loan table if missing (Banking system)
                 if 'loan' not in inspector.get_table_names():
                     from models.db_models import Loan
