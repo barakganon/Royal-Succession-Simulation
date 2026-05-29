@@ -1,12 +1,12 @@
 # Royal Succession Simulation - Development Status
 Last updated: 2026-05-29
-Last commit: Merge feature/borders-panzoom-overlays — borders + pan/zoom + overlay tabs (Story 3-4)
+Last commit: Merge feature/animated-turn-routing-cleanup — animated turn pass + routing + delete action_phase (Story 3-5)
 
 ---
 
 ## Current State
-**Tests:** 312 passed · 0 skipped · 0 failed
-**Story 3-4 (Map borders + pan/zoom + overlay tabs):** done — branch `feature/borders-panzoom-overlays` (3 worktree agents: canvas JS / tabs+CSS / tests). Epic 3 stories 3-1…3-4 done; 3-5 (animated turn pass + routing cleanup) next.
+**Tests:** 315 passed · 0 skipped · 0 failed
+**Story 3-5 (Animated turn pass + routing + delete action_phase):** done — branch `feature/animated-turn-routing-cleanup` (3 worktree agents: backend / frontend / tests). **Epic 3 (Map as Main View) complete** — stories 3-1…3-5 all done. End Turn now plays event toasts on the map then routes to the turn report; login lands on the map; `action_phase` route deleted (404). Next epic: Epic 4 (Free actions split) or Epic L legacy items.
 **App:** imports cleanly, all 6 blueprints registered
 **main_flask_app.py:** 290 lines — app setup + blueprint registration only
 

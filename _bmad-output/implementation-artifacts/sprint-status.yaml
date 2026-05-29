@@ -39,7 +39,7 @@
 # - Each story should have a corresponding file: {story_key}.md in story_location
 
 generated: 2026-05-02
-last_updated: 2026-05-29  # updated: Story 3-5 created (ready-for-dev)
+last_updated: 2026-05-29  # updated: Story 3-5 done — Epic 3 complete
 project: Royal-Succession-Simulation
 project_key: RSS
 tracking_system: file-system
@@ -104,7 +104,7 @@ development_status:
 
   # ── EPIC 3: Map as Main View (Sprint 3) ────────────────────────────────────
   # Goal: world_map.html becomes the single play surface. Kill action_phase.html.
-  epic-3: in-progress
+  epic-3: done
 
   # Story 3-1: Rebuild world_map.html side panels
   # Audit existing world_map.html canvas + tooltip code; implement left rail (60px
@@ -133,7 +133,7 @@ development_status:
   # On End Turn click: fetch turn summary, play events as toasts with delays before
   # redirecting; redirect auth.dashboard → world_map for users with active dynasty;
   # delete templates/action_phase.html + action_phase route (→ 404).
-  3-5-animated-turn-routing-cleanup: ready-for-dev
+  3-5-animated-turn-routing-cleanup: done
 
   epic-3-retrospective: optional
 

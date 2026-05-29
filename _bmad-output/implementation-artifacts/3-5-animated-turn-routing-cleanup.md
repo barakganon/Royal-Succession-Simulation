@@ -1,6 +1,6 @@
 # Story 3-5: Animated Turn Pass + Routing + Delete action_phase
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -125,10 +125,45 @@ Merge `--no-ff` after `pytest` green; update STATUS.md + `3-5 → done`; push on
 
 ### Agent Model Used
 
-(to be filled by dev/integration)
+claude-opus-4-8[1m] — 3 parallel worktree sub-agents (backend / frontend / tests) against a frozen contract, + main-session integrator.
 
-### Debug Log References
+### Implementation Plan
+
+Contract-first 3-agent worktree split, zero file overlap:
+- **Agent A** `wt/3-5-backend` @ `fd7a732` — `advance_turn` XHR→JSON (`{ok,redirect,summary}` at every return incl. victory/failure), `auth.dashboard` → `world_map` when the user has a dynasty & `manage!=1`, deleted `action_phase` route + `templates/action_phase.html` + the view_dynasty link (kept `submit_actions` + `view_dynasty`), and updated the existing tests that referenced action_phase/dashboard.
+- **Agent B** `wt/3-5-frontend` @ `858b8e2` — `endTurn()` fetch (`X-Requested-With`) → sequential type-colored toasts in `#turn-toast-stack` → redirect; no-JS `href` fallback + double-submit guard; toast CSS.
+- **Agent C** `wt/3-5-tests` @ `ac609b2` — `tests/integration/test_animated_turn_and_routing.py` (6 contract-first tests).
+- **Integrator** — merged A→B→C clean (no overlap); fixed one C bonus-test bug (asserted a flat `year`; corrected to the contract keys `start_year`/`end_year`); reviewed all seams.
 
 ### Completion Notes List
 
+- All 6 ACs satisfied. `pytest -p no:randomly`: **315 passed, 0 failed, 0 skipped** (was 312; net −3 from A's action_phase-test consolidation, +6 from C).
+- Backend XHR branch verified at all five `advance_turn` return points; dashboard `manage=1` escape works; `GET /dynasty/<id>/action_phase` → 404; frontend correctly consumes the JSON contract with fallbacks.
+- One integrator patch: corrected C's bonus assertion (`'year'` → `start_year`/`end_year`).
+- Defers logged (`deferred-work.md`, 2026-05-29): advance_turn should be POST; turn_report single-use summary; project-start/cannot-afford still unwired (Sprint 4).
+- **Epic 3 (Map as Main View) is now complete** (3-1…3-5 all done).
+- **Visual verification deferred** (no dev server in session). Pending the user's `/world/map` check: End Turn plays event toasts then lands on the turn report; logging in goes straight to the map; `/dashboard?manage=1` still reaches the manager; old action_phase URL 404s.
+
 ### File List
+
+- `blueprints/dynasty.py` — MODIFIED (advance_turn XHR/JSON; action_phase view removed; submit_actions kept)
+- `blueprints/auth.py` — MODIFIED (dashboard → world_map redirect with manage=1 escape)
+- `templates/view_dynasty.html` — MODIFIED (removed action_phase "Take Actions" link)
+- `templates/action_phase.html` — DELETED
+- `templates/world_map.html` — MODIFIED (End Turn button → `endTurn()`, `#turn-toast-stack`)
+- `static/style.css` — MODIFIED (toast stack + toast styles)
+- `tests/integration/test_animated_turn_and_routing.py` — NEW (6 tests; 1 integrator fix)
+- `tests/integration/test_dynasty_routes.py` — MODIFIED (action_phase → 404 assertions)
+- `tests/integration/test_game_loop.py` — MODIFIED (dashboard?manage=1)
+- `_bmad-output/implementation-artifacts/{sprint-status.yaml, deferred-work.md, 3-5-...md}` — MODIFIED
+
+### Change Log
+
+| Date | Change |
+|---|---|
+| 2026-05-29 | spec(3-5) committed (frozen contract for 3 worktree agents) |
+| 2026-05-29 | wt/3-5-backend / wt/3-5-frontend / wt/3-5-tests implemented in parallel |
+| 2026-05-29 | merged all three into feature/animated-turn-routing-cleanup (clean) |
+| 2026-05-29 | integrator fix (test contract keys); review of XHR/dashboard/endTurn seams |
+| 2026-05-29 | pytest: 315 passed, 0 failed, 0 skipped (was 312) |
+| 2026-05-29 | Story 3-5 → done; Epic 3 complete |
