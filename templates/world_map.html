@@ -29,9 +29,11 @@
       Year {{ dynasty.current_simulation_year if dynasty else '—' }}
     </span>
 
-    <!-- End Turn button -->
+    <!-- End Turn button (Story 3-5: animated turn pass; falls back to plain 302 with JS off) -->
     {% if dynasty_id %}
-      <a href="{{ url_for('dynasty.advance_turn', dynasty_id=dynasty_id) }}"
+      <a id="end-turn-btn"
+         href="{{ url_for('dynasty.advance_turn', dynasty_id=dynasty_id) }}"
+         onclick="endTurn(event)"
          class="btn btn-warning btn-sm ml-2" style="font-size:.75rem;white-space:nowrap;">
         &#x231B; End Turn
       </a>
@@ -251,11 +253,143 @@
     <span id="selected-info" style="color:var(--text-light);"></span>
   </div>
 
+  <!-- Story 3-5: animated turn-pass toast stack (event ticker overlay) -->
+  <div id="turn-toast-stack" class="turn-toast-stack" aria-live="polite" aria-atomic="false"></div>
+
 </div><!-- /game-viewport -->
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
+/* ══════════════════════════════════════════════════════════════════════════
+   Story 3-5: Animated End Turn
+   Fetch the advance_turn summary as JSON, play events as sequential toasts,
+   then redirect. Falls back to a plain 302 GET when JS is off (the <a href>).
+   ══════════════════════════════════════════════════════════════════════════ */
+var advanceTurnUrl = {% if dynasty_id %}"{{ url_for('dynasty.advance_turn', dynasty_id=dynasty_id) }}"{% else %}null{% endif %};
+var _turnInFlight = false;
+
+/* Map an event type → { icon, cls } mirroring turn_report.html. */
+function _turnEventStyle(type) {
+  var t = (type || '').toLowerCase();
+  if (t === 'death')                                   return { icon: '☠',   cls: 'text-danger'  };
+  if (t === 'birth')                                   return { icon: '👶', cls: 'text-success' };
+  if (t === 'succession_end' || t === 'succession')    return { icon: '👑', cls: 'text-warning' };
+  if (t === 'succession_start')                        return { icon: '⚔',   cls: 'text-warning' };
+  if (t === 'marriage')                                return { icon: '💍', cls: 'text-info'    };
+  /* world_event / event / default */
+  return { icon: '◆', cls: '' };
+}
+
+/* Build and append one toast; auto-removes after its lifetime. */
+function _pushTurnToast(text, type, year) {
+  var stack = document.getElementById('turn-toast-stack');
+  if (!stack) return;
+  var style = _turnEventStyle(type);
+
+  var toast = document.createElement('div');
+  toast.className = 'turn-toast ' + (style.cls ? style.cls : '');
+
+  var icon = document.createElement('span');
+  icon.className = 'turn-toast-icon';
+  icon.textContent = style.icon;
+
+  var body = document.createElement('div');
+  body.className = 'turn-toast-body';
+  if (year !== undefined && year !== null && year !== '') {
+    var y = document.createElement('div');
+    y.className = 'turn-toast-year';
+    y.textContent = 'Year ' + year;
+    body.appendChild(y);
+  }
+  var txt = document.createElement('div');
+  txt.className = 'turn-toast-text';
+  txt.textContent = text;
+  body.appendChild(txt);
+
+  toast.appendChild(icon);
+  toast.appendChild(body);
+  stack.appendChild(toast);
+
+  /* trigger slide-in on next frame */
+  requestAnimationFrame(function () { toast.classList.add('is-in'); });
+
+  /* fade out after a while, then remove from DOM */
+  setTimeout(function () {
+    toast.classList.add('is-out');
+    setTimeout(function () { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 600);
+  }, 4000);
+}
+
+/* Play events one at a time, ~700ms apart, then run the callback. */
+function _playTurnEvents(events, fallbackText, onDone) {
+  var GAP = 700;
+  if (!events || !events.length) {
+    _pushTurnToast(fallbackText, 'world_event', '');
+    setTimeout(onDone, 1100);
+    return;
+  }
+  var i = 0;
+  (function step() {
+    if (i >= events.length) {
+      /* trailing delay so the last toast is readable before redirect */
+      setTimeout(onDone, 900);
+      return;
+    }
+    var ev = events[i++];
+    _pushTurnToast(ev.text, ev.type, ev.year);
+    setTimeout(step, GAP);
+  })();
+}
+
+function endTurn(event) {
+  if (event && event.preventDefault) event.preventDefault();
+
+  /* No-JS path already handled by the href; here we always have JS. */
+  var btn = document.getElementById('end-turn-btn');
+  if (!advanceTurnUrl) {
+    if (btn) window.location = btn.getAttribute('href');
+    return;
+  }
+  if (_turnInFlight) return;          // guard against double-click
+  _turnInFlight = true;
+
+  var originalHtml = btn ? btn.innerHTML : null;
+  if (btn) {
+    btn.classList.add('is-busy');
+    btn.setAttribute('aria-busy', 'true');
+    btn.innerHTML = '⌛ Advancing…';
+  }
+
+  function _bail() {
+    /* On any failure, fall back to the plain navigation. */
+    window.location = (btn && btn.getAttribute('href')) || advanceTurnUrl;
+  }
+
+  fetch(advanceTurnUrl, {
+    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+    credentials: 'same-origin'
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data || !data.ok) {
+        window.location = (data && data.redirect) || (btn && btn.getAttribute('href')) || advanceTurnUrl;
+        return;
+      }
+      var summary = data.summary || {};
+      var years = summary.years_advanced;
+      var fallbackText = (years !== undefined && years !== null ? years : 'A few') + ' quiet years passed';
+      _playTurnEvents(summary.events, fallbackText, function () {
+        window.location = data.redirect || (btn && btn.getAttribute('href')) || advanceTurnUrl;
+      });
+    })
+    .catch(function (err) {
+      console.error('End turn error:', err);
+      _bail();
+    });
+}
+window.endTurn = endTurn;
+
 /* ── Sprint 3 Story 3-3: server-side data seeds for detail panel ── */
 var activeProjectsArr = {{ active_projects | tojson }};
 window.__activeProjectsById = {};
