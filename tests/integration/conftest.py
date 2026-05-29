@@ -10,7 +10,10 @@ def app():
     """Return the real Flask app configured for testing."""
     import main_flask_app as mfa
     mfa.app.config['TESTING'] = True
-    mfa.app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+    # The DB engine is already bound at import time to DATABASE_URL (a throwaway
+    # temp file set in the root conftest), so the suite never touches the dev DB.
+    # Overriding SQLALCHEMY_DATABASE_URI here would be a no-op — the engine is
+    # already created — which is exactly the bug that let drop_all() wipe the dev DB.
     mfa.app.config['WTF_CSRF_ENABLED'] = False
     mfa.app.config['LOGIN_DISABLED'] = False
     with mfa.app.app_context():

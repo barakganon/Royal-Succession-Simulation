@@ -11,6 +11,22 @@ from flask_sqlalchemy import SQLAlchemy
 # This must happen before any matplotlib import elsewhere in the process.
 os.environ.setdefault('MPLBACKEND', 'Agg')
 
+# Redirect the application database to a throwaway temp file for the whole test
+# run, so the integration suite (which imports the real app via main_flask_app)
+# NEVER touches the developer's instance/dynastysim.db. main_flask_app reads
+# DATABASE_URL at import time, *before* db.init_app binds the engine — and this
+# root conftest is imported before any test or other conftest pulls in the app —
+# so setting it here is what actually takes effect (a late
+# app.config['SQLALCHEMY_DATABASE_URI'] override after import is a no-op because
+# the engine is already bound, which previously let drop_all() wipe the dev DB).
+# A temp FILE is used rather than sqlite:///:memory: because in-memory SQLite is
+# per-connection and would not be shared across pooled connections.
+import tempfile as _tempfile
+os.environ.setdefault(
+    'DATABASE_URL',
+    'sqlite:///' + os.path.join(_tempfile.gettempdir(), 'rss_pytest.db'),
+)
+
 # Add the project root directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
