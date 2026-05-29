@@ -1661,3 +1661,94 @@ body.game-page { overflow: hidden; }
   font-size: .82rem;
 }
 
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Story 3-5: Animated End Turn — turn-pass toast stack
+   Fixed overlay (top-right). Each toast slides in, holds, fades out.
+   Colors mirror the medieval theme + turn_report event types.
+   ══════════════════════════════════════════════════════════════════════════ */
+.turn-toast-stack {
+  position: fixed;
+  top: 64px;
+  right: 18px;
+  z-index: 4000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 320px;
+  max-width: calc(100vw - 36px);
+  pointer-events: none;
+}
+
+.turn-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  background: linear-gradient(160deg, var(--dark-card) 0%, var(--midnight) 100%);
+  border: 1px solid var(--dark-border);
+  border-left: 4px solid var(--gold);
+  border-radius: 6px;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, .55);
+  color: var(--text-light);
+  font-family: 'Crimson Text', Georgia, serif;
+  opacity: 0;
+  transform: translateX(28px);
+  transition: opacity .35s ease, transform .35s ease;
+  pointer-events: auto;
+}
+
+.turn-toast.is-in {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.turn-toast.is-out {
+  opacity: 0;
+  transform: translateX(28px);
+}
+
+.turn-toast-icon {
+  flex-shrink: 0;
+  font-size: 1.15rem;
+  line-height: 1.3;
+  color: var(--gold);
+}
+
+.turn-toast-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.turn-toast-year {
+  font-family: 'Cinzel', serif;
+  font-size: .68rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 1px;
+}
+
+.turn-toast-text {
+  font-size: .9rem;
+  line-height: 1.3;
+  color: var(--text-light);
+  word-wrap: break-word;
+}
+
+/* Type accent colors — recolor the left border + icon to match the event. */
+.turn-toast.text-danger  { border-left-color: var(--blood-red, #c0392b); }
+.turn-toast.text-danger  .turn-toast-icon { color: var(--blood-red, #c0392b); }
+.turn-toast.text-success { border-left-color: var(--forest-hover, #3a5e3a); }
+.turn-toast.text-success .turn-toast-icon { color: #6ec06e; }
+.turn-toast.text-warning { border-left-color: var(--gold); }
+.turn-toast.text-warning .turn-toast-icon { color: var(--gold-light); }
+.turn-toast.text-info    { border-left-color: #3aa0c0; }
+.turn-toast.text-info    .turn-toast-icon { color: #5ec0e0; }
+
+/* End Turn button busy state during the animated pass. */
+#end-turn-btn.is-busy {
+  opacity: .65;
+  pointer-events: none;
+  cursor: progress;
+}

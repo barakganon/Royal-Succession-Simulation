@@ -304,57 +304,19 @@ class TestDynastyTerritories:
 # ---------------------------------------------------------------------------
 
 class TestActionPhase:
-    def test_action_phase_unauthenticated_redirects(self, plain_client):
-        """GET /dynasty/<id>/action_phase without login redirects (302)."""
+    # Story 3-5 AC4: the action_phase route/template were removed in favour of
+    # in-context actions on the world map. GET /dynasty/<id>/action_phase now 404s.
+    def test_action_phase_route_removed_returns_404(self, plain_client):
+        """GET /dynasty/<id>/action_phase no longer exists — 404."""
         response = plain_client.get('/dynasty/1/action_phase', follow_redirects=False)
-        assert response.status_code == 302
+        assert response.status_code == 404
 
-    def test_action_phase_unauthenticated_goes_to_login(self, plain_client):
-        """GET /dynasty/<id>/action_phase without login ends at the login page."""
-        response = plain_client.get('/dynasty/1/action_phase', follow_redirects=True)
-        assert b'Enter the Realm' in response.data
-
-    def test_action_phase_authenticated_returns_200(self, dynasty_client, app, db):
-        """GET /dynasty/<id>/action_phase for own dynasty returns 200."""
+    def test_action_phase_route_removed_authenticated_404(self, dynasty_client, app, db):
+        """Even authenticated, the removed action_phase route 404s."""
         dynasty_id = _get_dynasty_id(app, db, username="dyn_user")
         assert dynasty_id is not None
         response = dynasty_client.get(f'/dynasty/{dynasty_id}/action_phase')
-        assert response.status_code == 200
-
-    def test_action_phase_shows_dynasty_name(self, dynasty_client, app, db):
-        """The action phase screen includes the dynasty name."""
-        dynasty_id = _get_dynasty_id(app, db, username="dyn_user")
-        response = dynasty_client.get(f'/dynasty/{dynasty_id}/action_phase')
-        assert b'House Ironwood' in response.data
-
-    def test_action_phase_wrong_owner_forbidden(self, app, db, session):
-        """A second user cannot access another user's action_phase — gets redirect/403."""
-        with app.app_context():
-            owner = User(username="ap_owner", email="ap_owner@ex.com")
-            owner.set_password("ownerpass")
-            intruder = User(username="ap_intruder", email="ap_intruder@ex.com")
-            intruder.set_password("intruderpass")
-            db.session.add_all([owner, intruder])
-            db.session.commit()
-            dynasty = DynastyDB(
-                user_id=owner.id,
-                name="House ActionOwner",
-                theme_identifier_or_json="MEDIEVAL_EUROPEAN",
-                current_wealth=200,
-                start_year=1100,
-                current_simulation_year=1100,
-            )
-            db.session.add(dynasty)
-            db.session.commit()
-            dynasty_id = dynasty.id
-
-        with app.test_client() as c:
-            c.post('/login', data={'username': 'ap_intruder', 'password': 'intruderpass'})
-            response = c.get(
-                f'/dynasty/{dynasty_id}/action_phase', follow_redirects=True
-            )
-            # Route flashes "Not authorized." and redirects to dashboard
-            assert b'Not authorized' in response.data
+        assert response.status_code == 404
 
     def test_submit_actions_unauthenticated_redirects(self, plain_client):
         """POST /dynasty/<id>/submit_actions without login redirects (302)."""
