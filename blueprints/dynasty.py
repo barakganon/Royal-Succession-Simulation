@@ -242,9 +242,18 @@ def advance_turn(dynasty_id):
     and cleared in a finally block to prevent double-submission or concurrent
     processing.
     """
+    # Frozen interface contract: XHR detection for animated turn (Story 3-5).
+    is_xhr = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
+        if is_xhr:
+            return jsonify({
+                "ok": False,
+                "redirect": url_for('auth.dashboard'),
+                "summary": None,
+            })
         return redirect(url_for('auth.dashboard'))
 
     # Mark turn as in-progress to block concurrent submissions
@@ -255,6 +264,12 @@ def advance_turn(dynasty_id):
         db.session.rollback()
         logger.error(f"Failed to set is_turn_processing for dynasty {dynasty.id}: {e}")
         flash("Could not start turn processing. Please try again.", "danger")
+        if is_xhr:
+            return jsonify({
+                "ok": False,
+                "redirect": url_for('dynasty.view_dynasty', dynasty_id=dynasty.id),
+                "summary": None,
+            })
         return redirect(url_for('dynasty.view_dynasty', dynasty_id=dynasty.id))
 
     # Number of years to advance per turn
@@ -278,6 +293,12 @@ def advance_turn(dynasty_id):
             logger.error(f"Unhandled error in advance_turn for dynasty {dynasty.id}: {e}", exc_info=True)
             db.session.rollback()
             flash(f"An unexpected error occurred while advancing the turn: {type(e).__name__}: {e}", 'danger')
+            if is_xhr:
+                return jsonify({
+                    "ok": False,
+                    "redirect": url_for('dynasty.view_dynasty', dynasty_id=dynasty.id),
+                    "summary": None,
+                })
             return redirect(url_for('dynasty.view_dynasty', dynasty_id=dynasty.id))
 
         if not success:
@@ -324,11 +345,29 @@ def advance_turn(dynasty_id):
         victory_data = check_victory_conditions(dynasty, dynasty.current_simulation_year)
         if victory_data:
             flask_session['victory'] = victory_data
+            if is_xhr:
+                return jsonify({
+                    "ok": True,
+                    "redirect": url_for('dynasty.victory', dynasty_id=dynasty.id),
+                    "summary": turn_summary,
+                })
             return redirect(url_for('dynasty.victory', dynasty_id=dynasty.id))
         flask_session['last_turn_summary'] = turn_summary
         flask_session['last_turn_dynasty_id'] = dynasty.id
+        if is_xhr:
+            return jsonify({
+                "ok": True,
+                "redirect": url_for('dynasty.turn_report', dynasty_id=dynasty.id),
+                "summary": turn_summary,
+            })
         return redirect(url_for('dynasty.turn_report', dynasty_id=dynasty.id))
 
+    if is_xhr:
+        return jsonify({
+            "ok": False,
+            "redirect": url_for('dynasty.view_dynasty', dynasty_id=dynasty.id),
+            "summary": turn_summary or None,
+        })
     return redirect(url_for('dynasty.view_dynasty', dynasty_id=dynasty.id))
 
 
@@ -379,147 +418,12 @@ def turn_report(dynasty_id):
     )
 
 
-@dynasty_bp.route('/dynasty/<int:dynasty_id>/action_phase')
-@login_required
-@block_if_turn_processing
-def action_phase(dynasty_id):
-    """Show the action-phase planning screen for the dynasty."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
-    if dynasty.owner_user != current_user:
-        flash("Not authorized.", "warning")
-        return redirect(url_for('auth.dashboard'))
-
-    # Load theme configuration
-    theme_config = {}
-    if dynasty.theme_identifier_or_json:
-        if dynasty.theme_identifier_or_json in get_all_theme_names():
-            theme_config = get_theme(dynasty.theme_identifier_or_json)
-        else:
-            try:
-                theme_config = json.loads(dynasty.theme_identifier_or_json)
-            except json.JSONDecodeError:
-                pass
-
-    # Current monarch
-    current_monarch = None
-    current_monarch_age = 0
-    monarch_query = PersonDB.query.filter_by(
-        dynasty_id=dynasty_id,
-        is_monarch=True,
-        death_year=None
-    ).first()
-    if monarch_query:
-        current_monarch = {
-            'id': monarch_query.id,
-            'name': monarch_query.name,
-            'surname': monarch_query.surname,
-            'portrait_svg': monarch_query.portrait_svg if hasattr(monarch_query, 'portrait_svg') else None,
-            'traits': monarch_query.get_traits() if hasattr(monarch_query, 'get_traits') else [],
-        }
-        current_monarch_age = dynasty.current_simulation_year - monarch_query.birth_year
-
-    # Territories
-    territory_objs = Territory.query.filter_by(controller_dynasty_id=dynasty_id).all()
-    territories = [
-        {
-            'id': t.id,
-            'name': t.name,
-            'terrain_type': t.terrain_type if hasattr(t, 'terrain_type') else '',
-            'population': t.population if hasattr(t, 'population') else 0,
-            'development_level': t.development_level if hasattr(t, 'development_level') else 0,
-            'fortification_level': t.fortification_level if hasattr(t, 'fortification_level') else 0,
-            'is_capital': t.is_capital if hasattr(t, 'is_capital') else False,
-        }
-        for t in territory_objs
-    ]
-
-    # Armies
-    army_objs = Army.query.filter_by(dynasty_id=dynasty_id, is_active=True).all()
-    armies = [
-        {
-            'id': a.id,
-            'name': a.name,
-            'territory_id': a.territory_id if hasattr(a, 'territory_id') else None,
-            'unit_count': len(a.units) if hasattr(a, 'units') else 0,
-        }
-        for a in army_objs
-    ]
-
-    # Unmarried nobles
-    unmarried_objs = PersonDB.query.filter_by(
-        dynasty_id=dynasty_id,
-        death_year=None,
-        is_noble=True,
-        spouse_sim_id=None
-    ).all()
-    unmarried_nobles = [
-        {
-            'id': p.id,
-            'name': p.name,
-            'surname': p.surname,
-            'gender': p.gender,
-            'age': dynasty.current_simulation_year - p.birth_year,
-        }
-        for p in unmarried_objs
-    ]
-
-    # Economy
-    try:
-        es = EconomySystem(db.session)
-        economy = es.calculate_dynasty_economy(dynasty_id)
-        # Normalise keys so the template can always use economy.gold etc.
-        if economy and 'gold' not in economy:
-            economy['gold'] = economy.get('current_treasury', dynasty.current_wealth)
-            economy['food'] = 0
-            economy['iron'] = dynasty.current_iron if hasattr(dynasty, 'current_iron') else 0
-            economy['timber'] = dynasty.current_timber if hasattr(dynasty, 'current_timber') else 0
-            economy['manpower'] = 0
-    except Exception as e:
-        logger.warning(f"action_phase: economy calculation failed for dynasty {dynasty_id}: {e}")
-        economy = {
-            'gold': dynasty.current_wealth,
-            'food': 0,
-            'iron': dynasty.current_iron if hasattr(dynasty, 'current_iron') else 0,
-            'timber': dynasty.current_timber if hasattr(dynasty, 'current_timber') else 0,
-            'manpower': 0,
-        }
-
-    # Neighbouring dynasties (other dynasties owned by this user — visible targets)
-    neighbour_objs = DynastyDB.query.filter(
-        DynastyDB.id != dynasty_id,
-        DynastyDB.user_id == current_user.id
-    ).all()
-    neighboring_dynasties = [{'id': d.id, 'name': d.name} for d in neighbour_objs]
-
-    dynasty_data = {
-        'id': dynasty.id,
-        'name': dynasty.name,
-        'current_wealth': dynasty.current_wealth,
-        'current_simulation_year': dynasty.current_simulation_year,
-        'coat_of_arms_svg': dynasty.coat_of_arms_svg,
-    }
-
-    return render_template(
-        'action_phase.html',
-        dynasty=dynasty_data,
-        current_monarch=current_monarch,
-        current_monarch_age=current_monarch_age,
-        territories=territories,
-        armies=armies,
-        unmarried_nobles=unmarried_nobles,
-        economy=economy,
-        neighboring_dynasties=neighboring_dynasties,
-        action_points=3,
-        theme_config=theme_config,
-        current_year=dynasty.current_simulation_year,
-    )
-
-
 @dynasty_bp.route('/dynasty/<int:dynasty_id>/submit_actions', methods=['POST'])
 @login_required
 @block_if_turn_processing
 def submit_actions(dynasty_id):
     """Accept a JSON list of player actions, execute up to 3, then advance the turn."""
+    # legacy: retained for tests / non-map submit
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
         return jsonify({'error': 'Not authorized'}), 403
