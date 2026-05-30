@@ -1,6 +1,6 @@
 # Story 5-4: Civil War + Heir-Majority Interrupts
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -92,10 +92,31 @@ Builds on 5-1 (interrupt halt + human/AI split), 5-3 (`is_pretender`/`pretender_
 
 ### Agent Model Used
 
-(to be filled by dev/integration)
-
-### Debug Log References
+claude-opus-4-8[1m] — 3 worktree sub-agents via the Workflow tool (run `wf_4883e755-baf`), + main-session integrator.
 
 ### Completion Notes List
 
+- All ACs satisfied. `pytest -p no:randomly`: **364 passed, 0 failed** (352 baseline + new). Backend `wt/5-4-backend` (`8d8d7e9`), frontend `wt/5-4-frontend` (`9ec30e7`), tests `wt/5-4-tests` (`08ac5c5`). Clean merges, zero file overlap.
+- Agent A added a **heir-majority backfill** at turn start (existing adults `>=16` get `has_seen_majority=True`) so only characters who *cross* 16 in-play fire the interrupt — semantically correct and prevents the founding generation tripping it on turn 1.
+- **Two integrator test-fixes** (the feature legitimately changed turn behavior): (1) C's heir-majority test made the heir *exactly* 16 at the turn's start year (backfilled → never fires) — changed birth_year so it's 14 at start and crosses 16 mid-turn; (2) the pre-existing `test_game_flow::test_complete_game_flow` asserted a fixed year after 4 turns, which an in-game heir reaching 16 now halts early — added a `process_childbirth_check` patch (alongside the existing death patch) so no in-game births → no heir_majority → deterministic year. Both are correct alignments with the new interrupt, not weakenings.
+- **AC8 visual + live:** civil-war modal renders ("CIVIL WAR! … Fight / Negotiate / Abdicate") over the dimmed map; live `advance_turn` returned `interrupt_reason: civil_war` for a human dynasty with a pretender ≥ 50; live `civil_war_resolve` negotiate cleared the claim, deducted gold, wrote a `civil_war` chronicle line. AI dynasties auto-resolve (no hang) per tests. (Dev-server note: had to relaunch with `MPLBACKEND=Agg` — the dev server otherwise crashes on a macOS matplotlib NSWindow-off-main-thread issue, pre-existing infra, unrelated to 5-4.)
+- **Epic 5 (Generational Interrupts + Succession Drama) is now complete** (5-1…5-4).
+
 ### File List
+
+- `models/turn_processor.py` — MODIFIED (`'civil_war'` interrupt, `CIVIL_WAR_THRESHOLD`, `HEIR_MAJORITY_AGE`, detection + backfill)
+- `models/db_models.py` — MODIFIED (`PersonDB.has_seen_majority`)
+- `models/db_initialization.py` — MODIFIED (has_seen_majority migration)
+- `blueprints/dynasty.py` — MODIFIED (`civil_war_resolve` endpoint)
+- `templates/world_map.html` — MODIFIED (`#civil-war-modal` + `#heir-majority-notice`)
+- `static/style.css` — MODIFIED (modal/notice styles)
+- `tests/integration/test_civil_war_majority.py` — NEW (+ integrator birth_year fix)
+- `tests/functional/test_game_flow.py` — MODIFIED (integrator: childbirth patch for determinism)
+- `_bmad-output/implementation-artifacts/{5-4-...md, sprint-status.yaml}`, `STATUS.md` — MODIFIED
+
+### Change Log
+
+| Date | Change |
+|---|---|
+| 2026-05-30 | spec(5-4); 3 worktree agents via Workflow; merged; 2 integrator test-fixes; 364 passed |
+| 2026-05-30 | AC8 civil-war modal + live resolve verified; Story 5-4 → done; Epic 5 complete |

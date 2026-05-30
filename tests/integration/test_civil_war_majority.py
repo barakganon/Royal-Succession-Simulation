@@ -389,10 +389,12 @@ class TestHeirMajorityInterrupt:
         )
         _add_person(app, db, dynasty_id, name="MajKing", gender="MALE",
                     birth_year=1190, is_monarch=True, reign_start_year=1215)
-        # Born so that within this 5-year turn (start 1230) the heir crosses
-        # HEIR_MAJORITY_AGE (16): birth_year 1214 -> age 16 in 1230.
+        # Born so the heir is UNDER 16 at the turn's start year (1230) and
+        # CROSSES HEIR_MAJORITY_AGE (16) mid-turn: birth_year 1216 -> age 14 at
+        # start, turns 16 in 1232 (within the 1230-1234 turn). (Anyone already
+        # >=16 at start is backfilled as has_seen_majority and never fires.)
         heir_id = _add_person(app, db, dynasty_id, name="ComingOfAgeHeir",
-                              gender="MALE", birth_year=1214)
+                              gender="MALE", birth_year=1216)
 
         with app.app_context():
             with patch('models.turn_processor.process_death_check', return_value=False):
