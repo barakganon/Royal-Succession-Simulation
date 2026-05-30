@@ -187,6 +187,11 @@ class DatabaseInitializer:
                 if 'project' not in inspector.get_table_names():
                     Project.__table__.create(db.engine, checkfirst=True)
                     self.logger.info("Created project table.")
+                # Create marriage_offer table if missing (Story 7-1 MarriageOfferDB)
+                if 'marriage_offer' not in inspector.get_table_names():
+                    from models.db_models import MarriageOfferDB
+                    MarriageOfferDB.__table__.create(db.engine, checkfirst=True)
+                    self.logger.info("Created marriage_offer table.")
 
         except Exception as e:
             self.logger.error(f"Error creating tables: {str(e)}")
