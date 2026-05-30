@@ -1,6 +1,6 @@
 # Story 5-2: LLM Succession Candidate Cards + Coronation Chronicle
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -86,10 +86,31 @@ Builds on Story 5-1 (`succession_candidates_json` + `succession_choice` + the mo
 
 ### Agent Model Used
 
-(to be filled by dev/integration)
-
-### Debug Log References
+claude-opus-4-8[1m] — 3 worktree sub-agents run via the **Workflow tool** (`parallel()` fan-out, `isolation: 'worktree'`) against a frozen contract; main-session integrator.
 
 ### Completion Notes List
 
+- All 7 ACs satisfied. `pytest -p no:randomly`: **347 passed, 0 failed, 0 skipped** (342 baseline + 5). Contract-first: C's 5 tests failed in isolation (flavor/coronation/marker absent), green on integration.
+- Agents (Workflow run `wf_fb779148-163`): A `wt/5-2-backend` (`14c245e`) — `build_succession_card_prompt`/`generate_succession_card_fallback` + `build_coronation_prompt`/`generate_coronation_fallback` in llm_prompts; `_succession_llm_flavor` guarded helper; `flavor` added per candidate in `succession_candidates_json` (recent_events = last 5 history entries); coronation `HistoryLogEntryDB(event_type='coronation')` appended in `succession_choice`. B `wt/5-2-frontend` (`a8e9cfc`) — `.succession-candidate-flavor` italic line on each card. C `wt/5-2-tests` (`0b361d8`) — 5 tests. Clean merges, zero file overlap.
+- 5-1 preserved: candidate shape only GAINED `flavor`; `succession_choice` still `{ok,message}` + crowns/unsets, now also writing the coronation entry.
+- **AC7 visual + live verification:** ran the app — modal cards show the 3-sentence narrated flavor (italic, between meta and trait pills); live crown wrote `coronation`: "In the year 1300, Cedric … was crowned … beginning a new reign." and set the heir `is_monarch`.
+- LLM-off in tests → deterministic fallbacks (flavor names candidate/relation/age/traits; coronation names heir/dynasty/year), both non-empty.
+- Note: Agent B initially edited the main working copy via the Edit tool, then reverted it and re-applied in its worktree — integrator verified the main tree was clean (0 stray markers) before merging.
+
 ### File List
+
+- `utils/llm_prompts.py` — MODIFIED (succession-card + coronation prompt builders + fallbacks)
+- `blueprints/dynasty.py` — MODIFIED (`flavor` per candidate + `_succession_llm_flavor` + coronation entry)
+- `templates/world_map.html` — MODIFIED (`.succession-candidate-flavor` on cards)
+- `static/style.css` — MODIFIED (flavor line styles)
+- `tests/integration/test_succession_flavor.py` — NEW (5 tests)
+- `_bmad-output/implementation-artifacts/{5-2-...md, sprint-status.yaml}`, `STATUS.md` — MODIFIED
+
+### Change Log
+
+| Date | Change |
+|---|---|
+| 2026-05-30 | spec(5-2) committed; 3 worktree agents run via Workflow tool (parallel) |
+| 2026-05-30 | merged all three into feature/succession-llm-cards (clean); 347 passed |
+| 2026-05-30 | AC7 visual (flavor on cards) + live coronation entry verified |
+| 2026-05-30 | Story 5-2 → done |
