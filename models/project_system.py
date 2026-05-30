@@ -32,6 +32,47 @@ class InsufficientResourcesError(Exception):
     """Raised by start_project when a dynasty cannot afford year 1's yearly cost."""
 
 
+def _dynasty_has_building(session: Session, dynasty_id: int, required: str) -> bool:
+    """Return True if the dynasty controls a territory with the required building.
+
+    The catalogue records the requirement as a human-readable string
+    ('Stables', 'Barracks'). Real Building rows carry a `BuildingType` enum
+    (e.g. BuildingType.STABLE -> .value 'stable', .name 'STABLE') and a free-text
+    `name`. The catalogue string is matched tolerantly against all three so that
+    plurals / casing / enum-vs-name differences do not cause false negatives:
+    we normalise to lowercase and strip a trailing 's' from both sides before
+    comparing.
+    """
+    def _norm(value: str) -> str:
+        v = (value or "").strip().lower()
+        return v[:-1] if v.endswith("s") else v
+
+    target = _norm(required)
+    if not target:
+        return False
+
+    buildings = (
+        session.query(Building)
+        .join(Territory, Building.territory_id == Territory.id)
+        .filter(Territory.controller_dynasty_id == dynasty_id)
+        .all()
+    )
+    for b in buildings:
+        candidates = []
+        bt = b.building_type
+        if bt is not None:
+            # Enum: compare both .value ('stable') and .name ('STABLE').
+            candidates.append(getattr(bt, "value", None))
+            candidates.append(getattr(bt, "name", None))
+        candidates.append(b.name)
+        for cand in candidates:
+            if cand is None:
+                continue
+            if _norm(str(cand)) == target:
+                return True
+    return False
+
+
 def _llm_available() -> bool:
     """Return True if the LLM API key is present in the running Flask app.
 
@@ -366,6 +407,18 @@ class ProjectSystem:
                 or dynasty.current_timber < meta['yearly_cost_timber']):
             raise InsufficientResourcesError(
                 f"Dynasty {dynasty_id} cannot afford year 1 of {project_type}"
+            )
+
+        # Building prerequisite gate — verified BEFORE charging cost / creating
+        # the Project. If the project type requires a building, the dynasty must
+        # control at least one territory that has it. requires_building is None
+        # for the vast majority of types → unchanged behavior.
+        required_building = meta.get('requires_building')
+        if required_building and not _dynasty_has_building(
+            self.session, dynasty_id, required_building
+        ):
+            raise ValueError(
+                f"Cannot start {project_type}: requires a {required_building}"
             )
 
         project = Project(

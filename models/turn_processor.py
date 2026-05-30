@@ -386,6 +386,12 @@ def process_death_check(person: PersonDB, current_year: int, theme_config: dict)
 
     # Check against themed max age
     max_age = 85 * theme_config.get("max_age_factor", 1.0)
+
+    # Sickly trait halves expected lifespan and doubles mortality
+    if "Sickly" in person.get_traits():
+        max_age *= 0.5
+        base_mortality *= 2
+
     if age > max_age:
         base_mortality = 1.0  # Guaranteed death if past max age
 
@@ -555,12 +561,30 @@ def process_childbirth_check(dynasty: DynastyDB, woman: PersonDB, current_year: 
             is_noble=woman.is_noble or spouse.is_noble
         )
 
-        # Set child traits
+        # Set child traits: inherit from parents, then add one common trait.
+        # Each parent trait is inherited with probability 0.30, deduplicated,
+        # capped at 3 inherited traits total.
+        parent_traits = list(woman.get_traits())
+        father = PersonDB.query.get(woman.spouse_sim_id) if woman.spouse_sim_id else None
+        if father:
+            parent_traits.extend(father.get_traits())
+
         child_traits = []
-        available_traits = theme_config.get("common_traits", ["Noble"])
+        for trait in parent_traits:
+            if len(child_traits) >= 3:
+                break
+            if trait in child_traits:
+                continue
+            if random.random() < 0.30:
+                child_traits.append(trait)
+
+        # Add one random common trait if available and not already present
+        available_traits = theme_config.get("common_traits", [])
         if available_traits:
-            num_traits = min(1, len(available_traits))
-            child_traits = random.sample(available_traits, num_traits)
+            new_trait = random.choice(available_traits)
+            if new_trait not in child_traits:
+                child_traits.append(new_trait)
+
         child.set_traits(child_traits)
 
         db.session.add(child)
