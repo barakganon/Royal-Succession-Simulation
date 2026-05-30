@@ -191,3 +191,4 @@ Task 1-4 remains (chronicle prompt update).
 | 7-1 | Marriage negotiation model + cross-dynasty matching (MarriageOfferDB) | Done |
 | 7-2 | AI marriage acceptance (decide_marriage_response) + wedding chronicle | Done |
 | 7-3 | Children-with-claims (ClaimDB on cross-dynasty birth) + Foreign-Court marriage-proposal UI (4 worktree agents) — 427 green | Done |
+| 8-1 | Family-tree SVG renderer (pure-Python Reingold-Tilford) + DynastyDB.family_tree_svg column + migration (3 worktree agents) — 436 green | Done |

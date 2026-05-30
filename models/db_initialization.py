@@ -159,6 +159,12 @@ class DatabaseInitializer:
                             conn.execute(text("ALTER TABLE dynasty ADD COLUMN succession_law VARCHAR(40)"))
                             conn.commit()
                         self.logger.info("Added succession_law column to dynasty table.")
+                    # Family tree SVG cache (Story 8-1)
+                    if 'family_tree_svg' not in dynasty_cols:
+                        with db.engine.connect() as conn:
+                            conn.execute(text("ALTER TABLE dynasty ADD COLUMN family_tree_svg TEXT"))
+                            conn.commit()
+                        self.logger.info("Added family_tree_svg column to dynasty table.")
                 # Pretender columns (Story 5-3) on person_db table
                 if 'person_db' in inspector.get_table_names():
                     person_cols = [c['name'] for c in inspector.get_columns('person_db')]
