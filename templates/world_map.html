@@ -276,6 +276,40 @@
     </div>
   </div>
 
+  <!-- ══════════════ Story 5-4: CIVIL WAR MODAL (hidden by default) ══════════════ -->
+  <div id="civil-war-modal" class="civil-war-modal succession-modal" hidden
+       role="dialog" aria-modal="true" aria-labelledby="civil-war-modal-title">
+    <div class="succession-modal-panel civil-war-modal-panel">
+      <h2 id="civil-war-modal-title" class="succession-modal-title">Civil War!</h2>
+      <p class="succession-modal-subtitle">
+        Rebellious factions rise against your rule. The realm fractures — how will the crown respond?
+      </p>
+      <div class="civil-war-actions">
+        <button type="button" class="civil-war-btn civil-war-btn-fight"
+                data-choice="fight">Fight</button>
+        <button type="button" class="civil-war-btn civil-war-btn-negotiate"
+                data-choice="negotiate">Negotiate</button>
+        <button type="button" class="civil-war-btn civil-war-btn-abdicate"
+                data-choice="abdicate">Abdicate</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ Story 5-4: HEIR MAJORITY NOTICE (hidden by default) ══════════════ -->
+  <div id="heir-majority-notice" class="heir-majority-notice" hidden
+       role="dialog" aria-modal="true" aria-labelledby="heir-majority-notice-title">
+    <div class="heir-majority-notice-panel">
+      <h2 id="heir-majority-notice-title" class="heir-majority-notice-title">An Heir Comes of Age</h2>
+      <p class="heir-majority-notice-text">
+        A young member of your house has reached majority. You may take a free action
+        from the right-click menu before ending the turn.
+      </p>
+      <div class="heir-majority-notice-actions">
+        <button type="button" id="heir-majority-dismiss" class="heir-majority-btn">Continue</button>
+      </div>
+    </div>
+  </div>
+
 </div><!-- /game-viewport -->
 {% endblock %}
 
@@ -371,6 +405,12 @@ function endTurn(event) {
     return;
   }
 
+  /* Story 5-4: block ending the turn while a civil war is unresolved. */
+  if (typeof _civilWarPending !== 'undefined' && _civilWarPending) {
+    if (typeof openCivilWarModal === 'function') openCivilWarModal();
+    return;
+  }
+
   /* No-JS path already handled by the href; here we always have JS. */
   var btn = document.getElementById('end-turn-btn');
   if (!advanceTurnUrl) {
@@ -405,20 +445,35 @@ function endTurn(event) {
       var summary = data.summary || {};
       var years = summary.years_advanced;
       var fallbackText = (years !== undefined && years !== null ? years : 'A few') + ' quiet years passed';
-      /* Story 5-1: a monarch died this turn → prompt for succession instead of
-         the normal redirect. Play the event toasts first, then open the modal. */
-      var interrupted = summary.interrupt_reason === 'monarch_death';
+      /* A turn can be interrupted for several reasons; play the event toasts
+         first, then surface the appropriate modal/notice in place. */
+      var reason = summary.interrupt_reason;
+      function _restoreEndTurnBtn() {
+        if (btn) {
+          btn.classList.remove('is-busy');
+          btn.removeAttribute('aria-busy');
+          if (originalHtml !== null) btn.innerHTML = originalHtml;
+        }
+        _turnInFlight = false;
+      }
       _playTurnEvents(summary.events, fallbackText, function () {
-        if (interrupted) {
-          /* Re-enable spinner state then surface the succession modal in place;
-             a reload happens after a crowning, not here. */
-          if (btn) {
-            btn.classList.remove('is-busy');
-            btn.removeAttribute('aria-busy');
-            if (originalHtml !== null) btn.innerHTML = originalHtml;
-          }
-          _turnInFlight = false;
+        /* Story 5-1: a monarch died this turn → prompt for succession.
+           A reload happens after a crowning, not here. */
+        if (reason === 'monarch_death') {
+          _restoreEndTurnBtn();
           openSuccessionModal();
+          return;
+        }
+        /* Story 5-4: civil war erupted → force a Fight/Negotiate/Abdicate choice. */
+        if (reason === 'civil_war') {
+          _restoreEndTurnBtn();
+          openCivilWarModal();
+          return;
+        }
+        /* Story 5-4: an heir reached majority → invite a free action first. */
+        if (reason === 'heir_majority') {
+          _restoreEndTurnBtn();
+          openHeirMajorityNotice();
           return;
         }
         window.location = data.redirect || (btn && btn.getAttribute('href')) || advanceTurnUrl;
@@ -568,6 +623,106 @@ function _crownHeir(heirId, btn) {
     });
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   Story 5-4: Civil-war modal — Fight / Negotiate / Abdicate.
+   Opens when a turn is interrupted with interrupt_reason === 'civil_war'.
+   Each choice POSTs to /dynasty/<id>/civil_war_resolve (XHR) then reloads.
+   ══════════════════════════════════════════════════════════════════════════ */
+var civilWarDynastyId = {% if dynasty_id %}"{{ dynasty_id }}"{% else %}null{% endif %};
+var _civilWarPending = false;
+
+function openCivilWarModal() {
+  var modal = document.getElementById('civil-war-modal');
+  if (!modal) return;
+  modal.hidden = false;
+  modal.classList.add('is-open');
+  _civilWarPending = true;
+  if (typeof _setEndTurnDisabled === 'function') _setEndTurnDisabled(true);
+}
+
+function _hideCivilWarModal() {
+  var modal = document.getElementById('civil-war-modal');
+  if (modal) {
+    modal.hidden = true;
+    modal.classList.remove('is-open');
+  }
+  _civilWarPending = false;
+  if (typeof _setEndTurnDisabled === 'function') _setEndTurnDisabled(false);
+}
+
+function _resolveCivilWar(choice) {
+  if (!civilWarDynastyId) { _hideCivilWarModal(); return; }
+  var btns = document.querySelectorAll('#civil-war-modal .civil-war-btn');
+  btns.forEach(function (b) { b.disabled = true; });
+
+  fetch('/dynasty/' + civilWarDynastyId + '/civil_war_resolve', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Accept': 'application/json'
+    },
+    credentials: 'same-origin',
+    body: JSON.stringify({ choice: choice })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data && data.ok) {
+        if (data.message && typeof _pushTurnToast === 'function') {
+          _pushTurnToast(data.message, 'succession_start', '');
+        }
+        setTimeout(function () { window.location.reload(); }, 900);
+        return;
+      }
+      btns.forEach(function (b) { b.disabled = false; });
+      if (data && data.message && typeof _pushTurnToast === 'function') {
+        _pushTurnToast(data.message, 'world_event', '');
+      }
+    })
+    .catch(function (err) {
+      console.error('Civil war resolve error:', err);
+      btns.forEach(function (b) { b.disabled = false; });
+    });
+}
+
+function _wireCivilWarButtons() {
+  var modal = document.getElementById('civil-war-modal');
+  if (!modal) return;
+  modal.querySelectorAll('.civil-war-btn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      _resolveCivilWar(b.getAttribute('data-choice'));
+    });
+  });
+}
+window.openCivilWarModal = openCivilWarModal;
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Story 5-4: Heir-majority notice — lighter banner, no endpoint.
+   Opens when a turn is interrupted with interrupt_reason === 'heir_majority'.
+   The player may take a free action (right-click menu) before ending the turn.
+   ══════════════════════════════════════════════════════════════════════════ */
+function openHeirMajorityNotice() {
+  var notice = document.getElementById('heir-majority-notice');
+  if (!notice) return;
+  notice.hidden = false;
+  notice.classList.add('is-open');
+  /* Non-blocking: the player keeps full agency to take a free action. */
+}
+
+function _hideHeirMajorityNotice() {
+  var notice = document.getElementById('heir-majority-notice');
+  if (notice) {
+    notice.hidden = true;
+    notice.classList.remove('is-open');
+  }
+}
+
+function _wireHeirMajorityNotice() {
+  var btn = document.getElementById('heir-majority-dismiss');
+  if (btn) btn.addEventListener('click', _hideHeirMajorityNotice);
+}
+window.openHeirMajorityNotice = openHeirMajorityNotice;
+
 /* Fetch candidates; self-noops when pending:false so it is safe to call on
    page load for a kingless realm and after a monarch_death turn alike. */
 function openSuccessionModal() {
@@ -621,7 +776,11 @@ function openSuccessionModal() {
 window.openSuccessionModal = openSuccessionModal;
 
 /* Trigger (b): on page load, prompt once for a kingless realm. */
-document.addEventListener('DOMContentLoaded', function () { openSuccessionModal(); });
+document.addEventListener('DOMContentLoaded', function () {
+  openSuccessionModal();
+  _wireCivilWarButtons();
+  _wireHeirMajorityNotice();
+});
 
 /* ── Sprint 3 Story 3-3: server-side data seeds for detail panel ── */
 var activeProjectsArr = {{ active_projects | tojson }};
