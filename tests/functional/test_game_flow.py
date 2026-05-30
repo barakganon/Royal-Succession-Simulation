@@ -104,9 +104,11 @@ class TestGameFlow:
             assert ruler is not None
 
         # 4. Advance a turn (GET /dynasty/<id>/advance_turn — advances 5 years)
-        # Patch death check to guarantee no monarch death interrupt fires, ensuring
-        # exactly 5 years advance and a deterministic year assertion.
-        with patch('models.turn_processor.process_death_check', return_value=False):
+        # Patch death check (no monarch_death interrupt) AND childbirth check (no
+        # in-game children → none can reach 16, so no heir_majority interrupt
+        # halts the turn early — Story 5-4). Both keep the year advance deterministic.
+        with patch('models.turn_processor.process_death_check', return_value=False), \
+             patch('models.turn_processor.process_childbirth_check', return_value=False):
             response = client.get(f'/dynasty/{dynasty_id}/advance_turn', follow_redirects=True)
         assert response.status_code == 200
         # Flash message contains the advance summary
@@ -136,8 +138,11 @@ class TestGameFlow:
         assert response.status_code == 200
 
         # 9. Advance multiple turns and verify cumulative year
-        # Patch death check to guarantee no interrupt, so exactly 5 years advance per turn.
-        with patch('models.turn_processor.process_death_check', return_value=False):
+        # Patch death + childbirth checks: no monarch_death and no in-game children
+        # (so no heir_majority interrupt halts a turn early — Story 5-4), keeping
+        # exactly 5 years advanced per turn for the deterministic 1420 assertion.
+        with patch('models.turn_processor.process_death_check', return_value=False), \
+             patch('models.turn_processor.process_childbirth_check', return_value=False):
             for _ in range(3):
                 client.get(f'/dynasty/{dynasty_id}/advance_turn', follow_redirects=True)
 

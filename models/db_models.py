@@ -196,6 +196,9 @@ class PersonDB(db.Model):
     # Pretender mechanics (Story 5-3)
     is_pretender = db.Column(db.Boolean, default=False, nullable=False)
     pretender_strength = db.Column(db.Integer, default=0, nullable=False)
+
+    # Heir-majority interrupt (Story 5-4): set once a person first reaches majority age.
+    has_seen_majority = db.Column(db.Boolean, default=False, nullable=False)
     
     # New fields for multi-agent game
     diplomatic_skill = db.Column(db.Integer, default=0)  # Skill for diplomacy (0-20)
