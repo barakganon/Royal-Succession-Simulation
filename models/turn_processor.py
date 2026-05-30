@@ -27,7 +27,7 @@ import random
 import logging
 
 from models.db_models import (
-    db, DynastyDB, PersonDB, HistoryLogEntryDB
+    db, DynastyDB, PersonDB, HistoryLogEntryDB, ClaimDB
 )
 from models.banking_system import BankingSystem
 from models.project_system import ProjectSystem
@@ -769,6 +769,26 @@ def process_childbirth_check(dynasty: DynastyDB, woman: PersonDB, current_year: 
                 event_type="death"
             )
             db.session.add(death_log)
+
+        # Story 7-3: a child born to parents of two different dynasties takes the
+        # mother's dynasty but gains a claim on the father's dynasty. Register it
+        # only for surviving children. A claim failure must NEVER abort the birth.
+        if child.death_year is None and spouse.dynasty_id != woman.dynasty_id:
+            try:
+                claim = ClaimDB(
+                    claimant_sim_id=child.id,
+                    target_dynasty_id=spouse.dynasty_id,
+                    source_dynasty_id=woman.dynasty_id,
+                    claim_type='cross_dynasty_birth',
+                    created_year=current_year,
+                )
+                db.session.add(claim)
+            except Exception as claim_exc:
+                logger.warning(
+                    "Cross-dynasty birth claim registration failed (child %s, "
+                    "target dynasty %s): %s",
+                    child.id, spouse.dynasty_id, claim_exc,
+                )
 
         return True
 

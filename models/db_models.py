@@ -1212,4 +1212,54 @@ class MarriageOfferDB(db.Model):
         )
 
 
-logger.debug("models.db_models defined (User, DynastyDB, PersonDB, HistoryLogEntryDB, Region, Province, Territory, Settlement, Resource, TerritoryResource, Building, TradeRoute, MilitaryUnit, Army, DiplomaticRelation, Treaty, War, Battle, Siege, ChronicleEntryDB, Loan, MarriageOfferDB).")
+class ClaimDB(db.Model):
+    """A dynastic claim a person holds over a foreign dynasty (Story 7-3).
+
+    When a child is born to parents of two different dynasties, the child takes
+    the MOTHER's dynasty but gains a claim on the FATHER's dynasty. This table
+    records that claim. Foreign keys are one-way (no reverse collections); the
+    person_db FK uses use_alter=True to keep the circular DynastyDB<->PersonDB
+    FK cycle resolvable, mirroring MarriageOfferDB.
+
+    target_dynasty_id  = the dynasty being claimed (the father's dynasty).
+    source_dynasty_id  = the claimant's own dynasty (the mother's dynasty).
+    claimant_sim_id    = the person who holds the claim (the child).
+    """
+    __tablename__ = 'claim'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    claimant_sim_id = db.Column(
+        db.Integer,
+        db.ForeignKey('person_db.id', use_alter=True, name='fk_claim_claimant'),
+        nullable=False,
+        index=True,
+    )
+    target_dynasty_id = db.Column(
+        db.Integer, db.ForeignKey('dynasty.id'), nullable=False, index=True
+    )
+    source_dynasty_id = db.Column(
+        db.Integer, db.ForeignKey('dynasty.id'), nullable=True, index=True
+    )
+
+    claim_type = db.Column(db.String(30), default='cross_dynasty_birth')
+    strength = db.Column(db.Integer, default=0)
+    created_year = db.Column(db.Integer, nullable=True)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
+    # One-way relationships (no reverse collections); explicit foreign_keys
+    # because there are two FKs to dynasty.
+    claimant = db.relationship('PersonDB', foreign_keys=[claimant_sim_id])
+    target_dynasty = db.relationship('DynastyDB', foreign_keys=[target_dynasty_id])
+    source_dynasty = db.relationship('DynastyDB', foreign_keys=[source_dynasty_id])
+
+    def __repr__(self):
+        return (
+            f"<ClaimDB id={self.id} claimant={self.claimant_sim_id} "
+            f"target={self.target_dynasty_id} type={self.claim_type} "
+            f"active={self.is_active}>"
+        )
+
+
+logger.debug("models.db_models defined (User, DynastyDB, PersonDB, HistoryLogEntryDB, Region, Province, Territory, Settlement, Resource, TerritoryResource, Building, TradeRoute, MilitaryUnit, Army, DiplomaticRelation, Treaty, War, Battle, Siege, ChronicleEntryDB, Loan, MarriageOfferDB, ClaimDB).")
