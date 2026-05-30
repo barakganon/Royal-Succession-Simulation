@@ -1,11 +1,11 @@
 # Royal Succession Simulation - Development Status
 Last updated: 2026-05-30
-Last commit: Story 7-1 — cross-dynasty marriage matching + MarriageOffer model
+Last commit: Story 7-2 — AI marriage acceptance + wedding chronicle
 
 ---
 
 ## Current State
-**Tests:** 408 passed · 0 skipped (full suite green this run; a shared-state isolation flake still intermittently dings the gate — passes in isolation)
+**Tests:** 414 passed + 1 known heir-majority isolation flake (passes in isolation) · 0 skipped
 **Epic 7 (Dynastic Marriages) — in progress.** 7-1 done: marriages now first seek an eligible unmarried noble in another dynasty (political match, both keep their house), stranger fallback only if none; added `MarriageOfferDB` scaffold for 7-2. Next: 7-2 (AI marriage acceptance + wedding chronicle), 7-3 (children-with-claims + UI). Epics 1–6 complete.
 **Epic 6 (Traits & Buildings Matter) — COMPLETE.** 6-1 trait_effects + Military/Economy/Diplomacy hooks; 6-2 building gates + Sickly lifespan + trait inheritance; 6-3 monarch-trait chronicle voice + portrait tooltip + `docs/traits.md`. **Epics 1–6 all done.** Next: Epic 7 (Dynastic Marriages). ⚠ Tech-debt: a shared-temp-DB test-isolation flake intermittently fails the full-suite gate across a few files (passes in isolation) — worth a Sprint-11 test-isolation fix. Dev-server: launch with `MPLBACKEND=Agg`.
 **Epic 6 (Traits & Buildings Matter) — in progress.** 6-1 done: `models/trait_effects.py` (8-trait modifier map) wired into combat (`_resolve_battle`), tax (`calculate_territory_tax_income`), and diplomacy (`perform_diplomatic_action`) — a Brave monarch fights better, Greedy taxes harder, Cunning negotiates better; no-op for trait-less/monarch-less. Also fixed a latent bug where `perform_diplomatic_action` returned None for non-special actions. Next: 6-2 (building gates + lifespan + trait inheritance), 6-3 (chronicle voice + trait docs).

@@ -461,28 +461,127 @@ def process_marriage_check(dynasty: DynastyDB, person: PersonDB, current_year: i
             db.session, person, current_year, min_marriage_age, max_marriage_age
         )
         if partner is not None:
-            # Link both ways; both spouses keep their own dynasty_id (no change in 7-1).
-            person.spouse_sim_id = partner.id
-            partner.spouse_sim_id = person.id
+            # Story 7-2: lazy imports keep this module importable even when Agent A's
+            # new symbols are absent in this worktree.
+            from models.ai_controller import AIController
+            from models.diplomacy_system import DiplomacySystem
+            from models.free_action_system import _llm_available
+            from utils.llm_prompts import (
+                build_wedding_chronicle_prompt,
+                generate_wedding_fallback,
+            )
 
             partner_dynasty = DynastyDB.query.get(partner.dynasty_id)
             person_house = dynasty.name
             partner_house = partner_dynasty.name if partner_dynasty else partner.surname
 
-            marriage_log = HistoryLogEntryDB(
-                dynasty_id=dynasty.id,
-                year=current_year,
-                event_string=(
-                    f"{person.name} {person.surname} of House {person_house} and "
-                    f"{partner.name} {partner.surname} of House {partner_house} "
-                    f"were united in a cross-dynasty marriage."
-                ),
-                person1_sim_id=person.id,
-                person2_sim_id=partner.id,
-                event_type="marriage"
-            )
-            db.session.add(marriage_log)
-            return True
+            # Story 7-2: if the partner's dynasty is AI-controlled, it must accept
+            # the union before the link is forged. A rejection falls through to the
+            # stranger-generation fallback below.
+            accepted = True
+            if partner_dynasty is not None and getattr(partner_dynasty, "is_ai_controlled", False):
+                try:
+                    relation_score = 0
+                    relation = DiplomacySystem(db.session).get_diplomatic_relation(
+                        person.dynasty_id, partner.dynasty_id
+                    )
+                    if relation is not None:
+                        relation_score = relation.relation_score
+                    ai = AIController(
+                        db.session,
+                        partner.dynasty_id,
+                        partner_dynasty.ai_personality or "",
+                    )
+                    accepted = bool(ai.decide_marriage_response({
+                        "proposer_dynasty_id": person.dynasty_id,
+                        "relation_score": relation_score,
+                        "proposer_prestige": (dynasty.prestige or 0),
+                        "own_prestige": (partner_dynasty.prestige or 0),
+                    }))
+                except Exception as decide_exc:
+                    logger.warning(
+                        "Marriage acceptance check failed (proposer %s -> partner dynasty %s): %s",
+                        person.dynasty_id, partner.dynasty_id, decide_exc,
+                    )
+                    accepted = False
+
+            if accepted:
+                # Link both ways; both spouses keep their own dynasty_id (no change in 7-1).
+                person.spouse_sim_id = partner.id
+                partner.spouse_sim_id = person.id
+
+                # Story 7-2: a marriage alliance warms relations between the two houses.
+                try:
+                    alliance_relation = DiplomacySystem(db.session).get_diplomatic_relation(
+                        person.dynasty_id, partner.dynasty_id
+                    )
+                    if alliance_relation is not None:
+                        alliance_relation.update_relation("marriage_alliance", 30)
+                except Exception as relation_exc:
+                    logger.warning(
+                        "Marriage alliance relation bump failed (%s <-> %s): %s",
+                        person.dynasty_id, partner.dynasty_id, relation_exc,
+                    )
+
+                # Story 7-2: wedding chronicle line — LLM when available, else fallback.
+                person_house_name = person.surname or person_house
+                partner_house_name = partner.surname or partner_house
+                wedding_text = None
+                if _llm_available():
+                    try:
+                        import google.generativeai as genai
+                        from flask import current_app
+                        api_key = (
+                            current_app.config.get("FLASK_APP_GOOGLE_API_KEY")
+                            or os.environ.get("GOOGLE_API_KEY")
+                        )
+                        if api_key:
+                            genai.configure(api_key=api_key)
+                            model = genai.GenerativeModel("gemini-1.5-flash")
+                            prompt = build_wedding_chronicle_prompt(
+                                person.name,
+                                person.get_traits(),
+                                partner.name,
+                                partner.get_traits(),
+                                person_house_name,
+                                partner_house_name,
+                                current_year,
+                            )
+                            response = model.generate_content(
+                                prompt,
+                                generation_config={
+                                    "max_output_tokens": 150,
+                                    "temperature": 0.8,
+                                },
+                            )
+                            text = response.text.strip() if response.text else ""
+                            if text:
+                                wedding_text = text
+                    except Exception as llm_exc:
+                        logger.warning(
+                            "Wedding chronicle LLM failed (%s & %s): %s",
+                            person.name, partner.name, llm_exc,
+                        )
+                if not wedding_text:
+                    wedding_text = generate_wedding_fallback(
+                        person.name,
+                        partner.name,
+                        person_house_name,
+                        partner_house_name,
+                        current_year,
+                    )
+
+                marriage_log = HistoryLogEntryDB(
+                    dynasty_id=dynasty.id,
+                    year=current_year,
+                    event_string=wedding_text,
+                    person1_sim_id=person.id,
+                    person2_sim_id=partner.id,
+                    event_type="marriage"
+                )
+                db.session.add(marriage_log)
+                return True
+            # Rejected by AI partner — fall through to stranger-generation fallback.
 
         # No cross-dynasty candidate found — fall back to generating a stranger spouse.
         # Create a spouse
