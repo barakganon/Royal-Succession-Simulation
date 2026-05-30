@@ -187,3 +187,7 @@ Task 1-4 remains (chronicle prompt update).
 | 9C | Victory conditions + endgame screen (`templates/victory.html`) | Done |
 | 9D | Player onboarding panel + milestone progress bars on dashboard | Done |
 | 8J | Integration tests for action_phase + submit_actions routes | Done |
+| flake | Eliminate order-dependent full-suite flake (autouse RNG seed + heir-majority test patches marriage/childbirth) — 415 green | Done |
+| 7-1 | Marriage negotiation model + cross-dynasty matching (MarriageOfferDB) | Done |
+| 7-2 | AI marriage acceptance (decide_marriage_response) + wedding chronicle | Done |
+| 7-3 | Children-with-claims (ClaimDB on cross-dynasty birth) + Foreign-Court marriage-proposal UI (4 worktree agents) — 427 green | Done |

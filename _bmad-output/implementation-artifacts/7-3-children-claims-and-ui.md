@@ -1,6 +1,6 @@
 # Story 7-3: Children-with-Claims + Foreign-Court Marriage UI
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -92,7 +92,8 @@ A child born of a cross-dynasty union should carry a **claim** on the parent-hou
 claude-opus-4-8[1m] — 4 worktree sub-agents via the Workflow tool + main-session integrator.
 
 ### Completion Notes List
-- _pending_
+- All ACs satisfied. Full suite **427 passed** (415 baseline + 12 new), 0 failed. 4 worktree agents via Workflow (run wf_2e998f80-676), main-session integrator. Live run-the-app check: `/world/map` renders the Foreign Court button + panel; `foreign_characters.json` / `eligible_children.json` / `propose_marriage` routes return 200 with correct JSON shapes (dev DB has a single dynasty so the live list is empty-by-data — populated/accept/reject paths covered by the 12 integration tests).
+- **Integrator notes:** the first workflow attempt launched ~7 min before a session-limit reset (23:20) and all 4 agents no-op'd; relaunched after reset, clean. Agent A reported canonical (non-worktree) paths but its edits were actually isolated in its worktree; Agent C leaked into the main tree once then self-reverted. No signature drift this story (frozen contract held). Agent D made one justified deviation: used `random.random → 0.16` (not 0.99) for the surviving-birth tests because conception is gated on `random() < 0.4` *before* the `< 0.15` mortality roll using the same patched fn — 0.16 conceives AND survives.
 
 ### File List
 - `models/db_models.py` — MODIFIED (`ClaimDB`)
