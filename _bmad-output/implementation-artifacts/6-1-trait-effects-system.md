@@ -1,6 +1,6 @@
 # Story 6-1: Trait Effects System + Subsystem Hooks
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -81,10 +81,26 @@ so that the trait/portrait flavor from earlier sprints becomes real strategy.
 
 ### Agent Model Used
 
-(to be filled by dev/integration)
-
-### Debug Log References
+claude-opus-4-8[1m] — 3 worktree sub-agents via the Workflow tool (run `wf_6ac30fd7-d8b`), + main-session integrator.
 
 ### Completion Notes List
 
+- All ACs satisfied. `pytest -p no:randomly`: **387 passed, 0 failed** (364 baseline + 23). A `wt/6-1-core` (`a343815`): pure `trait_effects.py` (TRAIT_MODIFIERS + combat/tax/diplomacy modifiers) + combat hook in `_resolve_battle`. B `wt/6-1-hooks` (`824eec4`): tax hook in `calculate_territory_tax_income` + diplomacy hook in `perform_diplomatic_action` (lazy `trait_effects` import, ImportError-guarded). C `wt/6-1-tests` (`ffffa68`): 17 unit + 6 integration. Clean merges, zero file overlap. Backend-only → no visual check.
+- **Integrator bug-fix:** C's `send_envoy` diplomacy test surfaced a **pre-existing latent bug** — `perform_diplomatic_action` only returned a tuple on special-action branches; plain actions (`send_envoy`/`issue_ultimatum`/`declare_rivalry`) fell through to an implicit `None` and never committed. Added the missing general `commit + return (True, description)`. (4-1 never hit it — it tested `declare_war`.)
+- Trait modifiers default to no-op for monarch-less/trait-less dynasties, so existing tests stayed green.
+
 ### File List
+
+- `models/trait_effects.py` — NEW (pure modifier module)
+- `models/military_system.py` — MODIFIED (combat_modifier hook in `_resolve_battle` + `_monarch_traits`)
+- `models/economy_system.py` — MODIFIED (tax_modifier hook in `calculate_territory_tax_income`)
+- `models/diplomacy_system.py` — MODIFIED (diplomacy_modifier hook + **general-path return fix**)
+- `tests/unit/test_trait_effects.py` — NEW (17 tests)
+- `tests/integration/test_trait_effects_hooks.py` — NEW (6 tests)
+- `_bmad-output/implementation-artifacts/{6-1-...md, sprint-status.yaml}`, `STATUS.md` — MODIFIED
+
+### Change Log
+
+| Date | Change |
+|---|---|
+| 2026-05-30 | spec(6-1); 3 worktree agents via Workflow; merged; integrator fix (diplomacy return); 387 passed; Story 6-1 → done |

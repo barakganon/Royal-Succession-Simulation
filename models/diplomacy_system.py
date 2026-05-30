@@ -350,7 +350,16 @@ class DiplomacySystem:
                 
                 self.session.commit()
                 return True, f"Assassination against {target_dynasty.name} was successful!"
-        
+
+        # General path (declare_rivalry, send_envoy, issue_ultimatum, gift, etc.):
+        # the special-action branches above return early; everything else commits
+        # the relation change + log entries here and reports success. (Previously
+        # this fell through to an implicit None — a latent bug surfaced by the
+        # Story 6-1 diplomacy trait-hook test.)
+        self.session.commit()
+        return True, self._generate_diplomatic_action_description(
+            action_type, actor_dynasty.name, target_dynasty.name)
+
     def create_treaty(self, dynasty1_id: int, dynasty2_id: int, treaty_type: TreatyType,
                      duration: Optional[int] = None, terms: Optional[Dict] = None) -> Tuple[bool, str, Optional[Treaty]]:
         """

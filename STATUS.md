@@ -1,11 +1,12 @@
 # Royal Succession Simulation - Development Status
 Last updated: 2026-05-30
-Last commit: Story 5-4 — civil war + heir-majority interrupts (Epic 5 complete)
+Last commit: Story 6-1 — trait effects system + Military/Economy/Diplomacy hooks
 
 ---
 
 ## Current State
-**Tests:** 364 passed · 0 skipped · 0 failed
+**Tests:** 387 passed · 0 skipped · 0 failed
+**Epic 6 (Traits & Buildings Matter) — in progress.** 6-1 done: `models/trait_effects.py` (8-trait modifier map) wired into combat (`_resolve_battle`), tax (`calculate_territory_tax_income`), and diplomacy (`perform_diplomatic_action`) — a Brave monarch fights better, Greedy taxes harder, Cunning negotiates better; no-op for trait-less/monarch-less. Also fixed a latent bug where `perform_diplomatic_action` returned None for non-special actions. Next: 6-2 (building gates + lifespan + trait inheritance), 6-3 (chronicle voice + trait docs).
 **Epic 5 (Generational Interrupts + Succession Drama) — COMPLETE.** 5-1 succession modal on monarch death; 5-2 LLM candidate cards + coronation; 5-3 pretender mechanics (is_pretender/pretender_strength + accumulation, non-default heir flags a pretender); 5-4 civil-war interrupt (Fight/Negotiate/Abdicate modal + `/civil_war_resolve`) when a pretender's strength ≥ 50, and heir-majority interrupt at age 16 (`has_seen_majority`). AI dynasties auto-resolve/flag (never hang). Verified live (civil-war modal + negotiate resolve). Built via worktree-agent Workflows. **Epics 1–5 done.** Next: Epic 6 (Traits & Buildings Matter). Dev-server note: launch with `MPLBACKEND=Agg` to avoid a macOS matplotlib NSWindow crash.
 **Epic 5 (Generational Interrupts + Succession Drama) — in progress.** 5-1: human monarch death halts the turn → succession modal to crown an heir (AI auto-crowns); End Turn blocked while kingless. 5-2: each candidate card now carries a 3-sentence LLM character sketch (deterministic trait-based fallback when LLM is off), and crowning writes a `coronation` chronicle line. Verified live (flavor on cards + coronation entry). Built via 3 worktree agents (5-2 orchestrated through the Workflow tool). Next: 5-3 (pretenders), 5-4 (civil war + heir-majority).
 **Epic 4 (Free Actions Split) — complete.** 4-1: `POST /free_action` dispatcher (9 instant actions; diplomacy delegates to DiplomacySystem; +2 DynastyDB columns) that doesn't tick the turn. 4-2: each free action gets an LLM-narrated chronicle line (deterministic fallback); right-click menu now has a separated "Decisions" section (free_action_catalogue.json) alongside Projects; reversible actions (feast/tournament/pardon/name_heir/succession_law) can be undone before End Turn via a server session stack + `/free_action/undo` (war/treaty non-undoable). Verified live (menu screenshot + undo round-trip). Built via 3 worktree agents each. Next epic: Epic 5 (Generational Interrupts + Succession Drama).
