@@ -38,6 +38,7 @@ logger = logging.getLogger('royal_succession.turn_processor')
 
 INTERRUPT_REASONS = [
     'monarch_death',
+    'civil_war',
     'heir_majority',
     'project_complete',
     'project_stalled',
@@ -50,6 +51,13 @@ INTERRUPT_REASONS = [
 
 # Pretender mechanics (Story 5-3): strength a living pretender gains per year.
 PRETENDER_STRENGTH_PER_YEAR = 5
+
+# Civil war (Story 5-4): a living pretender at/above this strength triggers a
+# civil-war interrupt for human players (auto-resolved inline for AI dynasties).
+CIVIL_WAR_THRESHOLD = 50
+
+# Heir-majority (Story 5-4): age at which a person first reaches majority.
+HEIR_MAJORITY_AGE = 16
 
 
 # ---------------------------------------------------------------------------
@@ -114,8 +122,17 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
         death_year=None
     ).first()
 
-    # Process each year — interrupt-driven loop (Sprint 1)
+    # Heir-majority backfill (Story 5-4): anyone already at/above majority age
+    # when the turn begins has, by definition, already come of age — they must
+    # not trip the heir_majority interrupt. Mark them seen up front so only
+    # persons who CROSS the majority boundary during this turn (children raised
+    # in play) trigger the interrupt.
     start_year = dynasty.current_simulation_year
+    for person in living_persons:
+        if (start_year - person.birth_year) >= HEIR_MAJORITY_AGE:
+            person.has_seen_majority = True
+
+    # Process each year — interrupt-driven loop (Sprint 1)
     interrupt = None
     years_advanced = 0
     stalled_project_ids: list = []  # populated if a project stalls this turn
@@ -178,6 +195,44 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
 
             # Update living persons list (remove those who died)
             living_persons = [p for p in living_persons if p.death_year is None]
+
+            # --- Civil war + heir-majority detection (Story 5-4) ---
+            # Runs AFTER the per-person loop (monarch_death + pretender
+            # accumulation). monarch_death keeps precedence: if it fired above,
+            # ``interrupt`` is already set and we skip detection. Order within
+            # this block is civil_war first, then heir_majority; first match
+            # sets the interrupt and breaks the turn loop.
+            if interrupt is None:
+                # Civil war: a living pretender at/above the threshold.
+                for person in living_persons:
+                    if getattr(person, 'is_pretender', False) and (person.pretender_strength or 0) >= CIVIL_WAR_THRESHOLD:
+                        if not dynasty.is_ai_controlled:
+                            # Human: halt the turn so the player must resolve it.
+                            interrupt = ('civil_war', current_year)
+                            break
+                        else:
+                            # AI: auto-resolve inline — the rebellion is put down.
+                            person.is_pretender = False
+                            person.pretender_strength = 0
+                            db.session.add(HistoryLogEntryDB(
+                                dynasty_id=dynasty.id,
+                                year=current_year,
+                                event_string=f"The rebellion of {person.name} {person.surname} was put down and the claim extinguished.",
+                                person1_sim_id=person.id,
+                                event_type="civil_war",
+                            ))
+                            # continue scanning other pretenders
+
+                # Heir majority: a living person who first reaches majority age.
+                if interrupt is None:
+                    for person in living_persons:
+                        if (current_year - person.birth_year) >= HEIR_MAJORITY_AGE and not getattr(person, 'has_seen_majority', False):
+                            person.has_seen_majority = True  # always mark, human or AI
+                            if not dynasty.is_ai_controlled:
+                                interrupt = ('heir_majority', current_year)
+                                break
+                            # AI: flag only, no interrupt; keep scanning so all
+                            # newly-major persons get marked this year.
         except Exception as year_exc:
             logger.error(f"Error processing year {current_year} for dynasty {dynasty_id}: {year_exc}", exc_info=True)
             # Continue to next year rather than aborting entire turn
