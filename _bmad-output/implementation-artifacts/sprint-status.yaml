@@ -272,7 +272,7 @@ development_status:
   # Each lifecycle function in turn_processor.py calls the relevant flavor prompt
   # immediately after the mechanical event; result stored as event_string on
   # HistoryLogEntryDB. Fallback fires if LLM unavailable or times out (>3s).
-  9-2-lifecycle-flavor-wiring: backlog
+  9-2-lifecycle-flavor-wiring: ready-for-dev
 
   # Story 9-3: World news + async LLM calls
   # When AI dynasty does something significant, generate "letter from the east"
