@@ -1,6 +1,6 @@
 # Story 8-1: Family-Tree SVG Renderer + DynastyDB column
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -79,7 +79,9 @@ Replace the matplotlib/NetworkX family-tree PNG with a self-contained, determini
 claude-opus-4-8[1m] — 3 worktree sub-agents via the Workflow tool + main-session integrator.
 
 ### Completion Notes List
-- _pending_
+- All ACs satisfied. Full suite **436 passed** (427 baseline + 9 new), 0 failed. 3 worktree agents via Workflow (run wf_63c0ca65-2da), main-session integrator. Sanity render validated as well-formed XML (xml.dom.minidom), 483×262 for a monarch + cross-dynasty spouse + 2 children incl. one deceased.
+- **Integrator fix (one):** the renderer queries only the requesting dynasty's persons, so a cross-dynasty *in-married* spouse (who lives in another dynasty) was never positioned — the marriage-edge loop's `if sid not in positions: continue` silently dropped the edge, so the contract-required **dashed cross-dynasty edge** never rendered and `test_cross_dynasty_spouse_draws_dashed_edge` failed. Fixed by positioning out-of-tree spouses as **satellite nodes** beside their in-tree partner (combined `all_positions`/`all_objs` views) without disturbing the core tidy layout. Agent A had asserted the dash branch was reachable, but it wasn't for the standard in-married case.
+- Clean worktree isolation this run (no main-tree leaks). No signature drift. No new pip deps. plotter.py / templates / JS untouched (deferred to 8-2/8-3 as specified).
 
 ### File List
 - `visualization/family_tree_svg.py` — NEW (renderer)

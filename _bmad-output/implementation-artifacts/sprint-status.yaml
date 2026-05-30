@@ -241,7 +241,7 @@ development_status:
   # assignment; node = portrait + name + dates + crown; edges: solid parent-child,
   # double marriage, dashed cross-dynasty; parchment color palette.
   # Add family_tree_svg TEXT column to DynastyDB (migration).
-  8-1-family-tree-svg-renderer: ready-for-dev
+  8-1-family-tree-svg-renderer: done
 
   # Story 8-2: SVG interactivity
   # Pan/zoom JS (~50 LoC vanilla); hover tooltip with full character info;
