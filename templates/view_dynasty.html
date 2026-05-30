@@ -39,6 +39,9 @@
     <a href="{{ url_for('map.world_map') }}" class="btn btn-sm btn-secondary">
       &#128507; World Map
     </a>
+    <a href="{{ url_for('dynasty.family_tree', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-secondary">
+      &#127968; View Family Tree
+    </a>
     <a href="{{ url_for('dynasty.delete_dynasty', dynasty_id=dynasty.id) }}" class="btn btn-sm btn-outline-danger ml-auto">
       &#128465; Delete Dynasty
     </a>
@@ -249,6 +252,10 @@
             Family tree visualization will be generated after your first turn.
           </div>
           {% endif %}
+          <a href="{{ url_for('dynasty.family_tree', dynasty_id=dynasty.id) }}"
+             class="btn btn-sm btn-primary mt-2">
+            &#127968; View Interactive Family Tree
+          </a>
         </div>
       </div>
     </div>

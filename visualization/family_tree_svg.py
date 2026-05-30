@@ -108,7 +108,17 @@ def _node_svg(p, x: float, y: float) -> str:
     full_name = f'{p.name or ""} {p.surname or ""}'.strip()
     dates = _life_dates(p, None)
 
-    parts = [f'<g data-person-id="{p.id}" opacity="{opacity}">']
+    father_id = getattr(p, 'father_sim_id', None)
+    mother_id = getattr(p, 'mother_sim_id', None)
+    spouse_id = getattr(p, 'spouse_sim_id', None)
+
+    parts = [
+        f'<g data-person-id="{p.id}" '
+        f'data-father-id="{father_id if father_id is not None else ""}" '
+        f'data-mother-id="{mother_id if mother_id is not None else ""}" '
+        f'data-spouse-id="{spouse_id if spouse_id is not None else ""}" '
+        f'opacity="{opacity}">'
+    ]
 
     # Card body
     parts.append(
