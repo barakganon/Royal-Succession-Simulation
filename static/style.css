@@ -1948,6 +1948,15 @@ body.game-page { overflow: hidden; }
   font-size: .8rem;
 }
 
+.succession-candidate-flavor {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: .8rem;
+  line-height: 1.5;
+  max-width: 28rem;
+  margin: .4rem auto .25rem;
+}
+
 .succession-candidate-traits {
   display: flex;
   flex-wrap: wrap;
