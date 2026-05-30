@@ -414,6 +414,32 @@ def process_death_check(person: PersonDB, current_year: int, theme_config: dict)
     return False
 
 
+def _find_cross_dynasty_spouse(session, person: PersonDB, current_year: int, min_age: int, max_age: int):
+    """Find an eligible noble from a different dynasty to marry ``person``.
+
+    Searches for an unmarried, living noble of the opposite gender belonging to a
+    different dynasty, whose age falls within [min_age, max_age]. Returns the first
+    such candidate ordered by id, or None if no candidate exists (Story 7-1).
+    """
+    spouse_gender = "FEMALE" if person.gender == "MALE" else "MALE"
+
+    candidate = (
+        session.query(PersonDB)
+        .filter(
+            PersonDB.gender == spouse_gender,
+            PersonDB.death_year.is_(None),
+            PersonDB.is_noble.is_(True),
+            PersonDB.spouse_sim_id.is_(None),
+            PersonDB.dynasty_id != person.dynasty_id,
+            (current_year - PersonDB.birth_year) >= min_age,
+            (current_year - PersonDB.birth_year) <= max_age,
+        )
+        .order_by(PersonDB.id)
+        .first()
+    )
+    return candidate
+
+
 def process_marriage_check(dynasty: DynastyDB, person: PersonDB, current_year: int, theme_config: dict):
     """Check if an unmarried noble gets married this year."""
     age = current_year - person.birth_year
@@ -430,6 +456,35 @@ def process_marriage_check(dynasty: DynastyDB, person: PersonDB, current_year: i
 
     # Roll for marriage
     if random.random() < marriage_chance:
+        # Story 7-1: prefer a cross-dynasty union before generating a stranger.
+        partner = _find_cross_dynasty_spouse(
+            db.session, person, current_year, min_marriage_age, max_marriage_age
+        )
+        if partner is not None:
+            # Link both ways; both spouses keep their own dynasty_id (no change in 7-1).
+            person.spouse_sim_id = partner.id
+            partner.spouse_sim_id = person.id
+
+            partner_dynasty = DynastyDB.query.get(partner.dynasty_id)
+            person_house = dynasty.name
+            partner_house = partner_dynasty.name if partner_dynasty else partner.surname
+
+            marriage_log = HistoryLogEntryDB(
+                dynasty_id=dynasty.id,
+                year=current_year,
+                event_string=(
+                    f"{person.name} {person.surname} of House {person_house} and "
+                    f"{partner.name} {partner.surname} of House {partner_house} "
+                    f"were united in a cross-dynasty marriage."
+                ),
+                person1_sim_id=person.id,
+                person2_sim_id=partner.id,
+                event_type="marriage"
+            )
+            db.session.add(marriage_log)
+            return True
+
+        # No cross-dynasty candidate found — fall back to generating a stranger spouse.
         # Create a spouse
         spouse_gender = "FEMALE" if person.gender == "MALE" else "MALE"
         name_key = "names_male" if spouse_gender == "MALE" else "names_female"
