@@ -39,7 +39,7 @@
 # - Each story should have a corresponding file: {story_key}.md in story_location
 
 generated: 2026-05-02
-last_updated: 2026-05-30  # updated: Story 6-1 done (trait effects + hooks)
+last_updated: 2026-05-30  # updated: Story 6-2 created (ready-for-dev)
 project: Royal-Succession-Simulation
 project_key: RSS
 tracking_system: file-system
@@ -200,7 +200,7 @@ development_status:
   # Lock recruit-project starts behind building check (Stables → cavalry, Barracks →
   # heavy infantry); apply Sickly -50% lifespan in process_death_check; trait
   # inheritance in process_childbirth_check (~30% per-parent, cap 3, +1 random).
-  6-2-building-gates-and-trait-lifecycle: backlog
+  6-2-building-gates-and-trait-lifecycle: ready-for-dev
 
   # Story 6-3: Chronicle voice + trait documentation
   # build_chronicle_prompt receives active monarch's traits so narrative voice
