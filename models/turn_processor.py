@@ -533,23 +533,28 @@ def process_childbirth_check(dynasty: DynastyDB, woman: PersonDB, current_year: 
     return False
 
 
-def process_succession(dynasty: DynastyDB, deceased_monarch: PersonDB, current_year: int, theme_config: dict):
-    """Process succession after a monarch's death."""
-    # Log the succession crisis
-    succession_log = HistoryLogEntryDB(
-        dynasty_id=dynasty.id,
-        year=current_year,
-        event_string=f"With the death of {deceased_monarch.name} {deceased_monarch.surname}, the matter of succession weighs heavily on House {dynasty.name}.",
-        person1_sim_id=deceased_monarch.id,
-        event_type="succession_start"
-    )
-    db.session.add(succession_log)
+def _sort_by_rule(people: list, succession_rule: str) -> None:
+    """Sort a list of candidate PersonDB rows in place per the succession rule."""
+    if succession_rule == "PRIMOGENITURE_MALE_PREFERENCE":
+        # Sort by gender (males first) then by birth year (oldest first)
+        people.sort(key=lambda p: (p.gender != "MALE", p.birth_year))
+    elif succession_rule == "PRIMOGENITURE_ABSOLUTE":
+        # Sort by birth year only (oldest first)
+        people.sort(key=lambda p: p.birth_year)
+    elif succession_rule == "ELECTIVE_NOBLE_COUNCIL":
+        # For simplicity, just sort by traits count (desc) and age (oldest first)
+        people.sort(key=lambda p: (-len(p.get_traits()), p.birth_year))
 
-    # Get succession rule
+
+def get_succession_candidates(dynasty: DynastyDB, deceased_monarch: PersonDB, theme_config: dict) -> list:
+    """Return the ordered list of eligible heirs for a deceased monarch.
+
+    Pure helper: performs the children -> siblings -> any-noble selection and the
+    per-rule sort. Does NOT crown anyone and never mutates the DB. May be empty.
+    """
     succession_rule = theme_config.get("succession_rule_default", "PRIMOGENITURE_MALE_PREFERENCE")
 
-    # Find eligible heirs
-    eligible_heirs = []
+    eligible_heirs: list = []
 
     # First, check for children of the deceased
     children = PersonDB.query.filter(
@@ -560,16 +565,7 @@ def process_succession(dynasty: DynastyDB, deceased_monarch: PersonDB, current_y
     ).all()
 
     if children:
-        if succession_rule == "PRIMOGENITURE_MALE_PREFERENCE":
-            # Sort by gender (males first) then by birth year (oldest first)
-            children.sort(key=lambda c: (c.gender != "MALE", c.birth_year))
-        elif succession_rule == "PRIMOGENITURE_ABSOLUTE":
-            # Sort by birth year only (oldest first)
-            children.sort(key=lambda c: c.birth_year)
-        elif succession_rule == "ELECTIVE_NOBLE_COUNCIL":
-            # For simplicity, just sort by traits count and age
-            children.sort(key=lambda c: (-len(c.get_traits()), c.birth_year))
-
+        _sort_by_rule(children, succession_rule)
         eligible_heirs = children
 
     # If no children, look for siblings
@@ -583,13 +579,7 @@ def process_succession(dynasty: DynastyDB, deceased_monarch: PersonDB, current_y
         ).all()
 
         if siblings:
-            if succession_rule == "PRIMOGENITURE_MALE_PREFERENCE":
-                siblings.sort(key=lambda s: (s.gender != "MALE", s.birth_year))
-            elif succession_rule == "PRIMOGENITURE_ABSOLUTE":
-                siblings.sort(key=lambda s: s.birth_year)
-            elif succession_rule == "ELECTIVE_NOBLE_COUNCIL":
-                siblings.sort(key=lambda s: (-len(s.get_traits()), s.birth_year))
-
+            _sort_by_rule(siblings, succession_rule)
             eligible_heirs = siblings
 
     # If still no heirs, look for any living noble in the dynasty
@@ -601,40 +591,83 @@ def process_succession(dynasty: DynastyDB, deceased_monarch: PersonDB, current_y
         ).all()
 
         if nobles:
-            if succession_rule == "PRIMOGENITURE_MALE_PREFERENCE":
-                nobles.sort(key=lambda n: (n.gender != "MALE", n.birth_year))
-            elif succession_rule == "PRIMOGENITURE_ABSOLUTE":
-                nobles.sort(key=lambda n: n.birth_year)
-            elif succession_rule == "ELECTIVE_NOBLE_COUNCIL":
-                nobles.sort(key=lambda n: (-len(n.get_traits()), n.birth_year))
-
+            _sort_by_rule(nobles, succession_rule)
             eligible_heirs = nobles
 
-    # If we have an heir, make them the new monarch
-    if eligible_heirs:
-        new_monarch = eligible_heirs[0]
-        new_monarch.is_monarch = True
-        new_monarch.reign_start_year = current_year
+    return eligible_heirs
 
-        # Set monarch title
-        title_key = "titles_male" if new_monarch.gender == "MALE" else "titles_female"
-        titles = theme_config.get(title_key, ["Leader"])
-        if titles:
-            monarch_title = titles[0]
-            current_titles = new_monarch.get_titles()
-            if monarch_title not in current_titles:
-                current_titles.insert(0, monarch_title)
-                new_monarch.set_titles(current_titles)
 
-        # Log succession
-        succession_end_log = HistoryLogEntryDB(
-            dynasty_id=dynasty.id,
-            year=current_year,
-            event_string=f"{new_monarch.name} {new_monarch.surname} has become the new {monarch_title} of House {dynasty.name}.",
-            person1_sim_id=new_monarch.id,
-            event_type="succession_end"
-        )
-        db.session.add(succession_end_log)
+def crown_heir(dynasty: DynastyDB, heir: PersonDB, current_year: int, theme_config: dict) -> None:
+    """Crown ``heir`` as the new monarch of ``dynasty``.
+
+    Clears the monarch flag from every currently-monarch person of the dynasty
+    (including the deceased pending marker), sets the heir as monarch, records the
+    reign start, grants the monarch title and appends a ``succession_end`` history
+    log. Does NOT commit.
+    """
+    # Vacate the throne: clear is_monarch from every current monarch of the
+    # dynasty — this includes the deceased monarch acting as the pending marker.
+    current_monarchs = PersonDB.query.filter_by(
+        dynasty_id=dynasty.id,
+        is_monarch=True
+    ).all()
+    for m in current_monarchs:
+        m.is_monarch = False
+
+    heir.is_monarch = True
+    heir.reign_start_year = current_year
+
+    # Set monarch title
+    title_key = "titles_male" if heir.gender == "MALE" else "titles_female"
+    titles = theme_config.get(title_key, ["Leader"])
+    monarch_title = titles[0] if titles else "Leader"
+    current_titles = heir.get_titles()
+    if monarch_title not in current_titles:
+        current_titles.insert(0, monarch_title)
+        heir.set_titles(current_titles)
+
+    # Log succession
+    succession_end_log = HistoryLogEntryDB(
+        dynasty_id=dynasty.id,
+        year=current_year,
+        event_string=f"{heir.name} {heir.surname} has become the new {monarch_title} of House {dynasty.name}.",
+        person1_sim_id=heir.id,
+        event_type="succession_end"
+    )
+    db.session.add(succession_end_log)
+
+
+def process_succession(dynasty: DynastyDB, deceased_monarch: PersonDB, current_year: int, theme_config: dict):
+    """Process succession after a monarch's death.
+
+    Always logs the ``succession_start`` crisis. For an AI-controlled dynasty (or
+    when there is no candidate) this preserves the legacy auto-crown behaviour and
+    returns a falsy value. For a human-controlled dynasty with at least one
+    candidate it leaves the throne pending — the deceased monarch keeps
+    ``is_monarch=True`` as the pending-succession marker so the player can choose
+    an heir — and returns True.
+    """
+    # Log the succession crisis
+    succession_log = HistoryLogEntryDB(
+        dynasty_id=dynasty.id,
+        year=current_year,
+        event_string=f"With the death of {deceased_monarch.name} {deceased_monarch.surname}, the matter of succession weighs heavily on House {dynasty.name}.",
+        person1_sim_id=deceased_monarch.id,
+        event_type="succession_start"
+    )
+    db.session.add(succession_log)
+
+    candidates = get_succession_candidates(dynasty, deceased_monarch, theme_config)
+
+    # Human-controlled dynasty with a real choice: halt and let the player pick.
+    # Leave the deceased monarch as the pending marker (still is_monarch=True with
+    # a death_year set). Net: no living is_monarch, one dead is_monarch.
+    if not dynasty.is_ai_controlled and candidates:
+        return True
+
+    # AI-controlled, or no candidate at all: preserve legacy behaviour.
+    if candidates:
+        crown_heir(dynasty, candidates[0], current_year, theme_config)
     else:
         # No heir found - dynasty in crisis
         crisis_log = HistoryLogEntryDB(
@@ -644,6 +677,8 @@ def process_succession(dynasty: DynastyDB, deceased_monarch: PersonDB, current_y
             event_type="succession_crisis"
         )
         db.session.add(crisis_log)
+
+    return False
 
 
 def process_world_events(dynasty: DynastyDB, current_year: int, theme_config: dict):
