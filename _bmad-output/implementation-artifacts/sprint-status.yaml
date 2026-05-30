@@ -247,7 +247,7 @@ development_status:
   # Pan/zoom JS (~50 LoC vanilla); hover tooltip with full character info;
   # "Show deceased" toggle (default ON); "Highlight bloodline" on click;
   # search box jump-to-node.
-  8-2-family-tree-interactivity: ready-for-dev
+  8-2-family-tree-interactivity: done
 
   # Story 8-3: Delete matplotlib + integrate into templates
   # Delete visualization/plotter.py; delete visualizations/family_tree_*.png (all

@@ -1,6 +1,6 @@
 # Story 8-2: Interactive Family-Tree Page
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -89,7 +89,9 @@ Give the Story 8-1 family-tree SVG a real home: a dedicated **interactive family
 claude-opus-4-8[1m] — 3 worktree sub-agents via the Workflow tool + main-session integrator.
 
 ### Completion Notes List
-- _pending_
+- All ACs satisfied. Full suite **452 passed** (436 baseline + 16 new), 0 failed. 3 worktree agents via Workflow (run wf_f29b9081-c17), main-session integrator. Clean worktree isolation (no main-tree leaks), no signature/attr/DOM-id drift.
+- **Run-the-app visual check (UI story, per Epic 3 retro):** live dev server on :8091, logged in as test_user. `GET /dynasty/1/family_tree` → 200 with all toolbar hooks (`ft-viewport/ft-stage/ft-tooltip/ft-show-deceased/ft-search/ft-reset`) and a real 7-person inline tree. `family_tree.svg` → 200 `image/svg+xml`, 750×388; `?show_deceased=0` drops 7→6 nodes (toggle works). `person/<id>.json` → 200 with the exact 12 contract keys (age = death_year−birth_year verified); bogus id → 404. Pan/zoom/hover/highlight/search JS present in the page (mouse interactions not curl-drivable, but DOM hooks + script verified).
+- No new pip deps. plotter.py / PNGs untouched and the SVG is NOT yet embedded into view_dynasty.html (only a nav link added) — both deferred to Story 8-3 as specified.
 
 ### File List
 - `visualization/family_tree_svg.py` — MODIFIED (data-* attrs)
