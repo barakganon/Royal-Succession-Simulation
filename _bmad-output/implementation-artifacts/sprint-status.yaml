@@ -39,7 +39,7 @@
 # - Each story should have a corresponding file: {story_key}.md in story_location
 
 generated: 2026-05-02
-last_updated: 2026-05-30  # updated: Story 7-1 done (cross-dynasty marriage matching)
+last_updated: 2026-05-30  # updated: Story 7-2 created (ready-for-dev)
 project: Royal-Succession-Simulation
 project_key: RSS
 tracking_system: file-system
@@ -223,7 +223,7 @@ development_status:
   # AIController.decide_marriage_response (prestige, relations, religion, traits);
   # on acceptance: relations +30, alliance pull; LLM-narrated wedding chronicle
   # entry using both spouse traits.
-  7-2-ai-marriage-acceptance-and-chronicle: backlog
+  7-2-ai-marriage-acceptance-and-chronicle: ready-for-dev
 
   # Story 7-3: Children-with-claims + UI
   # Register Claim row when cross-dynasty child born (claim on maternal dynasty);
