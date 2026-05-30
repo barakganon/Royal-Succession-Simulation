@@ -15,6 +15,7 @@ from models.db_models import (
     TerrainType
 )
 from models.map_system import MovementSystem
+from models.trait_effects import combat_modifier
 
 # Import logging configuration if available, otherwise set up basic logging
 try:
@@ -603,6 +604,25 @@ class MilitarySystem:
         
         return True, f"Battle resolved. {winner_name} was victorious.", battle
 
+    def _monarch_traits(self, dynasty_id: int) -> List[str]:
+        """
+        Return the trait list of the LIVING monarch of the given dynasty.
+
+        Queries for a PersonDB that is_monarch and has no death_year for the
+        dynasty. If no such monarch exists, returns an empty list (which the
+        trait modifiers treat as the identity).
+        """
+        if dynasty_id is None:
+            return []
+        monarch = self.session.query(PersonDB).filter(
+            PersonDB.dynasty_id == dynasty_id,
+            PersonDB.is_monarch == True,  # noqa: E712
+            PersonDB.death_year == None  # noqa: E711
+        ).first()
+        if monarch is None:
+            return []
+        return monarch.get_traits() or []
+
     def _resolve_battle(self, attacker_army: Army, defender_army: Army,
                        territory: Territory) -> Tuple[int, int, int, Dict[str, Any]]:
         """
@@ -618,6 +638,11 @@ class MilitarySystem:
         if terrain_modifiers:
             attacker_strength *= terrain_modifiers.get("attack", 1.0)
             defender_strength *= terrain_modifiers.get("defense", 1.0)
+
+        # Apply living-monarch trait combat modifiers (Story 6-1).
+        # No monarch / no traits -> modifier 1.0 (unchanged).
+        attacker_strength *= combat_modifier(self._monarch_traits(attacker_army.dynasty_id))
+        defender_strength *= combat_modifier(self._monarch_traits(defender_army.dynasty_id))
 
         # Apply terrain bonuses for defender
         if territory.controller_dynasty_id == defender_army.dynasty_id:
