@@ -254,6 +254,17 @@ class TestActionMappingRejections:
 
     def test_recruit_cavalry_maps_to_recruit_cavalry_project(self, project_client, app, db):
         client, (dynasty_id, _, territory_id) = project_client
+        # Story 6-2: recruit_cavalry is gated behind a Stables. Give the dynasty's
+        # territory one so the gate passes and we can verify the action→project mapping.
+        with app.app_context():
+            db.session.add(Building(
+                territory_id=territory_id,
+                building_type=BuildingType.STABLE,
+                name="Stable",
+                level=1,
+                construction_year=1300,
+            ))
+            db.session.commit()
         # recruit_cavalry needs 80g + 10 iron — dynasty has 500g, 200 iron, fine.
         response = client.post(
             f'/dynasty/{dynasty_id}/submit_actions',

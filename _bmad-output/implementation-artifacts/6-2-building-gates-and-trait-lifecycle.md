@@ -1,6 +1,6 @@
 # Story 6-2: Building Gates + Sickly Lifespan + Trait Inheritance
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -69,10 +69,23 @@ As a player, I want recruit-projects gated behind the right buildings, sickly ru
 
 ### Agent Model Used
 
-(to be filled by dev/integration)
-
-### Debug Log References
+claude-opus-4-8[1m] — 3 worktree sub-agents via the Workflow tool (run `wf_2f69bb64-3fb`), + main-session integrator.
 
 ### Completion Notes List
 
+- All ACs satisfied. `pytest -p no:randomly`: **395 passed, 0 failed** (387 baseline + 8). A `wt/6-2-gate` (`2dfc2da`): `_dynasty_has_building` + `requires_building` gate in `start_project` (tolerant building-type match; reuses the existing `ValueError` invalid-start signal; ordered after affordability to keep `test_start_project_insufficient_iron_raises` green). B `wt/6-2-lifecycle` (`04ac9e9`): Sickly → `max_age *= 0.5` + `base_mortality *= 2`; child trait inheritance (≤3 parent traits at 30%/trait + 1 themed). C `wt/6-2-tests` (`6b8f8d4`): 8 tests. Clean merges, zero file overlap.
+- **Integrator fix:** the new gate broke the existing `test_recruit_cavalry_maps_to_recruit_cavalry_project` (its fixture had no Stables) — added a `Building(BuildingType.STABLE, construction_year=...)` to that test's territory so it verifies the mapping with the prerequisite met. (The two other lifecycle failures under full-suite ordering were the known shared-state flakes — green in isolation.)
+
 ### File List
+
+- `models/project_system.py` — MODIFIED (`requires_building` gate + `_dynasty_has_building`)
+- `models/turn_processor.py` — MODIFIED (Sickly lifespan + child trait inheritance)
+- `tests/integration/test_building_gates.py` — NEW (8 tests)
+- `tests/integration/test_project_turn_lifecycle.py` — MODIFIED (integrator: Stables for the cavalry-mapping test)
+- `_bmad-output/implementation-artifacts/{6-2-...md, sprint-status.yaml}`, `STATUS.md` — MODIFIED
+
+### Change Log
+
+| Date | Change |
+|---|---|
+| 2026-05-30 | spec(6-2); 3 worktree agents via Workflow; merged; integrator fixture fix; 395 passed; Story 6-2 → done |
