@@ -110,10 +110,15 @@
       <!-- Monarch portrait — null-safe name composition -->
       {% if current_monarch %}
         {% set monarch_name = (current_monarch.name or '') ~ ' ' ~ (current_monarch.surname or '') %}
+        {# Story 6-3: surface the monarch's personality traits in the
+           tooltip/aria-label so players can see what affects their realm. #}
+        {% set monarch_traits = (current_monarch.traits | default([], true)) | join(', ') %}
       {% else %}
         {% set monarch_name = 'No monarch' %}
+        {% set monarch_traits = '' %}
       {% endif %}
-      <div class="game-rail-portrait" title="{{ monarch_name | trim }}" aria-label="Current monarch: {{ monarch_name | trim }}">
+      {% set monarch_tooltip = (monarch_name | trim) ~ (' — ' ~ monarch_traits if monarch_traits else '') %}
+      <div class="game-rail-portrait" title="{{ monarch_tooltip }}" aria-label="Current monarch: {{ monarch_tooltip }}">
         {% if current_monarch and current_monarch.portrait_svg %}
           {{ current_monarch.portrait_svg | safe }}
         {% else %}
