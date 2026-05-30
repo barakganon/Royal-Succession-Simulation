@@ -1,11 +1,12 @@
 # Royal Succession Simulation - Development Status
 Last updated: 2026-05-30
-Last commit: Story 6-2 — building gates + Sickly lifespan + trait inheritance
+Last commit: Story 6-3 — chronicle trait-voice + tooltips + docs/traits.md (Epic 6 complete)
 
 ---
 
 ## Current State
-**Tests:** 395 passed · 0 skipped · 0 failed
+**Tests:** 402 (401 pass + 1 known shared-state isolation flake that passes in isolation) · 0 skipped
+**Epic 6 (Traits & Buildings Matter) — COMPLETE.** 6-1 trait_effects + Military/Economy/Diplomacy hooks; 6-2 building gates + Sickly lifespan + trait inheritance; 6-3 monarch-trait chronicle voice + portrait tooltip + `docs/traits.md`. **Epics 1–6 all done.** Next: Epic 7 (Dynastic Marriages). ⚠ Tech-debt: a shared-temp-DB test-isolation flake intermittently fails the full-suite gate across a few files (passes in isolation) — worth a Sprint-11 test-isolation fix. Dev-server: launch with `MPLBACKEND=Agg`.
 **Epic 6 (Traits & Buildings Matter) — in progress.** 6-1 done: `models/trait_effects.py` (8-trait modifier map) wired into combat (`_resolve_battle`), tax (`calculate_territory_tax_income`), and diplomacy (`perform_diplomatic_action`) — a Brave monarch fights better, Greedy taxes harder, Cunning negotiates better; no-op for trait-less/monarch-less. Also fixed a latent bug where `perform_diplomatic_action` returned None for non-special actions. Next: 6-2 (building gates + lifespan + trait inheritance), 6-3 (chronicle voice + trait docs).
 **Epic 5 (Generational Interrupts + Succession Drama) — COMPLETE.** 5-1 succession modal on monarch death; 5-2 LLM candidate cards + coronation; 5-3 pretender mechanics (is_pretender/pretender_strength + accumulation, non-default heir flags a pretender); 5-4 civil-war interrupt (Fight/Negotiate/Abdicate modal + `/civil_war_resolve`) when a pretender's strength ≥ 50, and heir-majority interrupt at age 16 (`has_seen_majority`). AI dynasties auto-resolve/flag (never hang). Verified live (civil-war modal + negotiate resolve). Built via worktree-agent Workflows. **Epics 1–5 done.** Next: Epic 6 (Traits & Buildings Matter). Dev-server note: launch with `MPLBACKEND=Agg` to avoid a macOS matplotlib NSWindow crash.
 **Epic 5 (Generational Interrupts + Succession Drama) — in progress.** 5-1: human monarch death halts the turn → succession modal to crown an heir (AI auto-crowns); End Turn blocked while kingless. 5-2: each candidate card now carries a 3-sentence LLM character sketch (deterministic trait-based fallback when LLM is off), and crowning writes a `coronation` chronicle line. Verified live (flavor on cards + coronation entry). Built via 3 worktree agents (5-2 orchestrated through the Workflow tool). Next: 5-3 (pretenders), 5-4 (civil war + heir-majority).
