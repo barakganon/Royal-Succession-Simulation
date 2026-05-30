@@ -39,7 +39,7 @@
 # - Each story should have a corresponding file: {story_key}.md in story_location
 
 generated: 2026-05-02
-last_updated: 2026-05-30  # updated: Story 5-2 done (LLM succession cards + coronation)
+last_updated: 2026-05-30  # updated: Story 5-3 done (pretender mechanics)
 project: Royal-Succession-Simulation
 project_key: RSS
 tracking_system: file-system
@@ -176,7 +176,7 @@ development_status:
   # Add is_pretender + pretender_strength to PersonDB (migration); pretender
   # accumulation logic in lifecycle tick; choosing non-default heir flags bypassed
   # candidate as pretender.
-  5-3-pretender-mechanics: backlog
+  5-3-pretender-mechanics: done
 
   # Story 5-4: Civil war + heir-of-age interrupts
   # civil_war interrupt type (modal: fight / negotiate / abdicate) when pretender

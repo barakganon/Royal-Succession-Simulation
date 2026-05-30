@@ -159,6 +159,19 @@ class DatabaseInitializer:
                             conn.execute(text("ALTER TABLE dynasty ADD COLUMN succession_law VARCHAR(40)"))
                             conn.commit()
                         self.logger.info("Added succession_law column to dynasty table.")
+                # Pretender columns (Story 5-3) on person_db table
+                if 'person_db' in inspector.get_table_names():
+                    person_cols = [c['name'] for c in inspector.get_columns('person_db')]
+                    if 'is_pretender' not in person_cols:
+                        with db.engine.connect() as conn:
+                            conn.execute(text("ALTER TABLE person_db ADD COLUMN is_pretender BOOLEAN DEFAULT 0"))
+                            conn.commit()
+                        self.logger.info("Added is_pretender column to person_db table.")
+                    if 'pretender_strength' not in person_cols:
+                        with db.engine.connect() as conn:
+                            conn.execute(text("ALTER TABLE person_db ADD COLUMN pretender_strength INTEGER DEFAULT 0"))
+                            conn.commit()
+                        self.logger.info("Added pretender_strength column to person_db table.")
                 # Create loan table if missing (Banking system)
                 if 'loan' not in inspector.get_table_names():
                     from models.db_models import Loan

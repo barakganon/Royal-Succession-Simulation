@@ -39,6 +39,9 @@ logger = logging.getLogger('royal_succession.dynasty')
 
 dynasty_bp = Blueprint('dynasty', __name__)
 
+# Starting strength of a pretender's claim when a default heir is passed over.
+PRETENDER_START_STRENGTH = 10
+
 # ---------------------------------------------------------------------------
 # FLASK_APP_GOOGLE_API_KEY_PRESENT — resolved lazily from the Flask app config
 # so that the blueprint does not need to import main_flask_app at module load time.
@@ -1272,6 +1275,23 @@ def succession_choice(dynasty_id):
             event_type='coronation',
             person1_sim_id=heir.id,
         ))
+
+        # Flag the bypassed default candidate as a pretender when the player
+        # crowns someone other than the default heir.
+        default_id = _default_candidate_id(dynasty, candidates)
+        if heir_id != default_id and default_id in candidate_map and default_id != heir_id:
+            bypassed = candidate_map[default_id]
+            bypassed.is_pretender = True
+            bypassed.pretender_strength = PRETENDER_START_STRENGTH
+            bypassed_name = f"{bypassed.name} {bypassed.surname or ''}".strip()
+            db.session.add(HistoryLogEntryDB(
+                dynasty_id=dynasty_id,
+                year=deceased.death_year,
+                event_string=f"{bypassed_name}, passed over for the crown, nurses a rival claim.",
+                event_type='pretender_claim',
+                person1_sim_id=bypassed.id,
+            ))
+
         db.session.commit()
     except Exception as e:
         db.session.rollback()
