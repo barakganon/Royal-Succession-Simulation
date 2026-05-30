@@ -577,23 +577,38 @@ class MilitarySystem:
         # Create history log entry
         winner_name = attacker_dynasty.name if winner_id == attacker_dynasty.id else defender_dynasty.name
         loser_name = defender_dynasty.name if winner_id == attacker_dynasty.id else attacker_dynasty.name
-        
+
+        # Story 9-2: narrate the battle event_string via guarded LLM (lazy imports)
+        from utils.llm_narration import narrate_event
+        from utils.llm_prompts import build_battle_flavor_prompt, generate_battle_flavor_fallback
+        attacker_dyn_name = attacker_dynasty.name
+        defender_dyn_name = defender_dynasty.name
+        battle_year = attacker_dynasty.current_simulation_year
+        battle_event_string = narrate_event(
+            build_battle_flavor_prompt(
+                attacker_dyn_name, defender_dyn_name, territory.name,
+                winner_name, attacker_casualties + defender_casualties, battle_year
+            ),
+            generate_battle_flavor_fallback(attacker_dyn_name, defender_dyn_name, winner_name, battle_year),
+            max_tokens=100
+        )
+
         log_entry = HistoryLogEntryDB(
             dynasty_id=attacker_dynasty.id,
             year=attacker_dynasty.current_simulation_year,
-            event_string=f"Battle of {territory.name}: {winner_name} defeated {loser_name}. Casualties: {attacker_casualties} attackers, {defender_casualties} defenders.",
+            event_string=battle_event_string,
             event_type="battle",
             territory_id=territory_id,
             battle_id=battle.id,
             war_id=war_id
         )
         self.session.add(log_entry)
-        
+
         # Also add to defender's history
         defender_log = HistoryLogEntryDB(
             dynasty_id=defender_dynasty.id,
             year=defender_dynasty.current_simulation_year,
-            event_string=f"Battle of {territory.name}: {winner_name} defeated {loser_name}. Casualties: {attacker_casualties} attackers, {defender_casualties} defenders.",
+            event_string=battle_event_string,
             event_type="battle",
             territory_id=territory_id,
             battle_id=battle.id,
