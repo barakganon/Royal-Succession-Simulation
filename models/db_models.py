@@ -78,6 +78,9 @@ class DynastyDB(db.Model):
     # Procedural SVG coat of arms — generated at dynasty creation, stored as SVG string
     coat_of_arms_svg = db.Column(db.Text, nullable=True)
 
+    # Procedural SVG family tree — generated on demand, cached as SVG string
+    family_tree_svg = db.Column(db.Text, nullable=True)
+
     # Turn-order enforcement: prevents concurrent or double-submission of advance_turn
     is_turn_processing = db.Column(db.Boolean, default=False, nullable=False)
     # Cumulative epic fantasy story — one paragraph appended per turn
