@@ -228,7 +228,7 @@ development_status:
   # Story 7-3: Children-with-claims + UI
   # Register Claim row when cross-dynasty child born (claim on maternal dynasty);
   # right-click on foreign character → "Propose marriage to my [son/daughter]".
-  7-3-children-claims-and-ui: backlog
+  7-3-children-claims-and-ui: ready-for-dev
 
   epic-7-retrospective: optional
 
