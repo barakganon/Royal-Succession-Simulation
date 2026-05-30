@@ -632,10 +632,18 @@ def free_action(dynasty_id):
             params[key] = value
 
     try:
-        ok, message = FreeActionSystem(db.session).perform_free_action(
-            dynasty_id, action_type, params
-        )
+        system = FreeActionSystem(db.session)
+        ok, message = system.perform_free_action(dynasty_id, action_type, params)
         if ok:
+            # Story 4-2: push the undo token for reversible actions onto the
+            # per-session stack before committing (commit assigns nothing new —
+            # the system already flushed the history-entry id).
+            if system.last_undo_token is not None:
+                stack = flask_session.get('free_action_undo_stack')
+                if not isinstance(stack, list):
+                    stack = []
+                stack.append(system.last_undo_token)
+                flask_session['free_action_undo_stack'] = stack
             db.session.commit()
             return jsonify({"ok": True, "message": message}), 200
         db.session.rollback()
@@ -647,6 +655,94 @@ def free_action(dynasty_id):
             exc_info=True,
         )
         return jsonify({"ok": False, "message": "An error occurred performing the action."}), 400
+
+
+@dynasty_bp.route('/dynasty/<int:dynasty_id>/free_action_catalogue.json')
+@login_required
+def free_action_catalogue(dynasty_id):
+    """Serve the free-action catalogue as JSON (Story 4-2).
+
+    Returns one entry per VALID_FREE_ACTIONS with display label, category,
+    whether the action needs a target dynasty, and whether it is undoable.
+    """
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        return jsonify({"error": "Not authorized"}), 403
+
+    from models.free_action_system import VALID_FREE_ACTIONS
+
+    # Static metadata per action (labels + classification).
+    _META = {
+        'declare_war':         ('Declare War',          'diplomacy', True,  False),
+        'propose_treaty':      ('Propose Treaty',       'diplomacy', True,  False),
+        'send_envoy':          ('Send Envoy',           'diplomacy', True,  False),
+        'issue_ultimatum':     ('Issue Ultimatum',      'diplomacy', True,  False),
+        'name_heir':           ('Name Heir',            'succession', False, True),
+        'adopt_succession_law':('Adopt Succession Law', 'succession', False, True),
+        'hold_feast':          ('Hold Feast',           'court',      False, True),
+        'hold_tournament':     ('Hold Tournament',      'court',      False, True),
+        'pardon_vassal':       ('Pardon Vassal',        'court',      False, True),
+    }
+
+    actions = []
+    for action_type in VALID_FREE_ACTIONS:
+        label, category, needs_target, undoable = _META.get(
+            action_type,
+            (action_type.replace('_', ' ').title(), 'court', False, False),
+        )
+        actions.append({
+            "action_type": action_type,
+            "label": label,
+            "category": category,
+            "needs_target": needs_target,
+            "undoable": undoable,
+        })
+    return jsonify({"actions": actions})
+
+
+@dynasty_bp.route('/dynasty/<int:dynasty_id>/free_action/undo', methods=['POST'])
+@login_required
+@block_if_turn_processing
+def free_action_undo(dynasty_id):
+    """Undo the most recent reversible free action (Story 4-2).
+
+    Pops the last token off the per-session undo stack and reverses it via
+    FreeActionSystem.undo_free_action. Empty stack → ``{"ok": false}`` (200).
+    """
+    from models.free_action_system import FreeActionSystem
+
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        return jsonify({"ok": False, "message": "Not authorized"}), 403
+
+    stack = flask_session.get('free_action_undo_stack', [])
+    if not isinstance(stack, list) or not stack:
+        return jsonify({"ok": False, "message": "Nothing to undo"}), 200
+
+    undo_token = stack.pop()
+
+    try:
+        ok, message = FreeActionSystem(db.session).undo_free_action(
+            dynasty_id, undo_token
+        )
+        if ok:
+            flask_session['free_action_undo_stack'] = stack
+            db.session.commit()
+            return jsonify({"ok": True, "message": message}), 200
+        # Bad token — discard it but keep the rest of the stack intact.
+        db.session.rollback()
+        flask_session['free_action_undo_stack'] = stack
+        return jsonify({"ok": False, "message": message}), 200
+    except Exception as e:
+        db.session.rollback()
+        # Restore the popped token so the user can retry.
+        stack.append(undo_token)
+        flask_session['free_action_undo_stack'] = stack
+        logger.error(
+            f"free_action_undo: error undoing for dynasty {dynasty_id}: {e}",
+            exc_info=True,
+        )
+        return jsonify({"ok": False, "message": "An error occurred undoing the action."}), 400
 
 
 def check_victory_conditions(dynasty, current_year):

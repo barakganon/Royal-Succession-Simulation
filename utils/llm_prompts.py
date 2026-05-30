@@ -252,3 +252,63 @@ def generate_multigen_project_completion_fallback(project_type: str, initiator_n
         f"What {initiator_name} began in {started_year}, "
         f"{completer_name} finished in {completion_year} — the {label} stands."
     )
+
+
+# --------------------------------------------------------------------------- #
+# Story 4-2: free-action chronicle flavor
+# --------------------------------------------------------------------------- #
+# Past-tense deed phrases describing each free action, used both to seed the
+# LLM prompt and to build the deterministic fallback line.
+_FREE_ACTION_LABELS = {
+    'declare_war': 'declared war',
+    'propose_treaty': 'proposed a treaty',
+    'send_envoy': 'sent an envoy',
+    'issue_ultimatum': 'issued an ultimatum',
+    'name_heir': 'named an heir',
+    'adopt_succession_law': 'reformed the succession law',
+    'hold_feast': 'held a grand feast',
+    'hold_tournament': 'held a grand tournament',
+    'pardon_vassal': 'pardoned a wayward vassal',
+}
+
+
+def _free_action_label(action_type: str) -> str:
+    return _FREE_ACTION_LABELS.get(action_type, action_type.replace('_', ' '))
+
+
+def build_free_action_flavor_prompt(action_type: str, dynasty_name: str,
+                                    monarch_name: str, year: int,
+                                    target_name: str = None) -> str:
+    """Prompt for a one- to two-sentence chronicle line about a free action.
+
+    Story 4-2. max_tokens<=150. Style: medieval chronicler, third-person,
+    1-2 sentences. Fallback: generate_free_action_flavor_fallback().
+    """
+    deed = _free_action_label(action_type)
+    target_clause = f" The matter concerned {target_name}." if target_name else ""
+    return (
+        f"You are a medieval chronicler recording the deeds of House {dynasty_name}. "
+        f"In the year {year}, {monarch_name}, ruler of House {dynasty_name}, {deed}."
+        f"{target_clause} "
+        f"Write exactly 1-2 sentences in the style of a medieval chronicle — formal, "
+        f"dramatic, third-person. Name the ruler. Do not use modern language or lists."
+    )
+
+
+def generate_free_action_flavor_fallback(action_type: str, dynasty_name: str,
+                                         monarch_name: str, year: int,
+                                         target_name: str = None) -> str:
+    """Deterministic, non-empty fallback when the LLM is unavailable (Story 4-2).
+
+    Returns an action-appropriate single-sentence chronicle line that always
+    names the dynasty, the ruler, and the year.
+    """
+    deed = _free_action_label(action_type)
+    if target_name:
+        return (
+            f"In the year {year}, {monarch_name} of House {dynasty_name} "
+            f"{deed} against {target_name}."
+        )
+    return (
+        f"In the year {year}, {monarch_name} of House {dynasty_name} {deed}."
+    )
