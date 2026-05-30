@@ -126,12 +126,10 @@
                     <h4 class="mb-0">Family Tree</h4>
                 </div>
                 <div class="card-body text-center">
-                    {% if family_tree_image %}
-                        <img src="{{ family_tree_image }}" class="img-fluid" alt="Family Tree">
+                    {% if dynasty.family_tree_svg %}
+                        <div class="family-tree-inline">{{ dynasty.family_tree_svg | safe }}</div>
                     {% else %}
-                        <div class="alert alert-info">
-                            <p>Family tree visualization will be generated after your first turn.</p>
-                        </div>
+                        <p class="text-muted">No family tree yet.</p>
                     {% endif %}
                 </div>
             </div>
