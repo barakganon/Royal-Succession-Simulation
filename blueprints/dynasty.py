@@ -7,7 +7,7 @@ import datetime
 import logging
 from functools import wraps
 
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session as flask_session, current_app
+from flask import Blueprint, render_template, redirect, url_for, flash, request, session as flask_session, current_app, Response, abort
 from flask_login import login_required, current_user
 
 from flask import jsonify
@@ -1415,3 +1415,84 @@ def civil_war_resolve(dynasty_id):
         return jsonify({"ok": False, "message": "Failed to resolve the civil war."}), 500
 
     return jsonify({"ok": True, "message": message})
+
+
+@dynasty_bp.route('/dynasty/<int:dynasty_id>/family_tree')
+@login_required
+def family_tree(dynasty_id):
+    """Render the interactive family tree page for a dynasty."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        flash("Not authorized.", "warning")
+        return redirect(url_for('auth.dashboard'))
+
+    from visualization.family_tree_svg import generate_family_tree_svg
+    tree_svg = generate_family_tree_svg(dynasty_id, db.session, show_deceased=True)
+    return render_template(
+        'family_tree.html',
+        dynasty=dynasty,
+        current_year=dynasty.current_simulation_year,
+        tree_svg=tree_svg,
+    )
+
+
+@dynasty_bp.route('/dynasty/<int:dynasty_id>/family_tree.svg')
+@login_required
+def family_tree_svg_route(dynasty_id):
+    """Return the raw family-tree SVG for a dynasty."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        return jsonify({"error": "Not authorized."}), 403
+
+    raw = request.args.get('show_deceased')
+    if raw is None:
+        show_deceased = True
+    elif raw.strip().lower() in ('1', 'true', 'yes'):
+        show_deceased = True
+    elif raw.strip().lower() in ('0', 'false', 'no'):
+        show_deceased = False
+    else:
+        show_deceased = True
+
+    from visualization.family_tree_svg import generate_family_tree_svg
+    svg = generate_family_tree_svg(dynasty_id, db.session, show_deceased=show_deceased)
+    return Response(svg, mimetype='image/svg+xml')
+
+
+@dynasty_bp.route('/dynasty/<int:dynasty_id>/person/<int:person_id>.json')
+@login_required
+def person_detail_json(dynasty_id, person_id):
+    """Return JSON details for a person belonging to (or married into) a dynasty."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        return jsonify({"error": "Not authorized."}), 403
+
+    person = PersonDB.query.get(person_id)
+    if person is None:
+        abort(404)
+
+    belongs = person.dynasty_id == dynasty_id
+    if not belongs:
+        is_married_in = PersonDB.query.filter_by(
+            dynasty_id=dynasty_id, spouse_sim_id=person_id
+        ).first() is not None
+        if not is_married_in:
+            abort(404)
+
+    current_year = dynasty.current_simulation_year
+    age = (person.death_year or current_year) - person.birth_year
+
+    return jsonify({
+        "id": person.id,
+        "name": person.name,
+        "surname": person.surname,
+        "gender": person.gender,
+        "birth_year": person.birth_year,
+        "death_year": person.death_year,
+        "age": age,
+        "traits": person.get_traits(),
+        "titles": person.get_titles(),
+        "is_monarch": bool(person.is_monarch),
+        "is_pretender": bool(person.is_pretender),
+        "reign_start_year": person.reign_start_year,
+    })
