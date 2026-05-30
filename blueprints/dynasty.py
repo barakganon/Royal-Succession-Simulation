@@ -23,7 +23,9 @@ from models.diplomacy_system import DiplomacySystem
 from models.project_system import (
     InsufficientResourcesError, ProjectSystem,
 )
-from models.turn_processor import process_dynasty_turn
+from models.turn_processor import (
+    process_dynasty_turn, get_succession_candidates, crown_heir,
+)
 from utils.theme_manager import get_all_theme_names, generate_theme_from_story_llm, get_theme
 from visualization.heraldry_renderer import generate_coat_of_arms
 
@@ -1029,3 +1031,161 @@ def initialize_dynasty_founder(dynasty_id: int, theme_config: dict, start_year: 
         logger.error(f"Error initializing dynasty founder for dynasty {dynasty_id}: {e}")
         return False
     return True
+
+
+# ===========================================================================
+# Succession (Story 5-1) — monarch-death interrupt + heir choice
+# ===========================================================================
+
+def _load_theme_config(dynasty: DynastyDB) -> dict:
+    """Resolve a dynasty's theme config (predefined name or stored JSON)."""
+    theme_config: dict = {}
+    if dynasty.theme_identifier_or_json:
+        if dynasty.theme_identifier_or_json in get_all_theme_names():
+            theme_config = get_theme(dynasty.theme_identifier_or_json) or {}
+        else:
+            try:
+                theme_config = json.loads(dynasty.theme_identifier_or_json)
+            except (json.JSONDecodeError, TypeError):
+                theme_config = {}
+    return theme_config
+
+
+def _find_pending_deceased(dynasty_id: int):
+    """Return the pending-succession marker: a monarch of the dynasty that has died.
+
+    The pending marker is a PersonDB with is_monarch=True and a non-null
+    death_year. Returns None when no succession is pending.
+    """
+    return PersonDB.query.filter(
+        PersonDB.dynasty_id == dynasty_id,
+        PersonDB.is_monarch == True,
+        PersonDB.death_year.isnot(None),
+    ).first()
+
+
+def _candidate_relation(deceased: PersonDB, candidate: PersonDB) -> str:
+    """Classify a candidate's relation to the deceased monarch."""
+    if deceased.id in (candidate.father_sim_id, candidate.mother_sim_id):
+        return 'child'
+    shares_parent = (
+        (candidate.father_sim_id is not None and candidate.father_sim_id == deceased.father_sim_id) or
+        (candidate.mother_sim_id is not None and candidate.mother_sim_id == deceased.mother_sim_id)
+    )
+    if shares_parent:
+        return 'sibling'
+    return 'kin'
+
+
+def _default_candidate_id(dynasty: DynastyDB, candidates: list) -> int:
+    """Pick the default heir: the designated heir if eligible, else the first candidate."""
+    candidate_ids = [c.id for c in candidates]
+    if dynasty.designated_heir_id in candidate_ids:
+        return dynasty.designated_heir_id
+    return candidates[0].id
+
+
+@dynasty_bp.route('/dynasty/<int:dynasty_id>/succession_candidates.json')
+@login_required
+def succession_candidates_json(dynasty_id):
+    """Return the pending-succession state and serialized heir candidates."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        return jsonify({"error": "Not authorized."}), 403
+
+    deceased = _find_pending_deceased(dynasty_id)
+    if deceased is None:
+        return jsonify({"pending": False, "candidates": []})
+
+    theme_config = _load_theme_config(dynasty)
+    candidates = get_succession_candidates(dynasty, deceased, theme_config)
+
+    if not candidates:
+        return jsonify({
+            "pending": True,
+            "deceased": {
+                "id": deceased.id,
+                "name": deceased.name,
+                "surname": deceased.surname,
+                "death_year": deceased.death_year,
+            },
+            "candidates": [],
+        })
+
+    default_id = _default_candidate_id(dynasty, candidates)
+
+    serialized = []
+    for c in candidates:
+        portrait = c.portrait_svg
+        if not portrait:
+            try:
+                portrait = c.generate_portrait()
+            except Exception as e:
+                logger.error(f"Error generating portrait for person {c.id}: {e}")
+                portrait = ""
+        serialized.append({
+            "id": c.id,
+            "name": c.name,
+            "surname": c.surname,
+            "portrait_svg": portrait,
+            "traits": c.get_traits(),
+            "birth_year": c.birth_year,
+            "age": deceased.death_year - c.birth_year,
+            "relation": _candidate_relation(deceased, c),
+            "is_default": c.id == default_id,
+        })
+
+    return jsonify({
+        "pending": True,
+        "deceased": {
+            "id": deceased.id,
+            "name": deceased.name,
+            "surname": deceased.surname,
+            "death_year": deceased.death_year,
+        },
+        "candidates": serialized,
+    })
+
+
+@dynasty_bp.route('/dynasty/<int:dynasty_id>/succession_choice', methods=['POST'])
+@login_required
+@block_if_turn_processing
+def succession_choice(dynasty_id):
+    """Crown the player-chosen heir for a pending succession."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        return jsonify({"error": "Not authorized."}), 403
+
+    deceased = _find_pending_deceased(dynasty_id)
+    if deceased is None:
+        return jsonify({"ok": False, "message": "No succession is pending."}), 400
+
+    # Accept heir_id from JSON body or form data
+    raw_heir_id = None
+    if request.is_json:
+        raw_heir_id = (request.get_json(silent=True) or {}).get('heir_id')
+    if raw_heir_id is None:
+        raw_heir_id = request.form.get('heir_id')
+
+    try:
+        heir_id = int(raw_heir_id)
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "message": "Invalid heir selection."}), 400
+
+    theme_config = _load_theme_config(dynasty)
+    candidates = get_succession_candidates(dynasty, deceased, theme_config)
+    candidate_map = {c.id: c for c in candidates}
+
+    if heir_id not in candidate_map:
+        return jsonify({"ok": False, "message": "Selected heir is not an eligible candidate."}), 400
+
+    heir = candidate_map[heir_id]
+    try:
+        crown_heir(dynasty, heir, deceased.death_year, theme_config)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error crowning heir {heir_id} for dynasty {dynasty_id}: {e}", exc_info=True)
+        return jsonify({"ok": False, "message": "Failed to crown the heir."}), 500
+
+    return jsonify({"ok": True, "message": f"{heir.name} {heir.surname} has been crowned."})
