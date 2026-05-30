@@ -995,88 +995,22 @@ def process_world_events(dynasty: DynastyDB, current_year: int, theme_config: di
 # ===========================================================================
 
 def generate_family_tree_visualization(dynasty: DynastyDB, theme_config: dict):
-    """Generate a family tree visualization for the dynasty.
+    """Generate the family tree visualization for the dynasty.
 
-    NOTE: This is the legacy matplotlib-based renderer.  Sprint 8 of the
-    master plan replaces it with a pure SVG renderer that fits the dark
-    medieval theme and renders deceased ancestors properly.  Kept here as-is
-    so this refactor introduces zero behavior change.
+    Story 8-3: the legacy matplotlib PNG renderer has been retired.  This now
+    populates DynastyDB.family_tree_svg via the Story 8-1/8-2 SVG renderer.
+    A render failure must never abort the turn — it is logged and swallowed.
     """
     try:
-        from visualization.plotter import visualize_family_tree_snapshot
-        from models.family_tree import FamilyTree
-        from models.person import Person
-
-        # Create a directory for visualizations
-        visualizations_dir = os.path.join('static', 'visualizations')
-        os.makedirs(visualizations_dir, exist_ok=True)
-
-        # Create a FamilyTree object from the database
-        family_tree = FamilyTree(dynasty.name, theme_config)
-        family_tree.current_year = dynasty.current_simulation_year
-
-        # Load all persons from the database into the family tree
-        persons = PersonDB.query.filter_by(dynasty_id=dynasty.id).all()
-
-        # First pass: Create Person objects
-        person_objects = {}
-        for db_person in persons:
-            # Create Person object with required parameters
-            person = Person(
-                name=db_person.name,
-                gender=db_person.gender,
-                birth_year=db_person.birth_year,
-                theme_config=theme_config,
-                is_noble=db_person.is_noble
-            )
-
-            # Set additional attributes
-            person.surname = db_person.surname
-            person.death_year = db_person.death_year
-            person.is_monarch = db_person.is_monarch
-            person.reign_start_year = db_person.reign_start_year
-            person.reign_end_year = db_person.reign_end_year
-            person.titles = db_person.get_titles()
-            person.traits = db_person.get_traits()
-
-            # Store the Person object with the database ID as the key
-            person_objects[db_person.id] = person
-            # Use the database ID as the key in the family tree members dictionary
-            family_tree.members[db_person.id] = person
-
-            if db_person.is_monarch and db_person.death_year is None:
-                family_tree.current_monarch = person
-
-        # Second pass: Set relationships
-        for db_person in persons:
-            person = person_objects.get(db_person.id)
-            if not person:
-                continue
-
-            # Set parents
-            if db_person.father_sim_id and db_person.father_sim_id in person_objects:
-                person.father = person_objects[db_person.father_sim_id]
-                if person not in person.father.children:
-                    person.father.children.append(person)
-
-            if db_person.mother_sim_id and db_person.mother_sim_id in person_objects:
-                person.mother = person_objects[db_person.mother_sim_id]
-                if person not in person.mother.children:
-                    person.mother.children.append(person)
-
-            # Set spouse
-            if db_person.spouse_sim_id and db_person.spouse_sim_id in person_objects:
-                person.spouse = person_objects[db_person.spouse_sim_id]
-
-        # Generate the visualization
-        visualize_family_tree_snapshot(
-            family_tree_obj=family_tree,
-            year=dynasty.current_simulation_year,
-            display_mode="living_nobles"
-        )
-
-        logger.debug(f"Family tree visualization generated for {dynasty.name} in year {dynasty.current_simulation_year}")
+        from visualization.family_tree_svg import generate_family_tree_svg
+        from models.db_models import db
+        dynasty.family_tree_svg = generate_family_tree_svg(dynasty.id, db.session)
+        db.session.add(dynasty)
         return True
     except Exception as e:
         logger.error(f"Error generating family tree visualization: {str(e)}", exc_info=True)
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
         return False
