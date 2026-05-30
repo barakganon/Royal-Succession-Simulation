@@ -39,7 +39,7 @@
 # - Each story should have a corresponding file: {story_key}.md in story_location
 
 generated: 2026-05-02
-last_updated: 2026-05-30  # updated: Story 6-2 done (building gates + trait lifecycle)
+last_updated: 2026-05-30  # updated: Story 6-3 created (ready-for-dev)
 project: Royal-Succession-Simulation
 project_key: RSS
 tracking_system: file-system
@@ -205,7 +205,7 @@ development_status:
   # Story 6-3: Chronicle voice + trait documentation
   # build_chronicle_prompt receives active monarch's traits so narrative voice
   # reflects them; surface traits in template tooltips; docs/traits.md player-facing.
-  6-3-chronicle-trait-voice: backlog
+  6-3-chronicle-trait-voice: ready-for-dev
 
   epic-6-retrospective: optional
 
