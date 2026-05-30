@@ -39,7 +39,7 @@
 # - Each story should have a corresponding file: {story_key}.md in story_location
 
 generated: 2026-05-02
-last_updated: 2026-05-30  # updated: Story 5-3 done (pretender mechanics)
+last_updated: 2026-05-30  # updated: Story 5-4 created (ready-for-dev)
 project: Royal-Succession-Simulation
 project_key: RSS
 tracking_system: file-system
@@ -182,7 +182,7 @@ development_status:
   # civil_war interrupt type (modal: fight / negotiate / abdicate) when pretender
   # support crosses threshold; heir_majority interrupt fires once per character at
   # age 16 with one free-action opportunity (tracks has_seen_majority on PersonDB).
-  5-4-civil-war-and-heir-majority: backlog
+  5-4-civil-war-and-heir-majority: ready-for-dev
 
   epic-5-retrospective: optional
 
