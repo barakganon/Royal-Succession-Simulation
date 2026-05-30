@@ -1,0 +1,582 @@
+{% extends "base.html" %}
+{% block title %}Family Tree — {{ dynasty.name }}{% endblock %}
+{% block body_class %}game-page{% endblock %}
+{% block main_wrapper_class %}container-fluid mt-3 flex-grow-1{% endblock %}
+
+{% block content %}
+<div class="ft-page">
+
+  <!-- ── Breadcrumb back to dynasty ── -->
+  <nav aria-label="breadcrumb" class="mt-1 mb-2">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item">
+        <a href="{{ url_for('auth.dashboard') }}">Dashboard</a>
+      </li>
+      <li class="breadcrumb-item">
+        <a href="{{ url_for('dynasty.view_dynasty', dynasty_id=dynasty.id) }}">{{ dynasty.name }}</a>
+      </li>
+      <li class="breadcrumb-item active" aria-current="page">Family Tree</li>
+    </ol>
+  </nav>
+
+  <!-- ── Toolbar ── -->
+  <div class="ft-toolbar">
+    <span class="ft-toolbar-title">&#127968; Family Tree of {{ dynasty.name }}</span>
+
+    <div class="ft-toolbar-controls">
+      <label class="ft-toggle" title="Show deceased members">
+        <input type="checkbox" id="ft-show-deceased" checked>
+        <span>Show deceased</span>
+      </label>
+
+      <input type="search" id="ft-search" class="ft-search-input"
+             placeholder="Search by name&hellip;" autocomplete="off"
+             aria-label="Search the family tree by name">
+
+      <button type="button" id="ft-reset" class="btn btn-sm btn-secondary ft-reset-btn"
+              title="Reset pan and zoom">&#8634; Reset view</button>
+    </div>
+  </div>
+
+  <!-- ── Pan / zoom viewport ── -->
+  <div class="ft-viewport" id="ft-viewport" tabindex="0"
+       aria-label="Interactive family tree. Drag to pan, scroll to zoom, click a person to highlight their bloodline.">
+    <div class="ft-stage" id="ft-stage">
+      {{ tree_svg | safe }}
+    </div>
+  </div>
+
+  <!-- ── Hover tooltip ── -->
+  <div class="ft-tooltip" id="ft-tooltip" aria-hidden="true"></div>
+
+  <div class="ft-status" id="ft-status" aria-live="polite"></div>
+
+</div><!-- /.ft-page -->
+
+<style>
+  .ft-page {
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+  }
+  .ft-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: .75rem;
+    padding: .5rem .75rem;
+    border: 1px solid var(--dark-border);
+    border-top: 3px solid var(--gold);
+    border-radius: 4px;
+    background: rgba(0, 0, 0, .3);
+  }
+  .ft-toolbar-title {
+    font-family: 'Cinzel', serif;
+    color: var(--gold);
+    font-size: 1rem;
+    white-space: nowrap;
+  }
+  .ft-toolbar-controls {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    flex-wrap: wrap;
+  }
+  .ft-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    font-family: 'Crimson Text', serif;
+    color: var(--text-light);
+    font-size: .85rem;
+    cursor: pointer;
+    margin: 0;
+  }
+  .ft-search-input {
+    background: var(--midnight);
+    border: 1px solid var(--dark-border);
+    border-radius: 4px;
+    color: var(--text-light);
+    font-family: 'Crimson Text', serif;
+    font-size: .85rem;
+    padding: .25rem .5rem;
+    min-width: 180px;
+  }
+  .ft-search-input:focus {
+    outline: none;
+    border-color: var(--gold);
+  }
+  .ft-reset-btn {
+    white-space: nowrap;
+  }
+
+  .ft-viewport {
+    position: relative;
+    width: 100%;
+    height: calc(100vh - 220px);
+    min-height: 420px;
+    overflow: hidden;
+    border: 1px solid var(--dark-border);
+    border-radius: 4px;
+    background: #0a1520;
+    cursor: grab;
+    touch-action: none;
+  }
+  .ft-viewport.is-panning {
+    cursor: grabbing;
+  }
+  .ft-stage {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: 0 0;
+    will-change: transform;
+  }
+  .ft-stage svg {
+    display: block;
+    /* let the SVG keep its intrinsic size for accurate centring math */
+    max-width: none;
+    height: auto;
+  }
+
+  /* Bloodline highlight states applied to <g data-person-id> nodes. */
+  .ft-stage svg g[data-person-id] {
+    transition: opacity .15s ease;
+  }
+  .ft-stage.has-selection svg g[data-person-id] {
+    opacity: .2;
+  }
+  .ft-stage.has-selection svg g[data-person-id].ft-highlight {
+    opacity: 1;
+  }
+  .ft-stage svg g[data-person-id].ft-flash {
+    opacity: 1 !important;
+    animation: ft-flash-anim 1.4s ease;
+  }
+  @keyframes ft-flash-anim {
+    0%, 100% { filter: none; }
+    25%, 60% { filter: drop-shadow(0 0 6px var(--gold-light)) drop-shadow(0 0 12px var(--gold)); }
+  }
+
+  .ft-tooltip {
+    position: absolute;
+    z-index: 50;
+    display: none;
+    pointer-events: none;
+    max-width: 260px;
+    padding: .4rem .55rem;
+    border: 1px solid var(--gold);
+    border-radius: 4px;
+    background: rgba(10, 10, 16, .96);
+    color: var(--text-light);
+    font-family: 'Crimson Text', serif;
+    font-size: .8rem;
+    line-height: 1.35;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .6);
+  }
+  .ft-tooltip .ft-tt-name {
+    font-family: 'Cinzel', serif;
+    color: var(--gold);
+    font-size: .85rem;
+  }
+  .ft-tooltip .ft-tt-dates {
+    color: var(--text-muted);
+    font-size: .74rem;
+  }
+  .ft-tooltip .ft-tt-line {
+    margin-top: .2rem;
+  }
+  .ft-tooltip .ft-tt-label {
+    color: var(--gold-light);
+  }
+
+  .ft-status {
+    min-height: 1.2em;
+    font-family: 'Crimson Text', serif;
+    font-size: .82rem;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  'use strict';
+
+  /* ── URL bases built in Jinja; the per-person route swaps the trailing id. ── */
+  var PERSON_URL_BASE = "{{ url_for('dynasty.person_detail_json', dynasty_id=dynasty.id, person_id=0) }}";
+  var FT_SVG_URL      = "{{ url_for('dynasty.family_tree_svg_route', dynasty_id=dynasty.id) }}";
+
+  function personUrl(id) {
+    /* Swap only the trailing "0" segment (…/person/0.json → …/person/<id>.json). */
+    return PERSON_URL_BASE.replace(/0(\.json)$/, id + '$1');
+  }
+
+  /* ── Elements (frozen ids) ── */
+  var viewport = document.getElementById('ft-viewport');
+  var stage    = document.getElementById('ft-stage');
+  var tooltip  = document.getElementById('ft-tooltip');
+  var showDeceased = document.getElementById('ft-show-deceased');
+  var searchInput  = document.getElementById('ft-search');
+  var resetBtn     = document.getElementById('ft-reset');
+  var statusEl     = document.getElementById('ft-status');
+
+  if (!viewport || !stage) return;
+
+  /* ── Pan / zoom transform state (mirrors world_map.html) ── */
+  var panX = 0, panY = 0, scale = 1;
+  var MIN_SCALE = 0.3, MAX_SCALE = 3.0;
+
+  function applyTransform() {
+    stage.style.transform =
+      'translate(' + panX + 'px,' + panY + 'px) scale(' + scale + ')';
+  }
+
+  function resetView() {
+    panX = 0; panY = 0; scale = 1;
+    applyTransform();
+    hideTooltip();
+  }
+
+  /* ── Per-person JSON cache ── */
+  var personCache = {};
+  function fetchPerson(id) {
+    if (personCache[id]) return Promise.resolve(personCache[id]);
+    return fetch(personUrl(id), {
+      headers: { 'Accept': 'application/json' },
+      credentials: 'same-origin'
+    })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) { if (data) personCache[id] = data; return data; })
+      .catch(function () { return null; });
+  }
+
+  /* ── Tooltip ── */
+  function _esc(s) {
+    if (s === null || s === undefined) return '';
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function hideTooltip() {
+    tooltip.style.display = 'none';
+    tooltip.setAttribute('aria-hidden', 'true');
+  }
+
+  function showTooltip(data, clientX, clientY) {
+    if (!data) return;
+    var name = ((data.name || '') + ' ' + (data.surname || '')).trim() || 'Unknown';
+    var birth = (data.birth_year !== undefined && data.birth_year !== null) ? data.birth_year : '?';
+    var death = (data.death_year !== undefined && data.death_year !== null) ? data.death_year : '';
+    var dates = 'b. ' + birth + (death !== '' ? ' — d. ' + death : ' — living');
+    if (data.age !== undefined && data.age !== null) dates += ' · age ' + data.age;
+
+    var html = '<div class="ft-tt-name">' + _esc(name) + '</div>';
+    html += '<div class="ft-tt-dates">' + _esc(dates) + '</div>';
+
+    var traits = data.traits || [];
+    if (traits.length) {
+      html += '<div class="ft-tt-line"><span class="ft-tt-label">Traits:</span> ' +
+              _esc(traits.join(', ')) + '</div>';
+    }
+    var titles = data.titles || [];
+    if (titles.length) {
+      html += '<div class="ft-tt-line"><span class="ft-tt-label">Titles:</span> ' +
+              _esc(titles.join(', ')) + '</div>';
+    }
+    if (data.is_monarch) {
+      html += '<div class="ft-tt-line"><span class="ft-tt-label">&#128081; Reigning monarch</span></div>';
+    }
+    tooltip.innerHTML = html;
+
+    var rect = viewport.getBoundingClientRect();
+    var x = clientX - rect.left + 14;
+    var y = clientY - rect.top + 14;
+    tooltip.style.display = 'block';
+    tooltip.setAttribute('aria-hidden', 'false');
+    /* clamp inside viewport */
+    var tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
+    if (x + tw > rect.width)  x = rect.width - tw - 6;
+    if (y + th > rect.height) y = rect.height - th - 6;
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    tooltip.style.left = x + 'px';
+    tooltip.style.top  = y + 'px';
+  }
+
+  /* Resolve the enclosing person <g> from any inner SVG element. */
+  function nodeFromTarget(target) {
+    var el = target;
+    while (el && el !== stage) {
+      if (el.getAttribute && el.getAttribute('data-person-id') !== null) return el;
+      el = el.parentNode;
+    }
+    return null;
+  }
+
+  /* ── Bloodline highlight ── */
+  var selectedId = null;
+
+  function buildIndex() {
+    /* id -> { node, fatherId, motherId, spouseId } and reverse child map. */
+    var byId = {};
+    var children = {};   // parentId -> [childId]
+    var nodes = stage.querySelectorAll('svg g[data-person-id]');
+    nodes.forEach(function (g) {
+      var id = g.getAttribute('data-person-id');
+      if (id === null || id === '') return;
+      var father = g.getAttribute('data-father-id') || '';
+      var mother = g.getAttribute('data-mother-id') || '';
+      var spouse = g.getAttribute('data-spouse-id') || '';
+      byId[id] = { node: g, father: father, mother: mother, spouse: spouse };
+      if (father) { (children[father] = children[father] || []).push(id); }
+      if (mother) { (children[mother] = children[mother] || []).push(id); }
+    });
+    return { byId: byId, children: children };
+  }
+
+  function computeBloodline(startId, idx) {
+    var highlight = {};
+    /* Walk ancestors upward. */
+    var stack = [startId];
+    while (stack.length) {
+      var id = stack.pop();
+      if (highlight[id]) continue;
+      highlight[id] = true;
+      var rec = idx.byId[id];
+      if (!rec) continue;
+      if (rec.father && !highlight[rec.father]) stack.push(rec.father);
+      if (rec.mother && !highlight[rec.mother]) stack.push(rec.mother);
+    }
+    /* Walk descendants downward from EVERY currently-highlighted node. */
+    var dstack = Object.keys(highlight);
+    while (dstack.length) {
+      var pid = dstack.pop();
+      var kids = idx.children[pid] || [];
+      kids.forEach(function (cid) {
+        if (!highlight[cid]) { highlight[cid] = true; dstack.push(cid); }
+      });
+    }
+    /* Include spouses of every highlighted node. */
+    Object.keys(highlight).forEach(function (id) {
+      var rec = idx.byId[id];
+      if (rec && rec.spouse) highlight[rec.spouse] = true;
+    });
+    return highlight;
+  }
+
+  function clearHighlight() {
+    selectedId = null;
+    stage.classList.remove('has-selection');
+    stage.querySelectorAll('svg g[data-person-id].ft-highlight').forEach(function (g) {
+      g.classList.remove('ft-highlight');
+    });
+    if (statusEl) statusEl.textContent = '';
+  }
+
+  function highlightBloodline(startId) {
+    var idx = buildIndex();
+    if (!idx.byId[startId]) { clearHighlight(); return; }
+    var hl = computeBloodline(startId, idx);
+    stage.classList.add('has-selection');
+    var count = 0;
+    Object.keys(idx.byId).forEach(function (id) {
+      var g = idx.byId[id].node;
+      if (hl[id]) { g.classList.add('ft-highlight'); count++; }
+      else { g.classList.remove('ft-highlight'); }
+    });
+    selectedId = startId;
+    if (statusEl) statusEl.textContent = 'Highlighting bloodline — ' + count + ' related members.';
+  }
+
+  /* ── Node listeners (re-bound after SVG swap) ── */
+  function bindNodeListeners() {
+    var svg = stage.querySelector('svg');
+    if (!svg) return;
+
+    svg.addEventListener('mousemove', function (e) {
+      if (isPanning) return;
+      var node = nodeFromTarget(e.target);
+      if (!node) { hideTooltip(); return; }
+      var id = node.getAttribute('data-person-id');
+      if (!id) { hideTooltip(); return; }
+      var cached = personCache[id];
+      if (cached) {
+        showTooltip(cached, e.clientX, e.clientY);
+      } else {
+        fetchPerson(id).then(function (data) {
+          /* only show if still hovering this node */
+          showTooltip(data, e.clientX, e.clientY);
+        });
+      }
+    });
+
+    svg.addEventListener('mouseleave', hideTooltip);
+
+    svg.addEventListener('click', function (e) {
+      var node = nodeFromTarget(e.target);
+      if (!node) { clearHighlight(); return; }
+      var id = node.getAttribute('data-person-id');
+      if (!id) { clearHighlight(); return; }
+      if (selectedId === id) { clearHighlight(); return; }   // toggle off
+      highlightBloodline(id);
+    });
+  }
+
+  /* ── Show-deceased toggle: refetch SVG and swap #ft-stage contents ── */
+  function reloadSvg() {
+    var flag = showDeceased.checked ? '1' : '0';
+    var url = FT_SVG_URL + (FT_SVG_URL.indexOf('?') === -1 ? '?' : '&') +
+              'show_deceased=' + flag;
+    if (statusEl) statusEl.textContent = 'Loading tree…';
+    fetch(url, { headers: { 'Accept': 'image/svg+xml' }, credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.text() : null; })
+      .then(function (svgText) {
+        if (!svgText) { if (statusEl) statusEl.textContent = 'Could not load tree.'; return; }
+        stage.innerHTML = svgText;
+        clearHighlight();
+        bindNodeListeners();
+        if (statusEl) statusEl.textContent = '';
+      })
+      .catch(function () {
+        if (statusEl) statusEl.textContent = 'Could not load tree.';
+      });
+  }
+
+  /* ── Search: centre + flash the matching node by name ── */
+  function findNodeByName(query) {
+    var q = (query || '').trim().toLowerCase();
+    if (!q) return null;
+    var nodes = stage.querySelectorAll('svg g[data-person-id]');
+    for (var i = 0; i < nodes.length; i++) {
+      var txt = (nodes[i].textContent || '').toLowerCase();
+      if (txt.indexOf(q) !== -1) return nodes[i];
+    }
+    return null;
+  }
+
+  function centreOnNode(node) {
+    /* Compute node centre in stage-local (untransformed) coords using bbox. */
+    var box;
+    try { box = node.getBBox(); }
+    catch (err) { box = null; }
+    var vpRect = viewport.getBoundingClientRect();
+    if (box) {
+      var localCx = box.x + box.width / 2;
+      var localCy = box.y + box.height / 2;
+      /* keep current scale; position so the node sits at viewport centre */
+      panX = vpRect.width / 2 - localCx * scale;
+      panY = vpRect.height / 2 - localCy * scale;
+    } else {
+      /* fallback: use bounding client rects */
+      var nRect = node.getBoundingClientRect();
+      var nodeCxScreen = nRect.left + nRect.width / 2 - vpRect.left;
+      var nodeCyScreen = nRect.top + nRect.height / 2 - vpRect.top;
+      panX += (vpRect.width / 2 - nodeCxScreen);
+      panY += (vpRect.height / 2 - nodeCyScreen);
+    }
+    applyTransform();
+  }
+
+  function flashNode(node) {
+    node.classList.add('ft-flash');
+    setTimeout(function () { node.classList.remove('ft-flash'); }, 1500);
+  }
+
+  function runSearch() {
+    var q = searchInput.value;
+    if (!q || !q.trim()) { if (statusEl) statusEl.textContent = ''; return; }
+    var node = findNodeByName(q);
+    if (!node) {
+      if (statusEl) statusEl.textContent = 'No family member matches “' + q + '”.';
+      return;
+    }
+    centreOnNode(node);
+    flashNode(node);
+    if (statusEl) statusEl.textContent = 'Found ' + (node.textContent || '').trim().slice(0, 60) + '.';
+  }
+
+  /* ── Pan (drag) ── */
+  var isPanning = false, lastX = 0, lastY = 0, movedDuringPan = false;
+
+  viewport.addEventListener('mousedown', function (e) {
+    if (e.button !== 0) return;
+    isPanning = true;
+    movedDuringPan = false;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    viewport.classList.add('is-panning');
+    hideTooltip();
+  });
+
+  document.addEventListener('mousemove', function (e) {
+    if (!isPanning) return;
+    var dx = e.clientX - lastX;
+    var dy = e.clientY - lastY;
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) movedDuringPan = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    panX += dx;
+    panY += dy;
+    applyTransform();
+  });
+
+  document.addEventListener('mouseup', function () {
+    if (!isPanning) return;
+    isPanning = false;
+    viewport.classList.remove('is-panning');
+  });
+
+  /* Suppress the click that ends a drag-pan so it doesn't toggle highlight. */
+  viewport.addEventListener('click', function (e) {
+    if (movedDuringPan) {
+      e.stopPropagation();
+      movedDuringPan = false;
+    }
+  }, true);
+
+  /* ── Wheel zoom — cursor-anchored ── */
+  viewport.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var rect = viewport.getBoundingClientRect();
+    var mx = e.clientX - rect.left;
+    var my = e.clientY - rect.top;
+    /* world point under cursor before zoom */
+    var wx = (mx - panX) / scale;
+    var wy = (my - panY) / scale;
+    var factor = e.deltaY < 0 ? 1.1 : (1 / 1.1);
+    var newScale = scale * factor;
+    if (newScale < MIN_SCALE) newScale = MIN_SCALE;
+    if (newScale > MAX_SCALE) newScale = MAX_SCALE;
+    scale = newScale;
+    /* re-anchor so the same world point stays under the cursor */
+    panX = mx - wx * scale;
+    panY = my - wy * scale;
+    hideTooltip();
+    applyTransform();
+  }, { passive: false });
+
+  /* ── Reset ── */
+  resetBtn.addEventListener('click', resetView);
+
+  /* ── Show-deceased toggle ── */
+  showDeceased.addEventListener('change', reloadSvg);
+
+  /* ── Search wiring ── */
+  searchInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); runSearch(); }
+  });
+  searchInput.addEventListener('input', function () {
+    if (!searchInput.value.trim() && statusEl) statusEl.textContent = '';
+  });
+
+  /* ── Initial bind ── */
+  applyTransform();
+  bindNodeListeners();
+})();
+</script>
+{% endblock %}
