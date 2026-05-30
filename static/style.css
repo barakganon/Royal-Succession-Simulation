@@ -1156,6 +1156,69 @@ body.game-page { overflow: hidden; }
 }
 
 
+/* ─── Story 4-2: free-action ("Decisions") section in the context menu ─── */
+.ctx-section-header {
+  padding: .3rem .6rem .2rem;
+  font-family: 'Cinzel', serif;
+  font-size: .66rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: rgba(0, 0, 0, .25);
+}
+.ctx-projects-header {
+  border-bottom: 1px solid rgba(255, 255, 255, .04);
+}
+.ctx-section-divider {
+  height: 1px;
+  margin: .15rem .35rem;
+  background: linear-gradient(
+    to right,
+    transparent,
+    var(--gold) 20%,
+    var(--gold) 80%,
+    transparent
+  );
+  opacity: .5;
+}
+.ctx-free-actions {
+  border-top: 1px solid var(--dark-border);
+}
+.game-context-menu-row.free-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-style: italic;
+}
+.game-context-menu-row.free-action-row:hover,
+.game-context-menu-row.free-action-row:focus-visible {
+  background: rgba(212, 175, 55, .12);
+  color: var(--gold);
+}
+.free-action-target-tag {
+  margin-left: .5rem;
+  font-size: .72rem;
+  color: var(--gold);
+  opacity: .8;
+  font-style: normal;
+}
+
+/* Undo-last control in the topbar (Story 4-2). */
+.btn.free-action-undo {
+  background: rgba(0, 0, 0, .3);
+  border: 1px solid var(--gold);
+  color: var(--gold);
+}
+.btn.free-action-undo:hover {
+  background: rgba(212, 175, 55, .18);
+  color: var(--text-light);
+}
+.btn.free-action-undo:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+
 /* ─── Sprint 3 Story 3-3: detail-panel content cards (territory / project / monarch / war) ─── */
 .detail-card {
   display: flex;
