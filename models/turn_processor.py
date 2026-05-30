@@ -400,11 +400,26 @@ def process_death_check(person: PersonDB, current_year: int, theme_config: dict)
     if random.random() < base_mortality:
         person.death_year = current_year
 
+        from utils.llm_narration import narrate_event
+        from utils.llm_prompts import build_death_flavor_prompt, generate_death_flavor_fallback
+
+        death_dynasty = DynastyDB.query.get(person.dynasty_id)
+        death_house = death_dynasty.name if death_dynasty else "their house"
+        person_full_name = f"{person.name} {person.surname}"
+
         # Log death
         death_log = HistoryLogEntryDB(
             dynasty_id=person.dynasty_id,
             year=current_year,
-            event_string=f"{person.name} {person.surname} passed away at the age of {age}.",
+            event_string=narrate_event(
+                build_death_flavor_prompt(
+                    person_full_name, person.get_traits(), death_house, age, current_year, person.is_monarch
+                ),
+                generate_death_flavor_fallback(
+                    person_full_name, death_house, age, current_year, person.is_monarch
+                ),
+                max_tokens=90,
+            ),
             person1_sim_id=person.id,
             event_type="death"
         )
@@ -747,10 +762,21 @@ def process_childbirth_check(dynasty: DynastyDB, woman: PersonDB, current_year: 
         child.generate_portrait()
 
         # Log birth
+        from utils.llm_narration import narrate_event
+        from utils.llm_prompts import build_birth_flavor_prompt, generate_birth_flavor_fallback
+
         birth_log = HistoryLogEntryDB(
             dynasty_id=dynasty.id,
             year=current_year,
-            event_string=f"{child_name} {child_surname} was born to {woman.name} {woman.surname} and {spouse.name} {spouse.surname}.",
+            event_string=narrate_event(
+                build_birth_flavor_prompt(
+                    child_name, child.get_traits(), woman.name, spouse.name, dynasty.name, current_year
+                ),
+                generate_birth_flavor_fallback(
+                    child_name, woman.name, spouse.name, dynasty.name, current_year
+                ),
+                max_tokens=80,
+            ),
             person1_sim_id=child.id,
             event_type="birth"
         )
