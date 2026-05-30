@@ -1,11 +1,12 @@
 # Royal Succession Simulation - Development Status
-Last updated: 2026-05-29
-Last commit: Merge feature/animated-turn-routing-cleanup — animated turn pass + routing + delete action_phase (Story 3-5)
+Last updated: 2026-05-30
+Last commit: Merge feature/free-action-endpoint — free_action endpoint + dispatcher (Story 4-1)
 
 ---
 
 ## Current State
-**Tests:** 315 passed · 0 skipped · 0 failed
+**Tests:** 327 passed · 0 skipped · 0 failed
+**Epic 4 (Free Actions Split) — in progress.** Story 4-1 done: `POST /dynasty/<id>/free_action` dispatcher (9 instant actions — declare_war/propose_treaty/send_envoy/issue_ultimatum delegate to DiplomacySystem; name_heir/adopt_succession_law/hold_feast/hold_tournament/pardon_vassal new) that appends a chronicle line and does NOT tick the turn; +2 DynastyDB columns (designated_heir_id, succession_law). Built via 3 worktree agents. Next: Story 4-2 (LLM flavor + right-click menu integration + undo).
 **Story 3-5 (Animated turn pass + routing + delete action_phase):** done — branch `feature/animated-turn-routing-cleanup` (3 worktree agents: backend / frontend / tests). **Epic 3 (Map as Main View) complete** — stories 3-1…3-5 all done. End Turn now plays event toasts on the map then routes to the turn report; login lands on the map; `action_phase` route deleted (404).
 
 **Correct-course fix (`fix/world-map-empty-render`):** running the app revealed the world map rendered **empty on real data** (every Epic 3 story had deferred visual verification). Root cause: `map_renderer` emits raw pixel coords as `col/row` but the canvas treated them as hex-grid indices (×48 off-screen). Fixed `hexCenter` + added `fitToView`; also wired a starting-map bootstrap into `create_dynasty` (gated on non-TESTING). Map now renders & fits-to-view; verified visually via headless Chrome. Logged follow-ups in `deferred-work.md`: **`pytest` wipes the dev DB** (conftest binds `:memory:` too late), borders need a tessellated layout, legacy AP panel still shown. Next epic: Epic 4 (Free actions split).

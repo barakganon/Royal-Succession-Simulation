@@ -590,6 +590,65 @@ def submit_actions(dynasty_id):
     return redirect(url_for('dynasty.view_dynasty', dynasty_id=dynasty_id))
 
 
+@dynasty_bp.route('/dynasty/<int:dynasty_id>/free_action', methods=['POST'])
+@login_required
+@block_if_turn_processing
+def free_action(dynasty_id):
+    """Perform a single free (no-tick) action via the FreeActionSystem (Story 4-1).
+
+    Free actions execute instantly without advancing the simulation year or
+    consuming action points.  The request may be JSON or form-encoded and must
+    include an ``action_type``; any remaining keys are forwarded as ``params``.
+
+    Returns JSON ``{"ok": bool, "message": str}``.
+    """
+    # Lazy import: FreeActionSystem lives in a module owned by another agent and
+    # may be absent in this worktree.  Importing it inside the route keeps the
+    # blueprint (and the whole test suite) importable. Mirrors the existing
+    # lazy-import pattern used elsewhere in this blueprint.
+    from models.free_action_system import FreeActionSystem
+
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        return jsonify({"ok": False, "message": "Not authorized"}), 403
+
+    data = request.get_json(silent=True) or request.form
+    action_type = data.get('action_type')
+    if not action_type:
+        return jsonify({"ok": False, "message": "Missing action_type"}), 400
+
+    # Build the params dict from the remaining keys; coerce known id fields to int.
+    _INT_KEYS = {'target_dynasty_id', 'heir_person_id'}
+    params = {}
+    for key, value in data.items():
+        if key == 'action_type':
+            continue
+        if key in _INT_KEYS and value not in (None, ''):
+            try:
+                params[key] = int(value)
+            except (TypeError, ValueError):
+                params[key] = value
+        else:
+            params[key] = value
+
+    try:
+        ok, message = FreeActionSystem(db.session).perform_free_action(
+            dynasty_id, action_type, params
+        )
+        if ok:
+            db.session.commit()
+            return jsonify({"ok": True, "message": message}), 200
+        db.session.rollback()
+        return jsonify({"ok": False, "message": message}), 400
+    except Exception as e:
+        db.session.rollback()
+        logger.error(
+            f"free_action: error performing {action_type!r} for dynasty {dynasty_id}: {e}",
+            exc_info=True,
+        )
+        return jsonify({"ok": False, "message": "An error occurred performing the action."}), 400
+
+
 def check_victory_conditions(dynasty, current_year):
     """Check if the dynasty has achieved a victory condition.
 

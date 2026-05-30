@@ -39,7 +39,7 @@
 # - Each story should have a corresponding file: {story_key}.md in story_location
 
 generated: 2026-05-02
-last_updated: 2026-05-29  # updated: Epic 3 retrospective done; map-render correct-course merged
+last_updated: 2026-05-30  # updated: Story 4-1 done (free_action endpoint)
 project: Royal-Succession-Simulation
 project_key: RSS
 tracking_system: file-system
@@ -139,14 +139,14 @@ development_status:
 
   # ── EPIC 4: Free Actions Split (Sprint 4) ──────────────────────────────────
   # Goal: Distinguish decisions (instant) from commitments (project, slot-consuming).
-  epic-4: backlog
+  epic-4: in-progress
 
   # Story 4-1: free_action endpoint + dispatcher
   # POST /dynasty/<id>/free_action with action_type + params; validate, apply, append
   # chronicle line; does NOT tick the turn. Implement: declare_war, propose_treaty,
   # send_envoy, issue_ultimatum, name_heir, adopt_succession_law, hold_feast,
   # hold_tournament, pardon_vassal.
-  4-1-free-action-endpoint: backlog
+  4-1-free-action-endpoint: done
 
   # Story 4-2: LLM flavor lines + right-click menu integration
   # Each free action triggers a flavor line (LLM or fallback); surface free actions

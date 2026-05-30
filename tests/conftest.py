@@ -22,10 +22,16 @@ os.environ.setdefault('MPLBACKEND', 'Agg')
 # A temp FILE is used rather than sqlite:///:memory: because in-memory SQLite is
 # per-connection and would not be shared across pooled connections.
 import tempfile as _tempfile
-os.environ.setdefault(
-    'DATABASE_URL',
-    'sqlite:///' + os.path.join(_tempfile.gettempdir(), 'rss_pytest.db'),
-)
+if 'DATABASE_URL' not in os.environ:
+    _test_db_file = os.path.join(_tempfile.gettempdir(), 'rss_pytest.db')
+    # Start every run from a clean schema: SQLite's create_all() does NOT ALTER an
+    # existing table, so a stale temp DB would silently miss newly-added columns
+    # (e.g. a story that adds a column would fail until the file is rebuilt).
+    try:
+        os.remove(_test_db_file)
+    except FileNotFoundError:
+        pass
+    os.environ['DATABASE_URL'] = 'sqlite:///' + _test_db_file
 
 # Add the project root directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
