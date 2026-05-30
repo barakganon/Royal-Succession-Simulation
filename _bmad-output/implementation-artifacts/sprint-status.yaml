@@ -266,7 +266,7 @@ development_status:
   # build_birth_flavor_prompt, build_death_flavor_prompt, build_battle_flavor_prompt,
   # build_world_news_prompt, build_succession_card_prompt, build_coronation_prompt,
   # build_construction_complete_prompt. Token budgets: 50-120 each.
-  9-1-event-flavor-prompt-builders: ready-for-dev
+  9-1-event-flavor-prompt-builders: done
 
   # Story 9-2: Wire flavor calls into lifecycle functions
   # Each lifecycle function in turn_processor.py calls the relevant flavor prompt
