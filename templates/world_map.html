@@ -502,6 +502,14 @@ function _renderSuccessionCandidate(c) {
   meta.textContent = metaBits.join(' · ');
   info.appendChild(meta);
 
+  /* LLM-generated character sketch (plain prose). */
+  if (c.flavor) {
+    var flavorEl = document.createElement('div');
+    flavorEl.className = 'succession-candidate-flavor';
+    flavorEl.textContent = c.flavor;
+    info.appendChild(flavorEl);
+  }
+
   if (c.traits && c.traits.length) {
     var traitsEl = document.createElement('div');
     traitsEl.className = 'succession-candidate-traits';

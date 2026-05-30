@@ -27,6 +27,12 @@ from models.turn_processor import (
     process_dynasty_turn, get_succession_candidates, crown_heir,
 )
 from utils.theme_manager import get_all_theme_names, generate_theme_from_story_llm, get_theme
+from utils.llm_prompts import (
+    build_succession_card_prompt,
+    generate_succession_card_fallback,
+    build_coronation_prompt,
+    generate_coronation_fallback,
+)
 from visualization.heraldry_renderer import generate_coat_of_arms
 
 logger = logging.getLogger('royal_succession.dynasty')
@@ -42,6 +48,38 @@ def _llm_available() -> bool:
     """Return True if the LLM API key is present in the running app."""
     from flask import current_app
     return current_app.config.get('FLASK_APP_GOOGLE_API_KEY_PRESENT', False)
+
+
+def _succession_llm_flavor(prompt: str, fallback: str) -> str:
+    """Generate succession/coronation flavor text via a guarded LLM call.
+
+    Mirrors models/free_action_system._build_flavor: when the LLM is available
+    and an API key is present, calls gemini-1.5-flash; ANY failure (or LLM off,
+    or empty response) returns the deterministic ``fallback``. Story 5-2.
+    """
+    if _llm_available():
+        try:
+            import google.generativeai as genai
+            api_key = (
+                current_app.config.get("FLASK_APP_GOOGLE_API_KEY")
+                or os.environ.get("GOOGLE_API_KEY")
+            )
+            if api_key:
+                genai.configure(api_key=api_key)
+                model = genai.GenerativeModel("gemini-1.5-flash")
+                response = model.generate_content(
+                    prompt,
+                    generation_config={
+                        "max_output_tokens": 120,
+                        "temperature": 0.8,
+                    },
+                )
+                text = response.text.strip() if response.text else ""
+                if text:
+                    return text
+        except Exception as llm_exc:
+            logger.warning("Succession LLM flavor failed: %s", llm_exc)
+    return fallback
 
 
 # ---------------------------------------------------------------------------
@@ -1114,6 +1152,15 @@ def succession_candidates_json(dynasty_id):
 
     default_id = _default_candidate_id(dynasty, candidates)
 
+    recent_events = [
+        e.event_string
+        for e in HistoryLogEntryDB.query.filter_by(dynasty_id=dynasty_id)
+        .order_by(HistoryLogEntryDB.year.desc(), HistoryLogEntryDB.id.desc())
+        .limit(5)
+        .all()
+    ]
+    monarch_name = f"{deceased.name} {deceased.surname or ''}".strip()
+
     serialized = []
     for c in candidates:
         portrait = c.portrait_svg
@@ -1123,16 +1170,38 @@ def succession_candidates_json(dynasty_id):
             except Exception as e:
                 logger.error(f"Error generating portrait for person {c.id}: {e}")
                 portrait = ""
+        traits = c.get_traits()
+        age = deceased.death_year - c.birth_year
+        relation = _candidate_relation(deceased, c)
+        candidate_name = f"{c.name} {c.surname or ''}".strip()
+        flavor = _succession_llm_flavor(
+            build_succession_card_prompt(
+                candidate_name=candidate_name,
+                candidate_traits=traits,
+                relation=relation,
+                age=age,
+                monarch_name=monarch_name,
+                dynasty_name=dynasty.name,
+                recent_events=recent_events,
+            ),
+            generate_succession_card_fallback(
+                candidate_name=candidate_name,
+                candidate_traits=traits,
+                relation=relation,
+                age=age,
+            ),
+        )
         serialized.append({
             "id": c.id,
             "name": c.name,
             "surname": c.surname,
             "portrait_svg": portrait,
-            "traits": c.get_traits(),
+            "traits": traits,
             "birth_year": c.birth_year,
-            "age": deceased.death_year - c.birth_year,
-            "relation": _candidate_relation(deceased, c),
+            "age": age,
+            "relation": relation,
             "is_default": c.id == default_id,
+            "flavor": flavor,
         })
 
     return jsonify({
@@ -1182,6 +1251,27 @@ def succession_choice(dynasty_id):
     heir = candidate_map[heir_id]
     try:
         crown_heir(dynasty, heir, deceased.death_year, theme_config)
+        heir_name = f"{heir.name} {heir.surname or ''}".strip()
+        coronation_text = _succession_llm_flavor(
+            build_coronation_prompt(
+                heir_name=heir_name,
+                dynasty_name=dynasty.name,
+                year=deceased.death_year,
+                heir_traits=heir.get_traits(),
+            ),
+            generate_coronation_fallback(
+                heir_name=heir_name,
+                dynasty_name=dynasty.name,
+                year=deceased.death_year,
+            ),
+        )
+        db.session.add(HistoryLogEntryDB(
+            dynasty_id=dynasty_id,
+            year=deceased.death_year,
+            event_string=coronation_text,
+            event_type='coronation',
+            person1_sim_id=heir.id,
+        ))
         db.session.commit()
     except Exception as e:
         db.session.rollback()

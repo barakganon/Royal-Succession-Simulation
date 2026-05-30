@@ -39,7 +39,7 @@
 # - Each story should have a corresponding file: {story_key}.md in story_location
 
 generated: 2026-05-02
-last_updated: 2026-05-30  # updated: Story 5-1 done (monarch death interrupt + succession UI)
+last_updated: 2026-05-30  # updated: Story 5-2 done (LLM succession cards + coronation)
 project: Royal-Succession-Simulation
 project_key: RSS
 tracking_system: file-system
@@ -170,7 +170,7 @@ development_status:
   # build_succession_card_prompt(candidate, monarch, recent_events) → 3-sentence
   # flavor per candidate; fallback templates using traits; coronation chronicle entry
   # after choice is made.
-  5-2-succession-candidate-llm-cards: backlog
+  5-2-succession-candidate-llm-cards: done
 
   # Story 5-3: Pretender mechanics
   # Add is_pretender + pretender_strength to PersonDB (migration); pretender

@@ -312,3 +312,98 @@ def generate_free_action_flavor_fallback(action_type: str, dynasty_name: str,
     return (
         f"In the year {year}, {monarch_name} of House {dynasty_name} {deed}."
     )
+
+
+# ---------------------------------------------------------------------------
+# Story 5-2 — Succession candidate cards + coronation chronicle
+# ---------------------------------------------------------------------------
+
+def _format_traits(traits) -> str:
+    """Render a traits list/iterable as a human-readable comma string."""
+    if not traits:
+        return "no notable traits"
+    if isinstance(traits, str):
+        return traits
+    try:
+        cleaned = [str(t).replace('_', ' ').strip() for t in traits if str(t).strip()]
+    except TypeError:
+        return str(traits)
+    if not cleaned:
+        return "no notable traits"
+    return ", ".join(cleaned)
+
+
+def build_succession_card_prompt(candidate_name: str, candidate_traits,
+                                 relation: str, age: int, monarch_name: str,
+                                 dynasty_name: str, recent_events) -> str:
+    """Prompt for a 3-sentence character sketch of a succession candidate.
+
+    Story 5-2. max_tokens<=120. Style: medieval chronicler, third-person,
+    exactly 3 sentences. Fallback: generate_succession_card_fallback().
+    """
+    traits_str = _format_traits(candidate_traits)
+    if not recent_events:
+        events_clause = "Recent years have passed without great incident."
+    else:
+        try:
+            events = [str(e).strip() for e in recent_events if str(e).strip()]
+        except TypeError:
+            events = [str(recent_events)]
+        joined = "; ".join(events[:5]) if events else ""
+        events_clause = (
+            f"Recent events in the realm: {joined}." if joined
+            else "Recent years have passed without great incident."
+        )
+    return (
+        f"You are a medieval chronicler of House {dynasty_name}. "
+        f"The late {monarch_name} has died, and {candidate_name}, "
+        f"the {relation} aged {age}, stands as a candidate for succession. "
+        f"This person is known for these traits: {traits_str}. "
+        f"{events_clause} "
+        f"Write exactly 3 sentences sketching this candidate as a potential ruler — "
+        f"formal, dramatic, third-person, in the style of a medieval chronicle. "
+        f"Name the candidate. Reflect their traits and relation. "
+        f"Do not use modern language or lists."
+    )
+
+
+def generate_succession_card_fallback(candidate_name: str, candidate_traits,
+                                      relation: str, age: int) -> str:
+    """Deterministic, non-empty fallback when the LLM is unavailable (Story 5-2).
+
+    Returns a 3-sentence sketch that always names the candidate and references
+    their relation, age, and traits.
+    """
+    traits_str = _format_traits(candidate_traits)
+    return (
+        f"{candidate_name}, the {relation}, has reached the age of {age}. "
+        f"Known for {traits_str}, this candidate is weighed for the succession. "
+        f"The realm watches to see whether {candidate_name} shall be crowned."
+    )
+
+
+def build_coronation_prompt(heir_name: str, dynasty_name: str, year: int,
+                            heir_traits) -> str:
+    """Prompt for a coronation chronicle line (Story 5-2).
+
+    max_tokens<=150. Style: medieval chronicler, third-person, 1-2 sentences.
+    Fallback: generate_coronation_fallback().
+    """
+    traits_str = _format_traits(heir_traits)
+    return (
+        f"You are a medieval chronicler recording the deeds of House {dynasty_name}. "
+        f"In the year {year}, {heir_name} was crowned ruler of House {dynasty_name}, "
+        f"a sovereign known for {traits_str}. "
+        f"Write exactly 1-2 sentences in the style of a medieval chronicle, marking "
+        f"this coronation — formal, dramatic, third-person. Name the new ruler. "
+        f"Do not use modern language or lists."
+    )
+
+
+def generate_coronation_fallback(heir_name: str, dynasty_name: str,
+                                 year: int) -> str:
+    """Deterministic, non-empty fallback when the LLM is unavailable (Story 5-2)."""
+    return (
+        f"In the year {year}, {heir_name} was crowned ruler of House "
+        f"{dynasty_name}, beginning a new reign."
+    )
