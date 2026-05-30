@@ -24,8 +24,6 @@ from utils.helpers import generate_name, generate_narrative_flair, generate_stor
 # Import logging configuration
 from utils.logging_config import setup_logger, log_performance
 
-# plotter for visualizations
-from visualization.plotter import visualize_family_tree_snapshot
 import matplotlib.pyplot as plt
 
 # Set up logger
@@ -377,11 +375,8 @@ def run_simulation(theme_name_or_user_story: str = None,
                     _perform_pruning(family, current_simulation_year, history_log)
                     last_prune_year = current_simulation_year
 
-                # Visualization
-                # VISUALIZE_TREE_INTERVAL_YEARS is a global, set by configure_simulation_globals from main script
-                if VISUALIZE_TREE_INTERVAL_YEARS > 0 and current_simulation_year >= last_viz_year + VISUALIZE_TREE_INTERVAL_YEARS:
-                    _perform_visualization(family, current_simulation_year, dynasty_id_for_filenames, generation_counter)
-                    last_viz_year = current_simulation_year
+                # Family-tree PNG visualization removed (Story 8-3): the web app
+                # renders the family tree as SVG via visualization.family_tree_svg.
 
                 # Extinction Check
                 if family.current_monarch is None and year_idx_offset > 7:  # Grace period of ~7 years after losing monarch
@@ -548,15 +543,6 @@ def _perform_pruning(family_obj: FamilyTree, current_year: int, history_log_obj:
         history_log_obj.gen_pruned_sample_info = history_log_obj.gen_pruned_sample_info[-5:]
 
 
-def _perform_visualization(family_obj: FamilyTree, current_year: int, dynasty_id_for_filenames_str: str,
-                           generation_counter_val: int):
-    # ... (Full logic as defined in previous correct version)
-    if VERBOSE_LOGGING: logger.debug(f"\nYear {current_year}: Generating family tree visualization.")
-    visualize_family_tree_snapshot(family_tree_obj=family_obj, year=current_year,
-                                   filename_suffix=f"_{dynasty_id_for_filenames_str}_gen{generation_counter_val}",
-                                   display_mode="monarch_focus")
-
-
 def _process_world_events(family_obj: FamilyTree, current_year: int, history_log_obj: History):
     """Processes world events for the current year."""
     theme_event_definitions_list = family_obj.theme_config.get("events", [])
@@ -615,10 +601,8 @@ def _simulation_wrap_up(family_obj: FamilyTree, history_log_obj: History, start_
     logger.debug(f"\n--- SIMULATION COMPLETED FOR HOUSE OF {family_obj.dynasty_name} ---")
     logger.debug(f"Duration: {start_year} to {final_year} ({sim_years} simulated years)")
     history_log_obj.log_generation_summary_to_console()
-    if VISUALIZE_TREE_INTERVAL_YEARS >= 0:
-        logger.debug(f"\nGenerating final family tree visualization for year {final_year}...")
-        visualize_family_tree_snapshot(family_obj, final_year, f"_{dynasty_id_for_files_str}_final",
-                                       display_mode="living_nobles")
+    # Final family-tree PNG visualization removed (Story 8-3); the web app
+    # renders the family tree as SVG via visualization.family_tree_svg.
     logger.debug("\n--- Overall Simulation Statistics ---")
     overall_stats = history_log_obj.get_overall_stats_summary(family_obj, family_obj.all_monarchs_ever_ids, final_year,
                                                               start_year)

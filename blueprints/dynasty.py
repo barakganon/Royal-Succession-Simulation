@@ -276,12 +276,22 @@ def view_dynasty(dynasty_id):
         dynasty_id=dynasty.id
     ).order_by(HistoryLogEntryDB.year.desc()).limit(10).all()
 
-    # Check if family tree visualization exists
-    family_tree_image = None
-    tree_filename = f"family_tree_{dynasty.name.replace(' ', '_')}_year_{dynasty.current_simulation_year}_living_nobles.png"
-    tree_path = os.path.join('static', 'visualizations', tree_filename)
-    if os.path.exists(tree_path):
-        family_tree_image = url_for('static', filename=f'visualizations/{tree_filename}')
+    # Ensure the inline family-tree SVG is populated (Story 8-3).
+    # The template reads dynasty.family_tree_svg directly. If it's not yet
+    # cached, generate it best-effort; a render failure must never abort the view.
+    if not dynasty.family_tree_svg:
+        try:
+            from visualization.family_tree_svg import generate_family_tree_svg
+            dynasty.family_tree_svg = generate_family_tree_svg(dynasty_id, db.session)
+            db.session.add(dynasty)
+            db.session.commit()
+        except Exception as e:
+            logger.error("Failed to generate family tree SVG for dynasty %s: %s",
+                         dynasty_id, e, exc_info=True)
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
 
     return render_template('view_dynasty.html',
                            dynasty=dynasty,
@@ -292,7 +302,6 @@ def view_dynasty(dynasty_id):
                            living_nobles=living_nobles,
                            person_ages=person_ages,
                            recent_events=recent_events,
-                           family_tree_image=family_tree_image,
                            current_year=dynasty.current_simulation_year)
 
 
