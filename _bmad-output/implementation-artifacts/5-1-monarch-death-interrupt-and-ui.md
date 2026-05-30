@@ -1,6 +1,6 @@
 # Story 5-1: Monarch Death Interrupt + Succession Choice UI
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -100,10 +100,30 @@ Builds on the Epic-1 interrupt loop (`monarch_death` already halts `process_dyna
 
 ### Agent Model Used
 
-(to be filled by dev/integration)
-
-### Debug Log References
+claude-opus-4-8[1m] — 3 parallel worktree sub-agents (backend / frontend / tests) against a frozen contract, + main-session integrator.
 
 ### Completion Notes List
 
+- All 8 ACs satisfied. `pytest -p no:randomly`: **342 passed, 0 failed, 0 skipped** (334 baseline + 8). Contract-first: C's 8 tests failed in isolation (404 + missing markers), green on integration.
+- Agents: A `wt/5-1-backend` (`46b5431`) — `get_succession_candidates` + `crown_heir` helpers, `process_succession` rework (human halts without crowning; AI auto-crowns; pending marker = dead `is_monarch`), `succession_candidates.json` + `succession_choice` endpoints. B `wt/5-1-frontend` (`38acb46`) — `#succession-modal` with candidate cards (portrait/traits/age/relation + default badge), crown buttons, End-Turn block, page-load + `monarch_death`-interrupt triggers. C `wt/5-1-tests` (`904dba9`) — 8 tests. Clean merges, zero file overlap.
+- **AC8 visual + live verification (retro lesson):** crafted a pending succession (deceased Geoffrey + heirs Aldous/Mathilde), ran the app — modal renders "The Crown Lies Empty" with both candidates, the DEFAULT HEIR badge, crown buttons, dimmed backdrop, and End Turn disabled (screenshot). Live crown round-trip: `succession_choice` crowned Aldous (`is_monarch=1`, reign 1300), unset Geoffrey, and `pending → false`. The endpoint's 400 path also confirmed live (rejected an invalid heir_id).
+- AI auto-crown preserved (GameManager turn flow untouched); no-heir crisis path unchanged.
+- Minor (not a feature bug): hand-crafted test persons render the 👑 portrait fallback because they lack generated `portrait_svg`/traits; real persons (created via the normal flow) carry portraits.
+
 ### File List
+
+- `models/turn_processor.py` — MODIFIED (`get_succession_candidates`, `crown_heir`, `process_succession` rework)
+- `blueprints/dynasty.py` — MODIFIED (`succession_candidates.json` + `succession_choice` routes)
+- `templates/world_map.html` — MODIFIED (`#succession-modal` + JS triggers + End-Turn block)
+- `static/style.css` — MODIFIED (succession modal + candidate-card styles)
+- `tests/integration/test_succession.py` — NEW (8 tests)
+- `_bmad-output/implementation-artifacts/{5-1-...md, sprint-status.yaml}`, `STATUS.md` — MODIFIED
+
+### Change Log
+
+| Date | Change |
+|---|---|
+| 2026-05-30 | spec(5-1) committed; Epic 5 in-progress; 3 worktree agents built backend/frontend/tests |
+| 2026-05-30 | merged all three into feature/succession-choice (clean); 342 passed |
+| 2026-05-30 | AC8 visual (modal screenshot) + live crown round-trip verified |
+| 2026-05-30 | Story 5-1 → done |

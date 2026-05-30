@@ -39,7 +39,7 @@
 # - Each story should have a corresponding file: {story_key}.md in story_location
 
 generated: 2026-05-02
-last_updated: 2026-05-30  # updated: Epic 5 started — Story 5-1 created (ready-for-dev)
+last_updated: 2026-05-30  # updated: Story 5-1 done (monarch death interrupt + succession UI)
 project: Royal-Succession-Simulation
 project_key: RSS
 tracking_system: file-system
@@ -164,7 +164,7 @@ development_status:
   # monarch_death interrupt halts turn loop at year of death; build
   # /dynasty/<id>/succession_choice POST endpoint; succession modal template showing
   # candidate portraits, traits, and default heir designation.
-  5-1-monarch-death-interrupt-and-ui: ready-for-dev
+  5-1-monarch-death-interrupt-and-ui: done
 
   # Story 5-2: LLM succession candidate cards
   # build_succession_card_prompt(candidate, monarch, recent_events) → 3-sentence
