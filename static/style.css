@@ -1989,3 +1989,114 @@ body.game-page { overflow: hidden; }
   font-style: italic;
   padding: 1.2rem;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Story 5-4: Civil-war modal — reuses .succession-modal backdrop + panel.
+   Three large stacked action buttons (Fight / Negotiate / Abdicate).
+   ══════════════════════════════════════════════════════════════════════════ */
+.civil-war-modal.is-open { display: flex; }
+
+.civil-war-modal-panel {
+  width: min(520px, 96vw);
+  border-color: var(--danger, #a33);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6), 0 0 0 4px rgba(120, 20, 20, 0.35);
+}
+
+.civil-war-actions {
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+  margin-top: 1.2rem;
+}
+
+.civil-war-btn {
+  font-family: 'Cinzel', serif;
+  font-size: .95rem;
+  letter-spacing: .03em;
+  padding: .7rem 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--dark-border);
+  background: var(--midnight);
+  color: var(--text-light);
+  cursor: pointer;
+  transition: border-color .15s ease, transform .15s ease, box-shadow .15s ease,
+              background .15s ease;
+}
+.civil-war-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+.civil-war-btn:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+.civil-war-btn-fight:hover:not(:disabled) {
+  border-color: var(--danger, #a33);
+  color: #ffd9d9;
+}
+.civil-war-btn-negotiate:hover:not(:disabled) {
+  border-color: var(--gold);
+  color: var(--gold-light);
+}
+.civil-war-btn-abdicate:hover:not(:disabled) {
+  border-color: var(--text-muted);
+  color: var(--text-light);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Story 5-4: Heir-majority notice — lighter, non-blocking banner/modal.
+   ══════════════════════════════════════════════════════════════════════════ */
+.heir-majority-notice {
+  position: fixed;
+  left: 50%;
+  bottom: 5.5rem;
+  transform: translateX(-50%);
+  z-index: 3800;
+  max-width: min(460px, 94vw);
+}
+.heir-majority-notice[hidden] { display: none; }
+
+.heir-majority-notice-panel {
+  background: var(--dark-card);
+  border: 1px solid var(--gold);
+  border-left: 4px solid var(--gold);
+  border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+  padding: 1rem 1.2rem 1.1rem;
+}
+
+.heir-majority-notice-title {
+  font-family: 'Cinzel', serif;
+  color: var(--gold);
+  font-size: 1.1rem;
+  margin: 0 0 .35rem;
+  letter-spacing: .03em;
+}
+.heir-majority-notice-text {
+  color: var(--text-light);
+  font-family: 'Crimson Text', serif;
+  font-size: .92rem;
+  line-height: 1.45;
+  margin: 0 0 .8rem;
+  opacity: .92;
+}
+.heir-majority-notice-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.heir-majority-btn {
+  font-family: 'Cinzel', serif;
+  font-size: .82rem;
+  letter-spacing: .02em;
+  padding: .45rem 1.1rem;
+  border-radius: 6px;
+  border: 1px solid var(--gold);
+  background: var(--gold);
+  color: var(--midnight);
+  cursor: pointer;
+  transition: filter .15s ease, transform .15s ease;
+}
+.heir-majority-btn:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
