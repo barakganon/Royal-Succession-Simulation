@@ -2,7 +2,7 @@
 
 import logging
 
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, abort
 from flask_login import login_required, current_user
 
 from models.db_models import (
@@ -345,3 +345,82 @@ def negotiate_peace(dynasty_id, war_id):
         flash(message, "danger")
 
     return redirect(url_for('diplomacy.diplomacy_view', dynasty_id=dynasty_id))
+
+
+# ---------------------------------------------------------------------------
+# Cross-dynasty marriage (Story 7-3)
+# ---------------------------------------------------------------------------
+
+
+@diplomacy_bp.route('/game/<int:dynasty_id>/foreign_characters.json')
+@login_required
+def foreign_characters_json(dynasty_id):
+    """Return JSON list of foreign marriageable nobles for the given dynasty."""
+    from models.marriage_system import MarriageSystem
+
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.user_id != current_user.id:
+        abort(403)
+
+    marriage_system = MarriageSystem(db.session)
+    characters = marriage_system.list_foreign_marriageable(dynasty_id)
+    return jsonify({'characters': characters})
+
+
+@diplomacy_bp.route('/game/<int:dynasty_id>/eligible_children.json')
+@login_required
+def eligible_children_json(dynasty_id):
+    """Return JSON list of the dynasty's own eligible children for marriage."""
+    from models.marriage_system import MarriageSystem
+
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.user_id != current_user.id:
+        abort(403)
+
+    target_gender = request.args.get('target_gender', 'MALE')
+    marriage_system = MarriageSystem(db.session)
+    children = marriage_system.eligible_children(dynasty_id, target_gender)
+    return jsonify({'children': children})
+
+
+@diplomacy_bp.route('/game/<int:dynasty_id>/propose_marriage', methods=['POST'])
+@login_required
+def propose_marriage(dynasty_id):
+    """Propose a cross-dynasty marriage between an own child and a foreign noble."""
+    from models.marriage_system import MarriageSystem
+
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.user_id != current_user.id:
+        abort(403)
+
+    data = request.form if request.form else (request.get_json(silent=True) or {})
+    proposer_person_id = data.get('proposer_person_id')
+    target_person_id = data.get('target_person_id')
+
+    try:
+        proposer_person_id = int(proposer_person_id)
+        target_person_id = int(target_person_id)
+    except (TypeError, ValueError):
+        return jsonify({
+            'ok': False,
+            'accepted': False,
+            'message': 'Invalid proposer or target person id.',
+            'offer_id': None,
+        })
+
+    marriage_system = MarriageSystem(db.session)
+    try:
+        result = marriage_system.propose_marriage(
+            proposer_person_id, target_person_id, dynasty.current_simulation_year
+        )
+    except Exception:
+        db.session.rollback()
+        logger.exception("Error proposing marriage for dynasty %s", dynasty_id)
+        return jsonify({
+            'ok': False,
+            'accepted': False,
+            'message': 'An error occurred while proposing the marriage.',
+            'offer_id': None,
+        })
+
+    return jsonify(result)
