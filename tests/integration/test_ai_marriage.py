@@ -250,16 +250,14 @@ class TestNonAITargetUngated:
 
 class TestWeddingChronicleText:
     def test_prompt_contains_both_names_and_a_trait(self, app, db, session):
-        """build_wedding_chronicle_prompt(['Brave'], ['Pious'], ...) contains both spouse names and at least one trait."""
+        """build_wedding_chronicle_prompt(name, traits, name, traits, house, house, year) contains both spouse names and at least one trait."""
         from utils.llm_prompts import build_wedding_chronicle_prompt
 
+        # Signature: (spouse1_name, spouse1_traits, spouse2_name, spouse2_traits, house1, house2, year)
         result = build_wedding_chronicle_prompt(
-            ['Brave'], ['Pious'],
-            spouse1_name='Aldric',
-            spouse2_name='Mirelle',
-            house1='Alpha',
-            house2='Beta',
-            year=1230,
+            'Aldric', ['Brave'],
+            'Mirelle', ['Pious'],
+            'Alpha', 'Beta', 1230,
         )
         assert isinstance(result, str) and result
         assert 'Aldric' in result

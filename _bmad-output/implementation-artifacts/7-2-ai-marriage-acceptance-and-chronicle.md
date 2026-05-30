@@ -1,6 +1,6 @@
 # Story 7-2: AI Marriage Acceptance + Wedding Chronicle
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -70,10 +70,24 @@ When a cross-dynasty match (Story 7-1) targets an AI-controlled house, that hous
 
 ### Agent Model Used
 
-(to be filled by dev/integration)
-
-### Debug Log References
+claude-opus-4-8[1m] — 3 worktree sub-agents via the Workflow tool (run `wf_35ef6337-703`), + main-session integrator.
 
 ### Completion Notes List
 
+- All ACs satisfied. `pytest -p no:randomly`: **414 passed** + 1 known heir-majority isolation flake (passes in isolation). A `wt/7-2-ai` (`5b35687`): `decide_marriage_response` (reject if `relation_score < -20`, else accept; optional LLM) + `build_wedding_chronicle_prompt`/`generate_wedding_fallback` (+ `build_marriage_decision_prompt`). B `wt/7-2-wire` (`a29ac4f`): AI-target gate + relation +30 + wedding chronicle in the cross-dynasty match (lazy imports). C `wt/7-2-tests` (`6e2d5d7`): 7 tests. Clean merges, zero file overlap.
+- **Integrator fixes — two signature drifts** (recurring pattern; flagged for future specs): B called `build_wedding_chronicle_prompt` with args in the wrong order vs A's `(spouse1_name, spouse1_traits, spouse2_name, spouse2_traits, house1, house2, year)`; and C's unit test mixed traits-first positionals with name keywords. Both corrected to A's signature.
+- AI-target matches gated by `decide_marriage_response`; accepted unions bump relations +30 + write a wedding chronicle; non-AI (player) targets accept without a gate (7-1 preserved).
+
 ### File List
+
+- `models/ai_controller.py` — MODIFIED (`decide_marriage_response`)
+- `utils/llm_prompts.py` — MODIFIED (wedding + marriage-decision prompts + fallback)
+- `models/turn_processor.py` — MODIFIED (AI gate + relations +30 + wedding chronicle; integrator arg-order fix)
+- `tests/integration/test_ai_marriage.py` — NEW (7 tests; integrator signature fix)
+- `_bmad-output/implementation-artifacts/{7-2-...md, sprint-status.yaml}`, `STATUS.md` — MODIFIED
+
+### Change Log
+
+| Date | Change |
+|---|---|
+| 2026-05-30 | spec(7-2); 3 worktree agents via Workflow; merged; 2 integrator signature fixes; 414 passed; Story 7-2 → done |

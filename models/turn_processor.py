@@ -540,12 +540,12 @@ def process_marriage_check(dynasty: DynastyDB, person: PersonDB, current_year: i
                             model = genai.GenerativeModel("gemini-1.5-flash")
                             prompt = build_wedding_chronicle_prompt(
                                 person.name,
+                                person.get_traits(),
                                 partner.name,
+                                partner.get_traits(),
                                 person_house_name,
                                 partner_house_name,
                                 current_year,
-                                person.get_traits(),
-                                partner.get_traits(),
                             )
                             response = model.generate_content(
                                 prompt,
