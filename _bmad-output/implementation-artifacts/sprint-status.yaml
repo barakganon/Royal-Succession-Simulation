@@ -234,7 +234,7 @@ development_status:
 
   # ── EPIC 8: Family Tree Replacement (Sprint 8) ─────────────────────────────
   # Goal: Replace matplotlib PNG with interactive dark-themed SVG family tree.
-  epic-8: in-progress
+  epic-8: done
 
   # Story 8-1: family_tree_svg.py renderer + DynastyDB column
   # visualization/family_tree_svg.py with Reingold-Tilford layout; BFS generation
@@ -253,7 +253,7 @@ development_status:
   # Delete visualization/plotter.py; delete visualizations/family_tree_*.png (all
   # 99 files); add visualizations/*.png to .gitignore; update view_dynasty.html to
   # render dynasty.family_tree_svg inline with `| safe`.
-  8-3-delete-matplotlib-and-integrate: ready-for-dev
+  8-3-delete-matplotlib-and-integrate: done
 
   epic-8-retrospective: optional
 

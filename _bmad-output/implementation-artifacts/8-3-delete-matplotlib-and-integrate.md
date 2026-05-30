@@ -1,6 +1,6 @@
 # Story 8-3: Retire the Matplotlib Family-Tree Plotter + Integrate the SVG
 
-Status: ready-for-dev (scope decision flagged — see Scope Decision below)
+Status: done (conservative scope — see Scope Decision below; full matplotlib removal deferred)
 
 ## Scope Decision (needs confirmation — plan vs. codebase conflict)
 
@@ -69,9 +69,11 @@ Replace the legacy matplotlib/NetworkX family-tree **PNG** pipeline with the det
 
 ## Dev Agent Record
 ### Agent Model Used
-_pending_
+claude-opus-4-8[1m] — 3 worktree sub-agents via the Workflow tool (run wf_5b143375-f44) + main-session integrator.
 ### Completion Notes List
-- _pending_
+- All ACs satisfied at the CONSERVATIVE scope. Full suite **455 passed** (452 baseline + 3 new), 0 failed — the simulation-core rewiring (`simulation_engine.py` + `turn_processor.py`) and plotter deletion caused no regressions. `visualization/plotter.py` + the one tracked PNG deleted (commit 690e6c1); no `visualize_family_tree_snapshot`/`visualization.plotter` references remain in any `*.py`. Clean worktree isolation, no drift.
+- **Run-the-app visual check:** live `/dynasty/1/view` → 200, renders the inline `family-tree-inline` SVG (real 7-person tree), `family_tree_image`/`/static/visualizations/` PNG `<img>` gone (0 occurrences), Story 8-2 "View Family Tree" link retained.
+- **matplotlib/networkx KEPT in requirements.txt** — five other renderers (diplomacy/military/time/economy/map) still import them; full uninstall is a separate migration (see Scope Decision). turn_processor's `generate_family_tree_visualization` now populates `DynastyDB.family_tree_svg` via the SVG renderer; the standalone-sim PNG calls were removed. **Epic 8 complete.**
 ### File List
 - DELETE `visualization/plotter.py`; MOD `visualization/__init__.py`, `simulation_engine.py`, `models/turn_processor.py`, `blueprints/dynasty.py`, `templates/view_dynasty.html`, `themes/view_dynasty.html`; tests; `git rm` the one tracked PNG.
 ### Change Log
