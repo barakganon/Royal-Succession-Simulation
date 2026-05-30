@@ -1,12 +1,12 @@
 # Royal Succession Simulation - Development Status
 Last updated: 2026-05-30
-Last commit: Merge feature/free-action-endpoint — free_action endpoint + dispatcher (Story 4-1)
+Last commit: Story 4-2 — free-action LLM flavor + right-click menu + reversible undo (Epic 4 complete)
 
 ---
 
 ## Current State
-**Tests:** 327 passed · 0 skipped · 0 failed
-**Epic 4 (Free Actions Split) — in progress.** Story 4-1 done: `POST /dynasty/<id>/free_action` dispatcher (9 instant actions — declare_war/propose_treaty/send_envoy/issue_ultimatum delegate to DiplomacySystem; name_heir/adopt_succession_law/hold_feast/hold_tournament/pardon_vassal new) that appends a chronicle line and does NOT tick the turn; +2 DynastyDB columns (designated_heir_id, succession_law). Built via 3 worktree agents. Next: Story 4-2 (LLM flavor + right-click menu integration + undo).
+**Tests:** 334 passed · 0 skipped · 0 failed
+**Epic 4 (Free Actions Split) — complete.** 4-1: `POST /free_action` dispatcher (9 instant actions; diplomacy delegates to DiplomacySystem; +2 DynastyDB columns) that doesn't tick the turn. 4-2: each free action gets an LLM-narrated chronicle line (deterministic fallback); right-click menu now has a separated "Decisions" section (free_action_catalogue.json) alongside Projects; reversible actions (feast/tournament/pardon/name_heir/succession_law) can be undone before End Turn via a server session stack + `/free_action/undo` (war/treaty non-undoable). Verified live (menu screenshot + undo round-trip). Built via 3 worktree agents each. Next epic: Epic 5 (Generational Interrupts + Succession Drama).
 **Story 3-5 (Animated turn pass + routing + delete action_phase):** done — branch `feature/animated-turn-routing-cleanup` (3 worktree agents: backend / frontend / tests). **Epic 3 (Map as Main View) complete** — stories 3-1…3-5 all done. End Turn now plays event toasts on the map then routes to the turn report; login lands on the map; `action_phase` route deleted (404).
 
 **Correct-course fix (`fix/world-map-empty-render`):** running the app revealed the world map rendered **empty on real data** (every Epic 3 story had deferred visual verification). Root cause: `map_renderer` emits raw pixel coords as `col/row` but the canvas treated them as hex-grid indices (×48 off-screen). Fixed `hexCenter` + added `fitToView`; also wired a starting-map bootstrap into `create_dynasty` (gated on non-TESTING). Map now renders & fits-to-view; verified visually via headless Chrome. Logged follow-ups in `deferred-work.md`: **`pytest` wipes the dev DB** (conftest binds `:memory:` too late), borders need a tessellated layout, legacy AP panel still shown. Next epic: Epic 4 (Free actions split).
