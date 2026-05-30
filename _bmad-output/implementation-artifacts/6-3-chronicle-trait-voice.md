@@ -1,6 +1,6 @@
 # Story 6-3: Chronicle Trait-Voice + Trait Tooltips + Player Docs
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -65,10 +65,28 @@ As a player, I want the chronicle's narrative voice to reflect the reigning mona
 
 ### Agent Model Used
 
-(to be filled by dev/integration)
-
-### Debug Log References
+claude-opus-4-8[1m] — 3 worktree sub-agents via the Workflow tool (run `wf_d4b2c14e-9e9`), + main-session integrator.
 
 ### Completion Notes List
 
+- All ACs satisfied. `pytest -p no:randomly`: **402 tests** — 401 pass + 1 pre-existing shared-state ordering flake (`test_heir_turning_majority_age_triggers_interrupt_once`, which passes 12/12 in its file and 3/3 alone). Not a 6-3 regression.
+- A `wt/6-3-prompt` (`5774999`): `monarch_traits=None` param on `build_chronicle_prompt` + `build_turn_story_prompt` (voice clause when truthy, byte-identical when None); call-site passes living-monarch `get_traits()`. B `wt/6-3-ui-docs` (`de88df5`): monarch rail tooltip `title`/`aria-label` includes traits; NEW `docs/traits.md` (all 8 traits + effects + building gates + inheritance). C `wt/6-3-tests` (`995b603`): 5 unit + 2 integration.
+- **Integrator cleanup:** Agent B's Edit again leaked into the main working tree (uncommitted `world_map.html` + untracked `docs/traits.md`), which made the `wt/6-3-ui-docs` merge fail on a dirty tree. Discarded the leaked copies and merged the branch cleanly (its commit had the same content).
+- Tooltip is a `title`/`aria-label` attribute (server-rendered Jinja from `current_monarch.traits`) → covered by the integration substring test; no heavy visual check needed.
+- **Epic 6 (Traits & Buildings Matter) complete** (6-1…6-3).
+- **Flagged tech-debt:** the shared-temp-DB test-isolation flake now intermittently fails the full-suite gate across several files — worth a dedicated Sprint-11 test-isolation fix (logged).
+
 ### File List
+
+- `utils/llm_prompts.py` — MODIFIED (monarch_traits voice param)
+- `models/turn_processor.py` — MODIFIED (pass monarch traits to the chronicle prompt)
+- `templates/world_map.html` — MODIFIED (monarch trait tooltip)
+- `docs/traits.md` — NEW (player-facing trait guide)
+- `tests/unit/test_chronicle_trait_voice.py`, `tests/integration/test_trait_docs_and_tooltip.py` — NEW (7 tests)
+- `_bmad-output/implementation-artifacts/{6-3-...md, sprint-status.yaml}`, `STATUS.md` — MODIFIED
+
+### Change Log
+
+| Date | Change |
+|---|---|
+| 2026-05-30 | spec(6-3); 3 worktree agents via Workflow; cleaned a leaked-edit merge; 401 pass + 1 isolation flake; Story 6-3 → done; Epic 6 complete |
