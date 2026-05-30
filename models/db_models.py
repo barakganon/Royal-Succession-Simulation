@@ -1162,4 +1162,54 @@ class Loan(db.Model):
         )
 
 
-logger.debug("models.db_models defined (User, DynastyDB, PersonDB, HistoryLogEntryDB, Region, Province, Territory, Settlement, Resource, TerritoryResource, Building, TradeRoute, MilitaryUnit, Army, DiplomaticRelation, Treaty, War, Battle, Siege, ChronicleEntryDB, Loan).")
+class MarriageOfferDB(db.Model):
+    """A marriage proposal sent from one dynasty to another (Story 7-1).
+
+    Records a pending/accepted/rejected offer of royal marriage between two
+    dynasties, optionally naming the specific persons proposed for the union.
+    Foreign keys are one-way (no reverse collections needed). The two FKs to
+    `dynasty` require explicit foreign_keys when relationships are declared;
+    the person_db FKs use use_alter=True to keep the circular
+    DynastyDB<->PersonDB FK cycle resolvable.
+    """
+    __tablename__ = 'marriage_offer'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    proposer_dynasty_id = db.Column(
+        db.Integer, db.ForeignKey('dynasty.id'), nullable=False, index=True
+    )
+    target_dynasty_id = db.Column(
+        db.Integer, db.ForeignKey('dynasty.id'), nullable=False, index=True
+    )
+
+    proposer_person_id = db.Column(
+        db.Integer,
+        db.ForeignKey('person_db.id', use_alter=True, name='fk_marriageoffer_proposer_person'),
+        nullable=True,
+    )
+    target_person_id = db.Column(
+        db.Integer,
+        db.ForeignKey('person_db.id', use_alter=True, name='fk_marriageoffer_target_person'),
+        nullable=True,
+    )
+
+    status = db.Column(db.String(20), default='pending')
+    created_year = db.Column(db.Integer, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
+    # One-way relationships (no reverse collections); explicit foreign_keys
+    # because there are two FKs to dynasty and two to person_db.
+    proposer_dynasty = db.relationship('DynastyDB', foreign_keys=[proposer_dynasty_id])
+    target_dynasty = db.relationship('DynastyDB', foreign_keys=[target_dynasty_id])
+    proposer_person = db.relationship('PersonDB', foreign_keys=[proposer_person_id])
+    target_person = db.relationship('PersonDB', foreign_keys=[target_person_id])
+
+    def __repr__(self):
+        return (
+            f"<MarriageOfferDB id={self.id} proposer={self.proposer_dynasty_id} "
+            f"target={self.target_dynasty_id} status={self.status}>"
+        )
+
+
+logger.debug("models.db_models defined (User, DynastyDB, PersonDB, HistoryLogEntryDB, Region, Province, Territory, Settlement, Resource, TerritoryResource, Building, TradeRoute, MilitaryUnit, Army, DiplomaticRelation, Treaty, War, Battle, Siege, ChronicleEntryDB, Loan, MarriageOfferDB).")
