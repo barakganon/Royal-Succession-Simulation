@@ -25,6 +25,7 @@ from models.project_system import (
 )
 from models.turn_processor import (
     process_dynasty_turn, get_succession_candidates, crown_heir,
+    CIVIL_WAR_THRESHOLD,
 )
 from utils.theme_manager import get_all_theme_names, generate_theme_from_story_llm, get_theme
 from utils.llm_prompts import (
@@ -1299,3 +1300,118 @@ def succession_choice(dynasty_id):
         return jsonify({"ok": False, "message": "Failed to crown the heir."}), 500
 
     return jsonify({"ok": True, "message": f"{heir.name} {heir.surname} has been crowned."})
+
+
+def _find_pending_civil_war(dynasty_id: int):
+    """Return the strongest living pretender at/above the civil-war threshold.
+
+    Returns None when no civil war is pending for the dynasty.
+    """
+    pretenders = PersonDB.query.filter(
+        PersonDB.dynasty_id == dynasty_id,
+        PersonDB.is_pretender == True,
+        PersonDB.death_year.is_(None),
+        PersonDB.pretender_strength >= CIVIL_WAR_THRESHOLD,
+    ).all()
+    if not pretenders:
+        return None
+    return max(pretenders, key=lambda p: p.pretender_strength or 0)
+
+
+@dynasty_bp.route('/dynasty/<int:dynasty_id>/civil_war_resolve', methods=['POST'])
+@login_required
+@block_if_turn_processing
+def civil_war_resolve(dynasty_id):
+    """Resolve a pending civil war by fighting, negotiating, or abdicating."""
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        return jsonify({"error": "Not authorized."}), 403
+
+    pretender = _find_pending_civil_war(dynasty_id)
+    if pretender is None:
+        return jsonify({"ok": False, "message": "No civil war to resolve."}), 400
+
+    raw_choice = None
+    if request.is_json:
+        raw_choice = (request.get_json(silent=True) or {}).get('choice')
+    if raw_choice is None:
+        raw_choice = request.form.get('choice')
+    choice = (raw_choice or '').strip().lower()
+
+    if choice not in ('fight', 'negotiate', 'abdicate'):
+        return jsonify({"ok": False, "message": "Invalid choice."}), 400
+
+    theme_config = _load_theme_config(dynasty)
+    pretender_name = f"{pretender.name} {pretender.surname or ''}".strip()
+    year = dynasty.current_simulation_year
+
+    try:
+        if choice == 'fight':
+            if (dynasty.prestige or 0) >= (pretender.pretender_strength or 0):
+                # Loyalists win: the pretender is defeated and exiled.
+                pretender.is_pretender = False
+                pretender.pretender_strength = 0
+                pretender.is_noble = False
+                event_string = (
+                    f"The loyalists of House {dynasty.name} crushed the rebellion; "
+                    f"{pretender_name} was defeated and driven into exile."
+                )
+                message = f"The rebellion was crushed. {pretender_name} has been exiled."
+            else:
+                # Pretender wins: they seize the crown.
+                crown_heir(dynasty, pretender, year, theme_config)
+                pretender.is_pretender = False
+                event_string = (
+                    f"The rebellion of {pretender_name} triumphed; "
+                    f"they seized the crown of House {dynasty.name} by force."
+                )
+                message = f"{pretender_name} won the war and seized the crown."
+            db.session.add(HistoryLogEntryDB(
+                dynasty_id=dynasty_id,
+                year=year,
+                event_string=event_string,
+                event_type='civil_war',
+                person1_sim_id=pretender.id,
+            ))
+
+        elif choice == 'negotiate':
+            payment = min(dynasty.current_wealth or 0, 100)
+            dynasty.current_wealth = (dynasty.current_wealth or 0) - payment
+            pretender.is_pretender = False
+            pretender.pretender_strength = 0
+            event_string = (
+                f"A settlement of {payment} gold bought the loyalty of {pretender_name}, "
+                f"ending their claim against House {dynasty.name}."
+            )
+            db.session.add(HistoryLogEntryDB(
+                dynasty_id=dynasty_id,
+                year=year,
+                event_string=event_string,
+                event_type='civil_war',
+                person1_sim_id=pretender.id,
+            ))
+            message = f"You paid {payment} gold to end the claim of {pretender_name}."
+
+        else:  # abdicate
+            crown_heir(dynasty, pretender, year, theme_config)
+            pretender.is_pretender = False
+            event_string = (
+                f"The reigning monarch abdicated, peacefully ceding the crown of "
+                f"House {dynasty.name} to {pretender_name} and ending the strife."
+            )
+            db.session.add(HistoryLogEntryDB(
+                dynasty_id=dynasty_id,
+                year=year,
+                event_string=event_string,
+                event_type='civil_war',
+                person1_sim_id=pretender.id,
+            ))
+            message = f"You abdicated. {pretender_name} now wears the crown."
+
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error resolving civil war for dynasty {dynasty_id}: {e}", exc_info=True)
+        return jsonify({"ok": False, "message": "Failed to resolve the civil war."}), 500
+
+    return jsonify({"ok": True, "message": message})

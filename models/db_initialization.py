@@ -172,6 +172,12 @@ class DatabaseInitializer:
                             conn.execute(text("ALTER TABLE person_db ADD COLUMN pretender_strength INTEGER DEFAULT 0"))
                             conn.commit()
                         self.logger.info("Added pretender_strength column to person_db table.")
+                    # Heir-majority interrupt column (Story 5-4)
+                    if 'has_seen_majority' not in person_cols:
+                        with db.engine.connect() as conn:
+                            conn.execute(text("ALTER TABLE person_db ADD COLUMN has_seen_majority BOOLEAN DEFAULT 0"))
+                            conn.commit()
+                        self.logger.info("Added has_seen_majority column to person_db table.")
                 # Create loan table if missing (Banking system)
                 if 'loan' not in inspector.get_table_names():
                     from models.db_models import Loan
