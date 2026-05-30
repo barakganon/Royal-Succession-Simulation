@@ -39,7 +39,7 @@
 # - Each story should have a corresponding file: {story_key}.md in story_location
 
 generated: 2026-05-02
-last_updated: 2026-05-30  # updated: Epic 7 started — Story 7-1 created (ready-for-dev)
+last_updated: 2026-05-30  # updated: Story 7-1 done (cross-dynasty marriage matching)
 project: Royal-Succession-Simulation
 project_key: RSS
 tracking_system: file-system
@@ -217,7 +217,7 @@ development_status:
   # Add MarriageOffer model or marriage_negotiation project type; replace
   # stranger-generation in process_marriage_check with cross-dynasty search first,
   # stranger fallback only if no candidates.
-  7-1-cross-dynasty-marriage-model: ready-for-dev
+  7-1-cross-dynasty-marriage-model: done
 
   # Story 7-2: AI acceptance + wedding chronicle
   # AIController.decide_marriage_response (prestige, relations, religion, traits);

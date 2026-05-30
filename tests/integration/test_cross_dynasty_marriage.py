@@ -10,7 +10,7 @@
 #     spouse_sim_id to each other, both keep their own dynasty, writes a marriage
 #     HistoryLogEntryDB, and creates NO new stranger PersonDB. Otherwise it falls
 #     back to creating a new stranger spouse PersonDB in the same dynasty.
-#   - _find_cross_dynasty_spouse(person, current_year) returns an eligible
+#   - _find_cross_dynasty_spouse(session, person, current_year, min_age, max_age) returns an eligible
 #     opposite-gender, alive, noble, unmarried person in a DIFFERENT dynasty of
 #     marriageable age, else None.
 #   - MarriageOfferDB(__tablename__='marriage_offer'): id, proposer_dynasty_id,
@@ -188,7 +188,7 @@ class TestFindCrossDynastySpouse:
 
         with app.app_context():
             seeker = db.session.get(PersonDB, seeker_id)
-            match = tp._find_cross_dynasty_spouse(seeker, 1230)
+            match = tp._find_cross_dynasty_spouse(db.session, seeker, 1230, 16, 55)
             assert match is None
 
     def test_returns_eligible_cross_dynasty_person(self, app, db, session):
@@ -202,7 +202,7 @@ class TestFindCrossDynastySpouse:
 
         with app.app_context():
             seeker = db.session.get(PersonDB, seeker_id)
-            match = tp._find_cross_dynasty_spouse(seeker, 1230)
+            match = tp._find_cross_dynasty_spouse(db.session, seeker, 1230, 16, 55)
             assert match is not None
             assert match.id == eligible_id
             assert match.dynasty_id == did_b

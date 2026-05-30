@@ -1,6 +1,6 @@
 # Story 7-1: Cross-Dynasty Marriage Matching + MarriageOffer Model
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -66,10 +66,24 @@ As the world fills with rival houses, I want marriages to first seek a real part
 
 ### Agent Model Used
 
-(to be filled by dev/integration)
-
-### Debug Log References
+claude-opus-4-8[1m] — 3 worktree sub-agents via the Workflow tool (run `wf_6795422d-8bd`), + main-session integrator.
 
 ### Completion Notes List
 
+- All ACs satisfied. `pytest -p no:randomly`: **408 passed, 0 failed** (402 baseline + 6). A `wt/7-1-match` (`ef6d1e5`): `_find_cross_dynasty_spouse` + cross-dynasty branch in `process_marriage_check` (links two existing singles, both keep their dynasty, marriage history entry; stranger fallback when none). B `wt/7-1-model` (`756b70c`): `MarriageOfferDB` (`marriage_offer`) + idempotent migration. C `wt/7-1-tests` (`6e753de`): 6 tests. Clean merges, zero file overlap.
+- **Integrator fix:** C's two `TestFindCrossDynastySpouse` tests called the helper as `(person, current_year)`, but the frozen contract (and A) use `(session, person, current_year, min_age, max_age)` — corrected C's calls to the full signature (seeker MALE → max age 55).
+- Single-dynasty setups have no cross-dynasty candidate → stranger fallback → existing marriage behavior preserved.
+
 ### File List
+
+- `models/turn_processor.py` — MODIFIED (`_find_cross_dynasty_spouse` + cross-dynasty matching)
+- `models/db_models.py` — MODIFIED (`MarriageOfferDB`)
+- `models/db_initialization.py` — MODIFIED (marriage_offer migration)
+- `tests/integration/test_cross_dynasty_marriage.py` — NEW (6 tests; integrator signature fix)
+- `_bmad-output/implementation-artifacts/{7-1-...md, sprint-status.yaml}`, `STATUS.md` — MODIFIED
+
+### Change Log
+
+| Date | Change |
+|---|---|
+| 2026-05-30 | spec(7-1); 3 worktree agents via Workflow; merged; integrator signature fix; 408 passed; Story 7-1 → done |
