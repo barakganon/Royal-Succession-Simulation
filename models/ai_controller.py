@@ -25,7 +25,7 @@ from models.db_models import (
     DiplomaticRelation, War, BuildingType,
 )
 from utils.logging_config import setup_logger
-from utils.llm_prompts import build_ai_decision_prompt
+from utils.llm_prompts import build_ai_decision_prompt, build_marriage_decision_prompt
 
 logger = setup_logger('royal_succession.ai_controller')
 
@@ -221,6 +221,89 @@ class AIController:
             f"(person={result['person_id']}) — rule-based fallback"
         )
         return result
+
+    def decide_marriage_response(self, context: dict) -> bool:
+        """Decide whether this dynasty accepts a marriage proposal.
+
+        An LLM may be consulted when available, but the decision always falls
+        back cleanly to deterministic rule-based logic and never raises.
+
+        Rule-based baseline:
+        - Reject outright if the proposer is hostile
+          (``context['relation_score'] < -20``).
+        - Otherwise accept. Acceptance is especially favoured when relations
+          are warm or the proposer outranks us in prestige
+          (``proposer_prestige >= own_prestige``).
+
+        Args:
+            context: Dict describing the proposal. Recognised keys:
+                ``proposer_dynasty_id`` (int),
+                ``relation_score`` (int, default 0),
+                ``proposer_prestige`` (number, default 0),
+                ``own_prestige`` (number, default 0).
+                Optional ``piety`` / ``traits`` are accepted but not required.
+
+        Returns:
+            ``True`` to accept the proposal, ``False`` to reject it.
+        """
+        dynasty_name = self._get_dynasty_name()
+
+        relation_score = context.get('relation_score', 0) or 0
+        proposer_prestige = context.get('proposer_prestige', 0) or 0
+        own_prestige = context.get('own_prestige', 0) or 0
+        proposer_id = context.get('proposer_dynasty_id')
+
+        # Try the LLM path first; it must never raise and must fall back cleanly.
+        llm_decision = self._llm_decide_marriage(context)
+        if llm_decision is not None:
+            logger.info(
+                f"{dynasty_name} [marriage]: "
+                f"{'accept' if llm_decision else 'reject'} proposal from "
+                f"dynasty {proposer_id} — LLM decision"
+            )
+            return llm_decision
+
+        # Rule-based fallback.
+        if relation_score < -20:
+            decision = False
+        else:
+            # Otherwise accept. Warm relations or a higher-prestige suitor make
+            # acceptance still more certain, but the baseline is to accept.
+            decision = True
+
+        logger.info(
+            f"{dynasty_name} [marriage]: "
+            f"{'accept' if decision else 'reject'} proposal from "
+            f"dynasty {proposer_id} (relation={relation_score}, "
+            f"proposer_prestige={proposer_prestige}, own_prestige={own_prestige}) "
+            f"— rule-based fallback"
+        )
+        return decision
+
+    def _llm_decide_marriage(self, context: dict) -> Optional[bool]:
+        """Optionally consult the LLM for a marriage accept/reject decision.
+
+        Returns ``True``/``False`` when the LLM responds clearly, or ``None``
+        when the LLM is unavailable or its reply cannot be parsed. Never raises.
+        """
+        try:
+            prompt = build_marriage_decision_prompt(
+                personality=self.personality,
+                dynasty_name=self._get_dynasty_name(),
+                relation_score=context.get('relation_score', 0) or 0,
+                proposer_prestige=context.get('proposer_prestige', 0) or 0,
+                own_prestige=context.get('own_prestige', 0) or 0,
+            )
+            raw = self._call_llm(prompt)
+            if raw is None:
+                return None
+            decision_match = re.search(r'DECISION\s*:\s*(accept|reject)', raw, re.IGNORECASE)
+            if not decision_match:
+                return None
+            return decision_match.group(1).strip().lower() == 'accept'
+        except Exception as exc:
+            logger.warning(f"AIController._llm_decide_marriage failed: {exc}")
+            return None
 
     # ------------------------------------------------------------------
     # State builder

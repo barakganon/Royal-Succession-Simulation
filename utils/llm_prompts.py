@@ -275,6 +275,66 @@ def generate_multigen_project_completion_fallback(project_type: str, initiator_n
 
 
 # --------------------------------------------------------------------------- #
+# Story 7-2: AI marriage decision + wedding chronicle
+# --------------------------------------------------------------------------- #
+
+def build_marriage_decision_prompt(personality: str, dynasty_name: str,
+                                   relation_score: int, proposer_prestige: float,
+                                   own_prestige: float) -> str:
+    """Prompt asking the AI dynasty to accept or reject a marriage proposal.
+
+    Story 7-2. max_tokens<=100. The model must answer with a single line:
+    ``DECISION: accept`` or ``DECISION: reject``. Fallback (when the LLM is
+    unavailable or unparseable): the rule baseline in
+    :meth:`AIController.decide_marriage_response`.
+    """
+    return (
+        f"You rule House {dynasty_name}. Personality: {personality} "
+        f"A rival house proposes a marriage alliance. "
+        f"Your relations with them score {relation_score} "
+        f"(below -20 is hostile). Their prestige is {proposer_prestige}; "
+        f"yours is {own_prestige}. A wealthier, higher-prestige suitor or a "
+        f"friendly neighbour is worth accepting; a hated rival is not. "
+        f"Answer with exactly one line: 'DECISION: accept' or 'DECISION: reject'."
+    )
+
+
+def build_wedding_chronicle_prompt(spouse1_name: str, spouse1_traits,
+                                   spouse2_name: str, spouse2_traits,
+                                   house1: str, house2: str, year: int) -> str:
+    """Prompt for a medieval wedding announcement chronicle line.
+
+    Story 7-2. max_tokens<=150. Style: medieval chronicler, third-person,
+    2-3 sentences. Names both spouses and both houses, references their traits.
+    Fallback: generate_wedding_fallback().
+    """
+    traits1 = _format_traits(spouse1_traits)
+    traits2 = _format_traits(spouse2_traits)
+    return (
+        f"You are a medieval chronicler recording a royal wedding in the year {year}. "
+        f"{spouse1_name} of House {house1} (known for being {traits1}) "
+        f"weds {spouse2_name} of House {house2} (known for being {traits2}), "
+        f"binding the two houses in alliance. "
+        f"Write exactly 2-3 sentences in the style of a medieval chronicle — formal, "
+        f"dramatic, third-person. Name both spouses and both houses, and allude to "
+        f"their natures. Do not use modern language or lists."
+    )
+
+
+def generate_wedding_fallback(spouse1_name: str, spouse2_name: str,
+                              house1: str, house2: str, year: int) -> str:
+    """Deterministic, non-empty fallback for the wedding chronicle (Story 7-2).
+
+    Always names both spouses, both houses, and the year.
+    """
+    return (
+        f"In the year {year}, {spouse1_name} of House {house1} was wed to "
+        f"{spouse2_name} of House {house2}, and the two houses were joined in "
+        f"solemn alliance."
+    )
+
+
+# --------------------------------------------------------------------------- #
 # Story 4-2: free-action chronicle flavor
 # --------------------------------------------------------------------------- #
 # Past-tense deed phrases describing each free action, used both to seed the
