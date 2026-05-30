@@ -316,6 +316,7 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
                         existing_story=existing_story,
                         years_advanced=years_advanced,
                         interrupt_reason=interrupt[0],
+                        monarch_traits=monarch_obj.get_traits() if monarch_obj else [],
                     )
                     response = model.generate_content(
                         prompt,
