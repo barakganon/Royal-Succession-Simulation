@@ -39,7 +39,7 @@
 # - Each story should have a corresponding file: {story_key}.md in story_location
 
 generated: 2026-05-02
-last_updated: 2026-05-30  # updated: Story 5-4 done — Epic 5 complete
+last_updated: 2026-05-30  # updated: Epic 6 started — Story 6-1 created (ready-for-dev)
 project: Royal-Succession-Simulation
 project_key: RSS
 tracking_system: file-system
@@ -188,13 +188,13 @@ development_status:
 
   # ── EPIC 6: Traits and Buildings Actually Matter (Sprint 6) ────────────────
   # Goal: Wire trait/building systems so they affect mechanical outcomes.
-  epic-6: backlog
+  epic-6: in-progress
 
   # Story 6-1: trait_effects.py + hook into subsystems
   # models/trait_effects.py with 8-trait modifier map (Brave, Craven, Cunning, Wroth,
   # Patient, Sickly, Pious, Greedy); hook into MilitarySystem.resolve_battle,
   # EconomySystem tax tick, DiplomacySystem acceptance.
-  6-1-trait-effects-system: backlog
+  6-1-trait-effects-system: ready-for-dev
 
   # Story 6-2: Building gates + lifespan + trait inheritance
   # Lock recruit-project starts behind building check (Stables → cavalry, Barracks →
