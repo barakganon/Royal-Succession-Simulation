@@ -266,6 +266,16 @@
   <!-- Story 3-5: animated turn-pass toast stack (event ticker overlay) -->
   <div id="turn-toast-stack" class="turn-toast-stack" aria-live="polite" aria-atomic="false"></div>
 
+  <!-- ══════════════ Story 5-1: SUCCESSION MODAL (hidden by default) ══════════════ -->
+  <div id="succession-modal" class="succession-modal" hidden
+       role="dialog" aria-modal="true" aria-labelledby="succession-modal-title">
+    <div class="succession-modal-panel">
+      <h2 id="succession-modal-title" class="succession-modal-title">The Crown Lies Empty</h2>
+      <p id="succession-modal-subtitle" class="succession-modal-subtitle"></p>
+      <div id="succession-candidate-list" class="succession-candidate-list"></div>
+    </div>
+  </div>
+
 </div><!-- /game-viewport -->
 {% endblock %}
 
@@ -355,6 +365,12 @@ function _playTurnEvents(events, fallbackText, onDone) {
 function endTurn(event) {
   if (event && event.preventDefault) event.preventDefault();
 
+  /* Story 5-1: block ending the turn while a succession is unresolved. */
+  if (typeof _successionPending !== 'undefined' && _successionPending) {
+    if (typeof openSuccessionModal === 'function') openSuccessionModal();
+    return;
+  }
+
   /* No-JS path already handled by the href; here we always have JS. */
   var btn = document.getElementById('end-turn-btn');
   if (!advanceTurnUrl) {
@@ -389,7 +405,22 @@ function endTurn(event) {
       var summary = data.summary || {};
       var years = summary.years_advanced;
       var fallbackText = (years !== undefined && years !== null ? years : 'A few') + ' quiet years passed';
+      /* Story 5-1: a monarch died this turn → prompt for succession instead of
+         the normal redirect. Play the event toasts first, then open the modal. */
+      var interrupted = summary.interrupt_reason === 'monarch_death';
       _playTurnEvents(summary.events, fallbackText, function () {
+        if (interrupted) {
+          /* Re-enable spinner state then surface the succession modal in place;
+             a reload happens after a crowning, not here. */
+          if (btn) {
+            btn.classList.remove('is-busy');
+            btn.removeAttribute('aria-busy');
+            if (originalHtml !== null) btn.innerHTML = originalHtml;
+          }
+          _turnInFlight = false;
+          openSuccessionModal();
+          return;
+        }
         window.location = data.redirect || (btn && btn.getAttribute('href')) || advanceTurnUrl;
       });
     })
@@ -399,6 +430,190 @@ function endTurn(event) {
     });
 }
 window.endTurn = endTurn;
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Story 5-1: Succession modal — fetch candidates, render cards, crown an heir.
+   Module-level so endTurn() and the page-load trigger can both reach it, and
+   so it can reuse the Story 3-5 _pushTurnToast helper for the success toast.
+   ══════════════════════════════════════════════════════════════════════════ */
+var successionDynastyId = {% if dynasty_id %}"{{ dynasty_id }}"{% else %}null{% endif %};
+var _successionPending = false;
+
+/* Reuse the 3-5 toast helper when present; otherwise no-op gracefully. */
+function _successionToast(text) {
+  if (typeof _pushTurnToast === 'function') {
+    _pushTurnToast(text, 'succession', '');
+  }
+}
+
+function _setEndTurnDisabled(disabled) {
+  var btn = document.getElementById('end-turn-btn');
+  if (!btn) return;
+  if (disabled) {
+    btn.classList.add('is-disabled');
+    btn.setAttribute('aria-disabled', 'true');
+  } else {
+    btn.classList.remove('is-disabled');
+    btn.removeAttribute('aria-disabled');
+  }
+}
+
+function _hideSuccessionModal() {
+  var modal = document.getElementById('succession-modal');
+  if (modal) {
+    modal.hidden = true;
+    modal.classList.remove('is-open');
+  }
+  _successionPending = false;
+  _setEndTurnDisabled(false);
+}
+
+function _renderSuccessionCandidate(c) {
+  var name = ((c.name || '') + ' ' + (c.surname || '')).trim() || 'Unnamed';
+  var card = document.createElement('div');
+  card.className = 'succession-candidate-card' + (c.is_default ? ' is-default' : '');
+
+  /* Portrait — server-generated SVG, injected verbatim. */
+  var portrait = document.createElement('div');
+  portrait.className = 'succession-candidate-portrait';
+  portrait.innerHTML = c.portrait_svg || '&#x1F451;';
+  card.appendChild(portrait);
+
+  var info = document.createElement('div');
+  info.className = 'succession-candidate-info';
+
+  if (c.is_default) {
+    var badge = document.createElement('span');
+    badge.className = 'succession-default-badge';
+    badge.textContent = 'Default heir';
+    info.appendChild(badge);
+  }
+
+  var nameEl = document.createElement('div');
+  nameEl.className = 'succession-candidate-name';
+  nameEl.textContent = name;
+  info.appendChild(nameEl);
+
+  var meta = document.createElement('div');
+  meta.className = 'succession-candidate-meta';
+  var metaBits = [];
+  if (c.age !== undefined && c.age !== null) metaBits.push('Age ' + c.age);
+  if (c.relation) metaBits.push(c.relation);
+  meta.textContent = metaBits.join(' · ');
+  info.appendChild(meta);
+
+  if (c.traits && c.traits.length) {
+    var traitsEl = document.createElement('div');
+    traitsEl.className = 'succession-candidate-traits';
+    c.traits.forEach(function (tr) {
+      var pill = document.createElement('span');
+      pill.className = 'succession-trait-pill';
+      pill.textContent = tr;
+      traitsEl.appendChild(pill);
+    });
+    info.appendChild(traitsEl);
+  }
+
+  var crownBtn = document.createElement('button');
+  crownBtn.type = 'button';
+  crownBtn.className = 'btn btn-warning succession-crown-btn';
+  crownBtn.textContent = 'Crown ' + name;
+  crownBtn.addEventListener('click', function () { _crownHeir(c.id, crownBtn); });
+  info.appendChild(crownBtn);
+
+  card.appendChild(info);
+  return card;
+}
+
+function _crownHeir(heirId, btn) {
+  if (!successionDynastyId) return;
+  if (btn) btn.disabled = true;
+  /* Disable every crown button while the request is in flight. */
+  var allBtns = document.querySelectorAll('#succession-candidate-list .succession-crown-btn');
+  allBtns.forEach(function (b) { b.disabled = true; });
+
+  fetch('/dynasty/' + successionDynastyId + '/succession_choice', {
+    method: 'POST',
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest',
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    },
+    credentials: 'same-origin',
+    body: JSON.stringify({ heir_id: heirId })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data && data.ok) {
+        _hideSuccessionModal();
+        _successionToast(data.message || 'A new monarch is crowned.');
+        window.location.reload();
+        return;
+      }
+      _successionToast((data && data.message) || 'That heir could not be crowned.');
+      allBtns.forEach(function (b) { b.disabled = false; });
+    })
+    .catch(function (err) {
+      console.error('succession_choice failed', err);
+      _successionToast('The coronation could not be completed.');
+      allBtns.forEach(function (b) { b.disabled = false; });
+    });
+}
+
+/* Fetch candidates; self-noops when pending:false so it is safe to call on
+   page load for a kingless realm and after a monarch_death turn alike. */
+function openSuccessionModal() {
+  if (!successionDynastyId) return;
+  fetch('/dynasty/' + successionDynastyId + '/succession_candidates.json', {
+    headers: { 'Accept': 'application/json' },
+    credentials: 'same-origin'
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data || !data.pending) return;   // self-noop
+      var modal = document.getElementById('succession-modal');
+      var subtitle = document.getElementById('succession-modal-subtitle');
+      var list = document.getElementById('succession-candidate-list');
+      if (!modal || !list) return;
+
+      var deceased = data.deceased || {};
+      var deceasedName = ((deceased.name || '') + ' ' + (deceased.surname || '')).trim();
+      if (subtitle) {
+        if (deceasedName) {
+          subtitle.textContent = deceasedName +
+            (deceased.death_year ? ' has died in ' + deceased.death_year + '.' : ' has died.') +
+            ' Choose who shall wear the crown.';
+        } else {
+          subtitle.textContent = 'The realm is without a monarch. Choose an heir.';
+        }
+      }
+
+      list.innerHTML = '';
+      var candidates = data.candidates || [];
+      if (candidates.length === 0) {
+        var empty = document.createElement('div');
+        empty.className = 'succession-empty';
+        empty.textContent = 'No eligible heirs remain. The dynasty teeters on the brink.';
+        list.appendChild(empty);
+      } else {
+        candidates.forEach(function (c) {
+          list.appendChild(_renderSuccessionCandidate(c));
+        });
+      }
+
+      modal.hidden = false;
+      modal.classList.add('is-open');
+      _successionPending = true;
+      _setEndTurnDisabled(true);
+    })
+    .catch(function (err) {
+      console.error('succession_candidates fetch failed', err);
+    });
+}
+window.openSuccessionModal = openSuccessionModal;
+
+/* Trigger (b): on page load, prompt once for a kingless realm. */
+document.addEventListener('DOMContentLoaded', function () { openSuccessionModal(); });
 
 /* ── Sprint 3 Story 3-3: server-side data seeds for detail panel ── */
 var activeProjectsArr = {{ active_projects | tojson }};
