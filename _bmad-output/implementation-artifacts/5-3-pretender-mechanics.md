@@ -1,6 +1,6 @@
 # Story 5-3: Pretender Mechanics
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -73,10 +73,25 @@ Builds on Story 5-1 (`succession_choice`, `_default_candidate_id`, `crown_heir`)
 
 ### Agent Model Used
 
-(to be filled by dev/integration)
-
-### Debug Log References
+claude-opus-4-8[1m] — 3 worktree sub-agents via the Workflow tool (run `wf_3bb61336-c69`), + main-session integrator.
 
 ### Completion Notes List
 
+- All ACs satisfied. `pytest -p no:randomly`: **352 passed, 0 failed** (347 baseline + 5). Contract-first: C's 5 tests failed in isolation (missing columns/constant), green on integration. Backend-only → no visual check.
+- A `wt/5-3-backend` (`b7f43cb`): `PersonDB.is_pretender`/`pretender_strength` + idempotent `person_db` migration; `PRETENDER_STRENGTH_PER_YEAR=5`; accumulation in the per-person yearly loop (living pretenders only; dead skip). B `wt/5-3-flagging` (`ef44aff`): `succession_choice` flags the bypassed default heir (`is_pretender=True`, `pretender_strength=10`) + a `pretender_claim` history entry when a non-default heir is crowned (`PRETENDER_START_STRENGTH=10`). C `wt/5-3-tests` (`e56d33e`): 5 tests. Clean merges, zero file overlap.
+- 5-1/5-2 preserved: crowning the default heir creates no pretender; candidate JSON unchanged.
+
 ### File List
+
+- `models/db_models.py` — MODIFIED (PersonDB +is_pretender/+pretender_strength)
+- `models/db_initialization.py` — MODIFIED (idempotent person_db migration)
+- `models/turn_processor.py` — MODIFIED (`PRETENDER_STRENGTH_PER_YEAR` + yearly accumulation)
+- `blueprints/dynasty.py` — MODIFIED (`succession_choice` bypassed-default flagging + `pretender_claim` log)
+- `tests/integration/test_pretender.py` — NEW (5 tests)
+- `_bmad-output/implementation-artifacts/{5-3-...md, sprint-status.yaml}`, `STATUS.md` — MODIFIED
+
+### Change Log
+
+| Date | Change |
+|---|---|
+| 2026-05-30 | spec(5-3); 3 worktree agents via Workflow; merged clean; 352 passed; Story 5-3 → done |

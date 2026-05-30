@@ -1,11 +1,11 @@
 # Royal Succession Simulation - Development Status
 Last updated: 2026-05-30
-Last commit: Story 5-2 — LLM succession candidate cards + coronation chronicle
+Last commit: Story 5-3 — pretender mechanics (schema + accumulation + non-default flagging)
 
 ---
 
 ## Current State
-**Tests:** 347 passed · 0 skipped · 0 failed
+**Tests:** 352 passed · 0 skipped · 0 failed
 **Epic 5 (Generational Interrupts + Succession Drama) — in progress.** 5-1: human monarch death halts the turn → succession modal to crown an heir (AI auto-crowns); End Turn blocked while kingless. 5-2: each candidate card now carries a 3-sentence LLM character sketch (deterministic trait-based fallback when LLM is off), and crowning writes a `coronation` chronicle line. Verified live (flavor on cards + coronation entry). Built via 3 worktree agents (5-2 orchestrated through the Workflow tool). Next: 5-3 (pretenders), 5-4 (civil war + heir-majority).
 **Epic 4 (Free Actions Split) — complete.** 4-1: `POST /free_action` dispatcher (9 instant actions; diplomacy delegates to DiplomacySystem; +2 DynastyDB columns) that doesn't tick the turn. 4-2: each free action gets an LLM-narrated chronicle line (deterministic fallback); right-click menu now has a separated "Decisions" section (free_action_catalogue.json) alongside Projects; reversible actions (feast/tournament/pardon/name_heir/succession_law) can be undone before End Turn via a server session stack + `/free_action/undo` (war/treaty non-undoable). Verified live (menu screenshot + undo round-trip). Built via 3 worktree agents each. Next epic: Epic 5 (Generational Interrupts + Succession Drama).
 **Story 3-5 (Animated turn pass + routing + delete action_phase):** done — branch `feature/animated-turn-routing-cleanup` (3 worktree agents: backend / frontend / tests). **Epic 3 (Map as Main View) complete** — stories 3-1…3-5 all done. End Turn now plays event toasts on the map then routes to the turn report; login lands on the map; `action_phase` route deleted (404).
