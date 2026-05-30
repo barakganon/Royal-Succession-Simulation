@@ -459,7 +459,41 @@ class EconomySystem:
             elif settlement.settlement_type == "town":
                 tax_income *= 1.2  # Towns provide 20% more tax
 
-        return tax_income
+        # Apply trait modifier of the controller dynasty's living monarch.
+        # Lazy import: trait_effects is provided by another agent and may be
+        # absent at module import time; importing here only runs at call time.
+        # Guarded so a missing module degrades to identity (no-op) rather than
+        # breaking turn processing.
+        try:
+            from models.trait_effects import tax_modifier
+            monarch_traits = self._get_controller_monarch_traits(territory)
+            tax_income *= tax_modifier(monarch_traits)
+        except ImportError:
+            pass
+
+        return float(tax_income)
+
+    def _get_controller_monarch_traits(self, territory) -> list:
+        """
+        Fetch the traits of the living monarch of the dynasty controlling a territory.
+
+        Returns an empty list if there is no controller, no living monarch, or
+        the monarch has no traits.
+        """
+        controller_id = getattr(territory, "controller_dynasty_id", None)
+        if not controller_id:
+            return []
+        monarch = self.session.query(PersonDB).filter(
+            PersonDB.dynasty_id == controller_id,
+            PersonDB.is_monarch == True,  # noqa: E712
+            PersonDB.death_year.is_(None)
+        ).first()
+        if not monarch:
+            return []
+        try:
+            return monarch.get_traits() or []
+        except Exception:
+            return []
 
     def calculate_dynasty_economy(self, dynasty_id: int) -> Dict[str, Any]:
         """

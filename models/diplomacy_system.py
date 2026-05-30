@@ -195,7 +195,28 @@ class DiplomacySystem:
             
         return descriptions.get(action_type, f"Diplomatic action '{action_type}' with {target_name}")
     
-    def perform_diplomatic_action(self, actor_dynasty_id: int, target_dynasty_id: int, 
+    def _get_living_monarch_traits(self, dynasty_id: int) -> list:
+        """
+        Fetch the traits of the living monarch of a dynasty.
+
+        Returns an empty list if there is no living monarch or the monarch has
+        no traits.
+        """
+        if not dynasty_id:
+            return []
+        monarch = self.session.query(PersonDB).filter(
+            PersonDB.dynasty_id == dynasty_id,
+            PersonDB.is_monarch == True,  # noqa: E712
+            PersonDB.death_year.is_(None)
+        ).first()
+        if not monarch:
+            return []
+        try:
+            return monarch.get_traits() or []
+        except Exception:
+            return []
+
+    def perform_diplomatic_action(self, actor_dynasty_id: int, target_dynasty_id: int,
                                  action_type: str, additional_data: Optional[Dict] = None) -> Tuple[bool, str]:
         """
         Perform a diplomatic action between two dynasties.
@@ -238,6 +259,18 @@ class DiplomacySystem:
             prestige_diff = (actor_dynasty.prestige - target_dynasty.prestige) / 100
             magnitude *= (1 + prestige_diff * 0.5)
         
+        # Apply the actor's living monarch trait modifier (additive) to the
+        # relation-score change before it is applied.
+        # Lazy import: trait_effects is provided by another agent and may be
+        # absent at module import time; importing here only runs at call time.
+        # Guarded so a missing module degrades to +0 (no-op).
+        try:
+            from models.trait_effects import diplomacy_modifier
+            actor_monarch_traits = self._get_living_monarch_traits(actor_dynasty_id)
+            magnitude = int(magnitude) + diplomacy_modifier(actor_monarch_traits)
+        except ImportError:
+            magnitude = int(magnitude)
+
         # Apply the effect to the relation
         relation.update_relation(action_type, int(magnitude))
         
@@ -317,7 +350,16 @@ class DiplomacySystem:
                 
                 self.session.commit()
                 return True, f"Assassination against {target_dynasty.name} was successful!"
-        
+
+        # General path (declare_rivalry, send_envoy, issue_ultimatum, gift, etc.):
+        # the special-action branches above return early; everything else commits
+        # the relation change + log entries here and reports success. (Previously
+        # this fell through to an implicit None — a latent bug surfaced by the
+        # Story 6-1 diplomacy trait-hook test.)
+        self.session.commit()
+        return True, self._generate_diplomatic_action_description(
+            action_type, actor_dynasty.name, target_dynasty.name)
+
     def create_treaty(self, dynasty1_id: int, dynasty2_id: int, treaty_type: TreatyType,
                      duration: Optional[int] = None, terms: Optional[Dict] = None) -> Tuple[bool, str, Optional[Treaty]]:
         """
