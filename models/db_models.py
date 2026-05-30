@@ -192,6 +192,10 @@ class PersonDB(db.Model):
     is_monarch = db.Column(db.Boolean, default=False)  # If they are CURRENTLY the monarch of their dynasty
     reign_start_year = db.Column(db.Integer, nullable=True)
     reign_end_year = db.Column(db.Integer, nullable=True)
+
+    # Pretender mechanics (Story 5-3)
+    is_pretender = db.Column(db.Boolean, default=False, nullable=False)
+    pretender_strength = db.Column(db.Integer, default=0, nullable=False)
     
     # New fields for multi-agent game
     diplomatic_skill = db.Column(db.Integer, default=0)  # Skill for diplomacy (0-20)

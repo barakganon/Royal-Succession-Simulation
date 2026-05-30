@@ -48,6 +48,9 @@ INTERRUPT_REASONS = [
     'quiet_period',
 ]
 
+# Pretender mechanics (Story 5-3): strength a living pretender gains per year.
+PRETENDER_STRENGTH_PER_YEAR = 5
+
 
 # ---------------------------------------------------------------------------
 # LLM availability — resolved lazily so this module does not depend on Flask
@@ -159,6 +162,11 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
                         interrupt = ('monarch_death', current_year)
                         break  # exit person loop; prevents double-succession if heir also in living_persons
                     continue
+
+                # Pretender strength accumulation (Story 5-3): living pretenders
+                # gain influence each simulated year they remain uncrushed.
+                if getattr(person, 'is_pretender', False):
+                    person.pretender_strength = (person.pretender_strength or 0) + PRETENDER_STRENGTH_PER_YEAR
 
                 # Process marriage for unmarried nobles
                 if person.is_noble and person.spouse_sim_id is None:
