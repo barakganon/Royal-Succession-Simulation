@@ -37,6 +37,16 @@
          class="btn btn-warning btn-sm ml-2" style="font-size:.75rem;white-space:nowrap;">
         &#x231B; End Turn
       </a>
+
+      <!-- Story 4-2: undo last free action (hidden until an undoable action runs) -->
+      <button id="free-action-undo-btn" type="button"
+              class="btn btn-sm ml-2 free-action-undo"
+              onclick="undoLastFreeAction(event)"
+              hidden
+              title="Undo the last reversible decision"
+              style="font-size:.75rem;white-space:nowrap;">
+        &#x21A9; Undo last
+      </button>
     {% endif %}
   </div><!-- /game-topbar -->
 
@@ -1159,6 +1169,9 @@ document.addEventListener('keydown', function (e) {
   var ctxRowsEl = document.getElementById('ctx-rows');
   /* Cached catalogue: fetched lazily on first right-click. */
   window.__projectCatalogue = window.__projectCatalogue || null;
+  /* Story 4-2: free-action ("Decisions") catalogue, fetched lazily and
+     cached on the window mirroring window.__projectCatalogue. */
+  window.__freeActionCatalogue = window.__freeActionCatalogue || null;
   var lastChosenAction = null;
   window.lastChosenAction = null;
 
@@ -1228,6 +1241,133 @@ document.addEventListener('keydown', function (e) {
     return row;
   }
 
+  /* ── Story 4-2: free-action toast + undo helpers ── */
+  /* Small toast: reuse the Story 3-5 turn-toast helper if present so free
+     actions share the medieval ticker styling; otherwise fall back to a
+     minimal inline toast so the feature degrades gracefully. */
+  function _freeActionToast(text) {
+    if (typeof _pushTurnToast === 'function') {
+      _pushTurnToast(text, 'world_event', '');
+      return;
+    }
+    var stack = document.getElementById('turn-toast-stack');
+    if (!stack) { return; }
+    var t = document.createElement('div');
+    t.className = 'turn-toast';
+    t.textContent = text;
+    stack.appendChild(t);
+    requestAnimationFrame(function () { t.classList.add('is-in'); });
+    setTimeout(function () {
+      t.classList.add('is-out');
+      setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 600);
+    }, 4000);
+  }
+
+  function _revealUndoControl() {
+    var btn = document.getElementById('free-action-undo-btn');
+    if (btn) { btn.hidden = false; btn.disabled = false; }
+  }
+
+  window.undoLastFreeAction = function (event) {
+    if (event && event.preventDefault) { event.preventDefault(); }
+    if (!dynastyId) { return; }
+    var btn = document.getElementById('free-action-undo-btn');
+    if (btn) { btn.disabled = true; }
+    fetch('/dynasty/' + dynastyId + '/free_action/undo', {
+      method: 'POST',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      credentials: 'same-origin'
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        _freeActionToast((data && data.message) || 'Nothing to undo.');
+        /* Once undone there is nothing left to revert; hide the control. */
+        if (btn) { btn.hidden = true; }
+      })
+      .catch(function (err) {
+        console.error('free_action undo failed', err);
+        _freeActionToast('Could not undo the last decision.');
+        if (btn) { btn.disabled = false; }
+      });
+  };
+
+  function _runFreeAction(a) {
+    if (!dynastyId) { return; }
+    var body = { action_type: a.action_type };
+    if (a.needs_target) {
+      var target = window.prompt('Target dynasty id:');
+      if (target === null) { return; }            /* cancelled */
+      target = (target || '').trim();
+      if (target === '') { return; }               /* blank → skip */
+      body.target_dynasty_id = target;
+    }
+    fetch('/dynasty/' + dynastyId + '/free_action', {
+      method: 'POST',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      credentials: 'same-origin',
+      body: JSON.stringify(body)
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        _freeActionToast((data && data.message) || 'Decision recorded.');
+        if (a.undoable && data && data.ok) { _revealUndoControl(); }
+        window.closeContextMenu();
+      })
+      .catch(function (err) {
+        console.error('free_action failed', err);
+        _freeActionToast('That decision could not be carried out.');
+        window.closeContextMenu();
+      });
+  }
+
+  function _renderFreeActionRow(a) {
+    var row = document.createElement('div');
+    row.className = 'game-context-menu-row free-action-row';
+    row.setAttribute('role', 'menuitem');
+    row.setAttribute('tabindex', '0');
+    if (a.category) { row.setAttribute('data-category', a.category); }
+    row.textContent = a.label || a.action_type;
+    if (a.needs_target) {
+      var tag = document.createElement('span');
+      tag.className = 'free-action-target-tag';
+      tag.textContent = '→';   /* arrow hints a target is required */
+      tag.title = 'Requires a target dynasty';
+      row.appendChild(tag);
+    }
+    row.addEventListener('click', function () { _runFreeAction(a); });
+    return row;
+  }
+
+  /* Append the visually separated "Decisions" section to the context menu. */
+  function _appendFreeActions(hex) {
+    var actions = window.__freeActionCatalogue && window.__freeActionCatalogue.actions;
+    if (!actions || actions.length === 0) { return; }
+    var section = document.createElement('div');
+    section.className = 'ctx-free-actions';
+
+    var divider = document.createElement('div');
+    divider.className = 'ctx-section-divider';
+    section.appendChild(divider);
+
+    var header = document.createElement('div');
+    header.className = 'ctx-section-header';
+    header.textContent = 'Decisions';
+    section.appendChild(header);
+
+    actions.forEach(function (a) {
+      section.appendChild(_renderFreeActionRow(a));
+    });
+    ctxRowsEl.appendChild(section);
+  }
+
   function _populateMenu(hex) {
     ctxTerrNameEl.textContent = hex.properties.name || 'Unknown';
     /* Guard against geojson features that lack territory_id (e.g. future
@@ -1243,11 +1383,20 @@ document.addEventListener('keydown', function (e) {
       empty.className = 'game-context-menu-row';
       empty.textContent = '(no projects available)';
       ctxRowsEl.appendChild(empty);
+      /* Story 4-2: free actions still apply even with no projects. */
+      _appendFreeActions(hex);
       return;
     }
+    /* Story 4-2: label the project rows so they read as a distinct group
+       from the "Decisions" (free actions) section appended below. */
+    var projHeader = document.createElement('div');
+    projHeader.className = 'ctx-section-header ctx-projects-header';
+    projHeader.textContent = 'Projects';
+    ctxRowsEl.appendChild(projHeader);
     cat.forEach(function (p) {
       ctxRowsEl.appendChild(_renderRow(p, hex));
     });
+    _appendFreeActions(hex);
   }
 
   function _showAt(pageX, pageY) {
@@ -1286,10 +1435,35 @@ document.addEventListener('keydown', function (e) {
     contextMenuEl.setAttribute('aria-hidden', 'true');
   };
 
+  /* Story 4-2: lazily fetch + cache the free-action catalogue, mirroring the
+     project-catalogue pattern. Resolves regardless of success so the menu
+     always opens. Guards when dynastyId is falsy. */
+  function _ensureFreeActionCatalogue() {
+    if (window.__freeActionCatalogue) { return Promise.resolve(); }
+    if (!dynastyId) {
+      window.__freeActionCatalogue = { actions: [] };
+      return Promise.resolve();
+    }
+    return fetch('/dynasty/' + dynastyId + '/free_action_catalogue.json', {
+      headers: { 'Accept': 'application/json' },
+      credentials: 'same-origin'
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        window.__freeActionCatalogue = data || { actions: [] };
+      })
+      .catch(function (err) {
+        console.error('free_action_catalogue fetch failed', err);
+        window.__freeActionCatalogue = { actions: [] };
+      });
+  }
+
   function _openContextMenu(hex, pageX, pageY) {
     if (window.__projectCatalogue) {
-      _populateMenu(hex);
-      _showAt(pageX, pageY);
+      _ensureFreeActionCatalogue().then(function () {
+        _populateMenu(hex);
+        _showAt(pageX, pageY);
+      });
       return;
     }
     if (!dynastyId) {
@@ -1301,14 +1475,19 @@ document.addEventListener('keydown', function (e) {
       .then(function (r) { return r.json(); })
       .then(function (data) {
         window.__projectCatalogue = data;
+        return _ensureFreeActionCatalogue();
+      })
+      .then(function () {
         _populateMenu(hex);
         _showAt(pageX, pageY);
       })
       .catch(function (err) {
         console.error('project_catalogue fetch failed', err);
         window.__projectCatalogue = { projects: [] };
-        _populateMenu(hex);
-        _showAt(pageX, pageY);
+        _ensureFreeActionCatalogue().then(function () {
+          _populateMenu(hex);
+          _showAt(pageX, pageY);
+        });
       });
   }
 
