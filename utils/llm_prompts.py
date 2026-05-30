@@ -8,7 +8,7 @@ Fallback generators are also co-located here so callers never need to
 inline prompt logic or fallback strings elsewhere.
 """
 
-from typing import List
+from typing import List, Optional
 
 from utils.logging_config import setup_logger
 
@@ -44,18 +44,30 @@ def build_ai_decision_prompt(phase: str, game_state: dict, personality: str, ava
     )
 
 
-def build_chronicle_prompt(events: List[str], dynasty_name: str, year: int) -> str:
+def build_chronicle_prompt(events: List[str], dynasty_name: str, year: int,
+                           monarch_traits: Optional[list] = None) -> str:
     """Build a prompt for the living chronicle narrator.
 
     max_tokens=150. Style: medieval chronicler, 2-3 sentences.
     Fallback: use generate_chronicle_fallback() instead.
+
+    Args:
+        monarch_traits: Optional list of trait names for the reigning monarch.
+            When truthy, a voice instruction reflecting those traits is appended.
+            None/empty leaves the prompt unchanged.
     """
     events_str = '; '.join(events) if events else 'a quiet turn with no notable events'
+    voice_instruction = ""
+    if monarch_traits:
+        traits_str = ', '.join(str(t) for t in monarch_traits)
+        voice_instruction = (
+            f" The reigning monarch is {traits_str} — let the telling reflect that character."
+        )
     return (
         f"You are a medieval chronicler writing the official history of {dynasty_name}. "
         f"In the year {year}, the following events transpired: {events_str}. "
         f"Write 2-3 sentences in the style of a medieval chronicle — formal, dramatic, "
-        f"third-person. Do not use modern language."
+        f"third-person. Do not use modern language.{voice_instruction}"
     )
 
 
@@ -126,8 +138,15 @@ def generate_advisor_fallback(treasury: float, active_wars: int, has_allies: boo
 
 
 def build_turn_story_prompt(dynasty_name, start_year, end_year, events, monarch_name, existing_story,
-                            years_advanced: int = 5, interrupt_reason: str = 'quiet_period'):
+                            years_advanced: int = 5, interrupt_reason: str = 'quiet_period',
+                            monarch_traits: Optional[list] = None):
     events_str = '; '.join(events[:8]) if events else 'quiet seasons of governance'
+    voice_instruction = ""
+    if monarch_traits:
+        traits_str = ', '.join(str(t) for t in monarch_traits)
+        voice_instruction = (
+            f" The reigning monarch is {traits_str} — let the telling reflect that character."
+        )
     continuation_hint = (
         'Continue the saga naturally from where it left off.'
         if existing_story.strip()
@@ -150,6 +169,7 @@ def build_turn_story_prompt(dynasty_name, start_year, end_year, events, monarch_
         f'{continuation_hint} {pacing_hint}Write exactly ONE paragraph (4-6 sentences) of vivid, '
         f'high-fantasy prose that weaves these events into the living legend of {dynasty_name}. '
         f'Use dramatic third-person narration. No bullet points, no headings, pure flowing prose only.'
+        f'{voice_instruction}'
     )
 
 
