@@ -36,6 +36,27 @@ if 'DATABASE_URL' not in os.environ:
 # Add the project root directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+import random as _random
+
+
+@pytest.fixture(autouse=True)
+def _deterministic_random():
+    """Seed the global RNG before EVERY test so random-driven code paths are
+    order-independent.
+
+    Root cause of the intermittent full-suite flakes (e.g. heir-majority /
+    military / project-lifecycle tests passing in isolation but failing under
+    full-suite ordering): turn processing (process_dynasty_turn — births,
+    deaths, marriages, majority) consumes the global `random` state, which
+    carried over from whatever tests ran earlier. Re-seeding here resets that
+    state to a fixed point per test, making turn outcomes deterministic
+    regardless of order. Tests that `mocker.patch` random.* are unaffected
+    (the patch overrides the seed).
+    """
+    _random.seed(1_234_567)
+    yield
+
+
 from models.db_models import db as _db
 from models.game_manager import GameManager
 
