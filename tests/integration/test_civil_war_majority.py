@@ -396,8 +396,15 @@ class TestHeirMajorityInterrupt:
         heir_id = _add_person(app, db, dynasty_id, name="ComingOfAgeHeir",
                               gender="MALE", birth_year=1216)
 
+        # Patch out marriage + childbirth so the only person who can cross the
+        # majority boundary is the heir under test. The marriage spawner would
+        # otherwise mint stranger spouses (some of them minors) who then come of
+        # age in a later turn and fire a *second* heir_majority — order/seed
+        # dependent noise unrelated to what this test asserts about the heir.
         with app.app_context():
-            with patch('models.turn_processor.process_death_check', return_value=False):
+            with patch('models.turn_processor.process_death_check', return_value=False), \
+                 patch('models.turn_processor.process_marriage_check', return_value=False), \
+                 patch('models.turn_processor.process_childbirth_check', return_value=False):
                 success, _msg, summary = tp.process_dynasty_turn(
                     dynasty_id, years_to_advance=5
                 )
@@ -412,7 +419,9 @@ class TestHeirMajorityInterrupt:
 
         # Run another turn: the same heir must NOT fire heir_majority again.
         with app.app_context():
-            with patch('models.turn_processor.process_death_check', return_value=False):
+            with patch('models.turn_processor.process_death_check', return_value=False), \
+                 patch('models.turn_processor.process_marriage_check', return_value=False), \
+                 patch('models.turn_processor.process_childbirth_check', return_value=False):
                 success2, _msg2, summary2 = tp.process_dynasty_turn(
                     dynasty_id, years_to_advance=5
                 )
