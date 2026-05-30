@@ -487,3 +487,181 @@ def generate_coronation_fallback(heir_name: str, dynasty_name: str,
         f"In the year {year}, {heir_name} was crowned ruler of House "
         f"{dynasty_name}, beginning a new reign."
     )
+
+
+# ---------------------------------------------------------------------------
+# Story 9-1 — Event flavor chronicle lines (births, deaths, battles,
+# world news, completed construction)
+# ---------------------------------------------------------------------------
+
+def build_birth_flavor_prompt(child_name: str, child_traits, mother_name: str,
+                              father_name: str, house: str, year: int) -> str:
+    """Prompt for a short medieval chronicle line announcing a birth.
+
+    Story 9-1. max_tokens<=80. Style: medieval chronicler, third-person,
+    1 sentence. Fallback: generate_birth_flavor_fallback().
+    """
+    traits_str = _format_traits(child_traits)
+    return (
+        f"You are a medieval chronicler recording the deeds of House {house}. "
+        f"In the year {year}, {mother_name} and {father_name} of House {house} "
+        f"were blessed with a child, {child_name}, said to be {traits_str}. "
+        f"Write exactly 1 sentence (about 80 tokens at most) in the style of a "
+        f"medieval chronicle — formal, dramatic, third-person. Name the child "
+        f"{child_name} and the house. Do not use modern language or lists."
+    )
+
+
+def generate_birth_flavor_fallback(child_name: str, mother_name: str,
+                                   father_name: str, house: str,
+                                   year: int) -> str:
+    """Deterministic, non-empty fallback when the LLM is unavailable (Story 9-1).
+
+    Always names the child, both parents, the house, and the year.
+    """
+    return (
+        f"In the year {year}, {child_name} was born to {mother_name} and "
+        f"{father_name} of House {house}, and the house rejoiced."
+    )
+
+
+def build_death_flavor_prompt(person_name: str, person_traits, house: str,
+                              age: int, year: int,
+                              was_monarch: bool = False) -> str:
+    """Prompt for a short medieval chronicle line marking a death.
+
+    Story 9-1. max_tokens<=90. Style: medieval chronicler, third-person,
+    1-2 sentences. When was_monarch is True the prompt references the crown
+    and the reign that has ended. Fallback: generate_death_flavor_fallback().
+    """
+    traits_str = _format_traits(person_traits)
+    if was_monarch:
+        station_clause = (
+            f"{person_name}, the crowned ruler of House {house}, has died at the "
+            f"age of {age}, and the reign is ended. Mark the passing of the crown "
+            f"and the sorrow of the realm."
+        )
+    else:
+        station_clause = (
+            f"{person_name} of House {house} has died at the age of {age}. "
+            f"Mark the passing with solemn dignity."
+        )
+    return (
+        f"You are a medieval chronicler recording the deeds of House {house}. "
+        f"In the year {year}, {station_clause} "
+        f"The departed was known for being {traits_str}. "
+        f"Write exactly 1-2 sentences (about 90 tokens at most) in the style of a "
+        f"medieval chronicle — formal, dramatic, third-person. Name {person_name}. "
+        f"Do not use modern language or lists."
+    )
+
+
+def generate_death_flavor_fallback(person_name: str, house: str, age: int,
+                                   year: int, was_monarch: bool = False) -> str:
+    """Deterministic, non-empty fallback when the LLM is unavailable (Story 9-1).
+
+    Always names the person, the house, and the year. When was_monarch is True
+    the line references the crown and the ended reign.
+    """
+    if was_monarch:
+        return (
+            f"In the year {year}, {person_name}, crowned ruler of House {house}, "
+            f"died at the age of {age}, and the reign passed into history."
+        )
+    return (
+        f"In the year {year}, {person_name} of House {house} died at the age "
+        f"of {age}, mourned by the house."
+    )
+
+
+def build_battle_flavor_prompt(attacker_name: str, defender_name: str,
+                               location: str, victor_name: str,
+                               casualties, year: int) -> str:
+    """Prompt for a short medieval chronicle line about a battle's outcome.
+
+    Story 9-1. max_tokens<=100. Style: medieval chronicler, third-person,
+    1-2 sentences. Fallback: generate_battle_flavor_fallback().
+    """
+    return (
+        f"You are a medieval chronicler recording the wars of the realm. "
+        f"In the year {year}, the host of {attacker_name} met the host of "
+        f"{defender_name} in battle at {location}. When the dust settled, "
+        f"{victor_name} held the field, at a cost of {casualties} fallen. "
+        f"Write exactly 1-2 sentences (about 100 tokens at most) in the style of "
+        f"a medieval chronicle — formal, dramatic, third-person. Name both "
+        f"{attacker_name} and {defender_name}, and the victor. "
+        f"Do not use modern language or lists."
+    )
+
+
+def generate_battle_flavor_fallback(attacker_name: str, defender_name: str,
+                                    victor_name: str, year: int) -> str:
+    """Deterministic, non-empty fallback when the LLM is unavailable (Story 9-1).
+
+    Always names the attacker, defender, victor, and the year.
+    """
+    return (
+        f"In the year {year}, {attacker_name} and {defender_name} clashed in "
+        f"battle, and {victor_name} carried the day."
+    )
+
+
+def build_world_news_prompt(actor_dynasty: str, action_desc: str,
+                            player_dynasty: str, year: int) -> str:
+    """Prompt for a chronicle line framed as distant news reaching the court.
+
+    Story 9-1. max_tokens<=120. Style: a letter from afar carried to the
+    player's court, third-person about the actor. Fallback:
+    generate_world_news_fallback().
+    """
+    return (
+        f"You are a medieval chronicler. Word has travelled from afar and reached "
+        f"the court of House {player_dynasty} in the year {year}: it is said that "
+        f"House {actor_dynasty} {action_desc}. "
+        f"Write exactly 1-2 sentences (about 120 tokens at most), framed as tidings "
+        f"of distant news carried by letter or messenger to the court of House "
+        f"{player_dynasty} — formal, dramatic, third-person. Name House "
+        f"{actor_dynasty}. Do not use modern language or lists."
+    )
+
+
+def generate_world_news_fallback(actor_dynasty: str, action_desc: str,
+                                 year: int) -> str:
+    """Deterministic, non-empty fallback when the LLM is unavailable (Story 9-1).
+
+    Always names the acting dynasty and the year.
+    """
+    return (
+        f"In the year {year}, word reached the court that House {actor_dynasty} "
+        f"{action_desc}."
+    )
+
+
+def build_construction_complete_prompt(building_name: str, territory_name: str,
+                                       house: str, year: int) -> str:
+    """Prompt for a short chronicle line marking a completed construction.
+
+    Story 9-1. max_tokens<=70. Style: medieval chronicler, third-person,
+    1 sentence. Fallback: generate_construction_complete_fallback().
+    """
+    return (
+        f"You are a medieval chronicler recording the works of House {house}. "
+        f"In the year {year}, the {building_name} at {territory_name} was at last "
+        f"completed. "
+        f"Write exactly 1 sentence (about 70 tokens at most) in the style of a "
+        f"medieval chronicle — formal, dramatic, third-person. Name the "
+        f"{building_name} and {territory_name}. Do not use modern language or lists."
+    )
+
+
+def generate_construction_complete_fallback(building_name: str,
+                                            territory_name: str, house: str,
+                                            year: int) -> str:
+    """Deterministic, non-empty fallback when the LLM is unavailable (Story 9-1).
+
+    Always names the building, the territory, the house, and the year.
+    """
+    return (
+        f"In the year {year}, the {building_name} at {territory_name} was "
+        f"completed for House {house}."
+    )

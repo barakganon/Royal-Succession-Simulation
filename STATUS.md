@@ -194,3 +194,4 @@ Task 1-4 remains (chronicle prompt update).
 | 8-1 | Family-tree SVG renderer (pure-Python Reingold-Tilford) + DynastyDB.family_tree_svg column + migration (3 worktree agents) — 436 green | Done |
 | 8-2 | Interactive family-tree page: pan/zoom/tooltip/show-deceased toggle/highlight-bloodline/search + person-JSON + raw-SVG routes (3 worktree agents) — 452 green | Done |
 | 8-3 | Retire matplotlib family-tree plotter + inline SVG in view_dynasty (kept matplotlib for 5 other renderers; full removal deferred) (3 worktree agents) — 455 green. Epic 8 complete | Done |
+| 9-1 | 5 event-flavor prompt builders + deterministic fallbacks (birth/death/battle/world-news/construction) (2 worktree agents) — 468 green | Done |
