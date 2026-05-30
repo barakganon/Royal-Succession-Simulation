@@ -253,7 +253,7 @@ development_status:
   # Delete visualization/plotter.py; delete visualizations/family_tree_*.png (all
   # 99 files); add visualizations/*.png to .gitignore; update view_dynasty.html to
   # render dynasty.family_tree_svg inline with `| safe`.
-  8-3-delete-matplotlib-and-integrate: backlog
+  8-3-delete-matplotlib-and-integrate: ready-for-dev
 
   epic-8-retrospective: optional
 
