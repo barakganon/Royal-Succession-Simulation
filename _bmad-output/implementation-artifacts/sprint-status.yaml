@@ -39,7 +39,7 @@
 # - Each story should have a corresponding file: {story_key}.md in story_location
 
 generated: 2026-05-02
-last_updated: 2026-05-29  # updated: Epic 4 started — Story 4-1 created (ready-for-dev)
+last_updated: 2026-05-30  # updated: Story 4-1 done (free_action endpoint)
 project: Royal-Succession-Simulation
 project_key: RSS
 tracking_system: file-system
@@ -146,7 +146,7 @@ development_status:
   # chronicle line; does NOT tick the turn. Implement: declare_war, propose_treaty,
   # send_envoy, issue_ultimatum, name_heir, adopt_succession_law, hold_feast,
   # hold_tournament, pardon_vassal.
-  4-1-free-action-endpoint: ready-for-dev
+  4-1-free-action-endpoint: done
 
   # Story 4-2: LLM flavor lines + right-click menu integration
   # Each free action triggers a flavor line (LLM or fallback); surface free actions

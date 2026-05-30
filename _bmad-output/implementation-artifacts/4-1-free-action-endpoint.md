@@ -1,6 +1,6 @@
 # Story 4-1: Free Action Endpoint + Dispatcher
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -104,10 +104,33 @@ so that decisions are distinguished from slot-consuming multi-year project commi
 
 ### Agent Model Used
 
-(to be filled by dev/integration)
-
-### Debug Log References
+claude-opus-4-8[1m] — 3 parallel worktree sub-agents (system+schema / route / tests) against a frozen contract, + main-session integrator.
 
 ### Completion Notes List
 
+- All 8 ACs satisfied. `pytest -p no:randomly`: **327 passed, 0 failed, 0 skipped** (315 baseline + 12). Contract-first: C's 12 tests failed in isolation (404 + missing columns) and went green on integration.
+- Agents: A `wt/4-1-system` @ `2ad3f87` (FreeActionSystem dispatcher; delegates declare_war/propose_treaty/send_envoy/issue_ultimatum to DiplomacySystem; new name_heir/adopt_succession_law/hold_feast/hold_tournament/pardon_vassal; +2 DynastyDB columns + idempotent migration). B `wt/4-1-route` @ `1350cea` (POST /free_action, lazy FreeActionSystem import, JSON {ok,message}, 403/400). C `wt/4-1-tests` @ `1ad2f5e` (12 tests). Clean merges, zero file overlap.
+- Invariants verified by review + test: FreeActionSystem never commits (route owns it) and never mutates `current_simulation_year` (no tick); each success appends `HistoryLogEntryDB(event_type='free_action')`.
+- A's defaults where the contract didn't pin them: `declare_war` → `WarGoal.HUMILIATE`, `propose_treaty` → `TreatyType.NON_AGGRESSION` (overridable via `params['treaty_type']`).
+- **Test-infra hardening (integrator):** the persistent temp test DB (`rss_pytest.db`) is now unlinked at the start of each run in the root conftest — SQLite `create_all()` doesn't ALTER existing tables, so a stale temp DB would miss newly-added columns. This generalizes the dev-DB-isolation fix for all future schema changes.
+- No regressions; no visual surface (4-1 is backend/endpoint), so per the Epic 3 retro lesson no run-the-app check is needed — Story 4-2 (right-click UI) will need one.
+
 ### File List
+
+- `models/free_action_system.py` — NEW (FreeActionSystem dispatcher + VALID_FREE_ACTIONS/VALID_SUCCESSION_LAWS)
+- `models/db_models.py` — MODIFIED (DynastyDB.designated_heir_id + succession_law)
+- `models/db_initialization.py` — MODIFIED (idempotent ALTER TABLE migration for the 2 columns)
+- `blueprints/dynasty.py` — MODIFIED (POST /dynasty/<id>/free_action route)
+- `tests/integration/test_free_action_endpoint.py` — NEW (12 tests)
+- `tests/conftest.py` — MODIFIED (unlink stale temp test DB per run)
+- `_bmad-output/implementation-artifacts/{4-1-...md, sprint-status.yaml}` — MODIFIED
+
+### Change Log
+
+| Date | Change |
+|---|---|
+| 2026-05-30 | spec(4-1) committed; Epic 4 in-progress |
+| 2026-05-30 | wt/4-1-system / wt/4-1-route / wt/4-1-tests built in parallel worktrees |
+| 2026-05-30 | merged all three into feature/free-action-endpoint (clean); conftest temp-DB hardening |
+| 2026-05-30 | pytest: 327 passed, 0 failed, 0 skipped (was 315) |
+| 2026-05-30 | Story 4-1 → done |
