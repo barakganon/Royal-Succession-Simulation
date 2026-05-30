@@ -138,6 +138,12 @@
       <button class="game-rail-btn" type="button"
               aria-label="Open war overview"
               title="War" onclick="openDetailPanel({type:'war'})">&#9876;</button>
+      {% if dynasty_id %}
+      <button class="game-rail-btn" type="button"
+              id="open-foreign-court"
+              aria-label="Open foreign court — royal matches"
+              title="Foreign Court — Royal Matches">&#x1F48D;</button>
+      {% endif %}
 
     </div><!-- /game-left-rail -->
 
@@ -259,6 +265,66 @@
       </div>
       <div id="ctx-rows"></div>
     </div>
+
+    <!-- ─────────── FOREIGN COURT (Royal Matches) — Story 7-3 ─────────── -->
+    <div id="foreign-court-panel" class="foreign-court-panel" hidden
+         role="dialog" aria-modal="true" aria-labelledby="foreign-court-title">
+      <div class="foreign-court-inner">
+        <div class="foreign-court-header">
+          <span id="foreign-court-title" class="foreign-court-title">&#x1F48D; Foreign Court — Royal Matches</span>
+          <button type="button" id="foreign-court-close" class="foreign-court-close"
+                  aria-label="Close foreign court">&#10005;</button>
+        </div>
+        <div id="foreign-court-status" class="foreign-court-status">Loading eligible nobles…</div>
+        <div id="foreign-court-list" class="foreign-court-list"></div>
+      </div>
+    </div>
+
+    <style>
+      .foreign-court-panel{
+        position:absolute; top:0; right:0; bottom:0;
+        width:360px; max-width:90vw; z-index:60;
+        background:linear-gradient(180deg,rgba(20,16,12,.98),rgba(12,10,8,.98));
+        border-left:2px solid var(--gold); box-shadow:-6px 0 24px rgba(0,0,0,.6);
+        display:flex; flex-direction:column; font-family:'Crimson Text',serif;
+      }
+      .foreign-court-panel[hidden]{ display:none; }
+      .foreign-court-inner{ display:flex; flex-direction:column; height:100%; overflow:hidden; }
+      .foreign-court-header{
+        display:flex; align-items:center; justify-content:space-between;
+        padding:.6rem .75rem; border-bottom:1px solid var(--dark-border);
+        background:rgba(0,0,0,.35);
+      }
+      .foreign-court-title{ font-family:'Cinzel',serif; color:var(--gold); font-size:.9rem; }
+      .foreign-court-close{
+        background:none; border:none; color:var(--text-muted); cursor:pointer;
+        font-size:1rem; line-height:1; padding:.2rem .4rem;
+      }
+      .foreign-court-close:hover{ color:var(--gold); }
+      .foreign-court-status{ padding:.5rem .75rem; font-size:.78rem; color:var(--text-muted); font-style:italic; }
+      .foreign-court-list{ overflow-y:auto; padding:.25rem .5rem .75rem; flex:1; }
+      .foreign-court-row{
+        border:1px solid var(--dark-border); border-radius:4px;
+        padding:.5rem .6rem; margin-bottom:.5rem; background:rgba(0,0,0,.3);
+        cursor:context-menu;
+      }
+      .foreign-court-row:hover{ border-color:var(--gold); }
+      .foreign-court-row .fc-name{ font-family:'Cinzel',serif; color:var(--text-light); font-size:.82rem; }
+      .foreign-court-row .fc-meta{ font-size:.72rem; color:var(--text-muted); margin-top:.15rem; }
+      .foreign-court-row .fc-traits{ font-size:.7rem; color:var(--gold); margin-top:.2rem; font-style:italic; }
+      .foreign-court-row .fc-propose{
+        margin-top:.4rem; font-family:'Cinzel',serif; font-size:.7rem;
+        letter-spacing:.04em;
+      }
+      .fc-children-box{
+        margin-top:.45rem; padding-top:.4rem; border-top:1px dashed var(--dark-border);
+      }
+      .fc-children-box .fc-children-label{ font-size:.7rem; color:var(--text-muted); margin-bottom:.3rem; }
+      .fc-child-option{
+        display:block; width:100%; text-align:left; margin-bottom:.3rem;
+        font-family:'Crimson Text',serif; font-size:.74rem;
+      }
+    </style>
 
   </div><!-- /game-main -->
 
@@ -2019,4 +2085,193 @@ document.addEventListener('keydown', function (e) {
 
 })();
 </script>
+
+{% if dynasty_id %}
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   Story 7-3: Foreign Court (Royal Matches)
+   - Open button (#open-foreign-court) reveals #foreign-court-panel
+   - Fetch foreign marriageable nobles → render rows (data-char-id / data-char-gender)
+   - Right-click a row (mirrors the game-context-menu pattern) OR per-row
+     "Propose Marriage" button → fetch eligible children for the opposite gender,
+     pick one → POST propose_marriage → surface the returned .message as a toast.
+   All URLs via url_for — never hardcoded.
+   ══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  var FC_FOREIGN_URL  = "{{ url_for('diplomacy.foreign_characters_json', dynasty_id=dynasty_id) }}";
+  var FC_CHILDREN_URL = "{{ url_for('diplomacy.eligible_children_json', dynasty_id=dynasty_id) }}";
+  var FC_PROPOSE_URL  = "{{ url_for('diplomacy.propose_marriage', dynasty_id=dynasty_id) }}";
+
+  var openBtn  = document.getElementById('open-foreign-court');
+  var panel    = document.getElementById('foreign-court-panel');
+  var closeBtn = document.getElementById('foreign-court-close');
+  var statusEl = document.getElementById('foreign-court-status');
+  var listEl   = document.getElementById('foreign-court-list');
+  if (!openBtn || !panel || !listEl) return;
+
+  var _loaded = false;
+
+  /* Surface a result line consistent with the rest of the map UI.
+     Reuse the Story 3-5 toast helper when present; fall back to status text. */
+  function fcNotice(text, type) {
+    if (typeof _pushTurnToast === 'function') {
+      _pushTurnToast(text, type || 'marriage');
+    } else if (statusEl) {
+      statusEl.textContent = text;
+    }
+  }
+
+  function fcClearChildBoxes() {
+    var boxes = listEl.querySelectorAll('.fc-children-box');
+    for (var i = 0; i < boxes.length; i++) {
+      boxes[i].parentNode.removeChild(boxes[i]);
+    }
+  }
+
+  /* Render the eligible-children chooser inside a foreign row, then POST on pick. */
+  function fcShowChildChooser(row) {
+    fcClearChildBoxes();
+    var targetId = row.getAttribute('data-char-id');
+    var targetGender = row.getAttribute('data-char-gender') || 'MALE';
+
+    var box = document.createElement('div');
+    box.className = 'fc-children-box';
+    var label = document.createElement('div');
+    label.className = 'fc-children-label';
+    label.textContent = 'Choose a child to wed…';
+    box.appendChild(label);
+    row.appendChild(box);
+
+    fetch(FC_CHILDREN_URL + '?target_gender=' + encodeURIComponent(targetGender), {
+      headers: { 'Accept': 'application/json' }
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var children = (data && data.children) || [];
+        if (!children.length) {
+          var none = document.createElement('div');
+          none.className = 'fc-children-label';
+          none.textContent = 'No eligible children of marriageable age.';
+          box.appendChild(none);
+          return;
+        }
+        children.forEach(function (c) {
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'btn btn-secondary action-btn-sm fc-child-option';
+          b.textContent = (c.name || '') + ' ' + (c.surname || '') + ' (age ' + c.age + ')';
+          b.addEventListener('click', function () {
+            fcProposeMarriage(c.id, targetId, box);
+          });
+          box.appendChild(b);
+        });
+      })
+      .catch(function (err) {
+        console.error('Foreign court children load error:', err);
+        var e = document.createElement('div');
+        e.className = 'fc-children-label';
+        e.textContent = 'Failed to load eligible children.';
+        box.appendChild(e);
+      });
+  }
+
+  function fcProposeMarriage(proposerId, targetId, box) {
+    if (box) box.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+    fetch(FC_PROPOSE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ proposer_person_id: proposerId, target_person_id: targetId })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var msg = (data && data.message) || 'The proposal was delivered.';
+        fcNotice(msg, (data && data.accepted) ? 'marriage' : 'event');
+        fcClearChildBoxes();
+        if (data && data.accepted) { _loaded = false; fcLoad(); }
+      })
+      .catch(function (err) {
+        console.error('Foreign court proposal error:', err);
+        fcNotice('The proposal could not be delivered.', 'event');
+      });
+  }
+
+  /* Build one foreign-noble row with the frozen data-* hooks. */
+  function fcRenderRow(ch) {
+    var row = document.createElement('div');
+    row.className = 'foreign-court-row';
+    row.setAttribute('data-char-id', ch.id);
+    row.setAttribute('data-char-gender', ch.gender || '');
+
+    var name = document.createElement('div');
+    name.className = 'fc-name';
+    name.textContent = (ch.name || '') + ' ' + (ch.surname || '');
+    row.appendChild(name);
+
+    var meta = document.createElement('div');
+    meta.className = 'fc-meta';
+    var house = ch.dynasty_name || ch.surname || 'Unknown house';
+    meta.textContent = 'House ' + house + ' • age ' + ch.age + ' • ' + (ch.gender || '');
+    row.appendChild(meta);
+
+    if (ch.traits && ch.traits.length) {
+      var tr = document.createElement('div');
+      tr.className = 'fc-traits';
+      tr.textContent = ch.traits.join(', ');
+      row.appendChild(tr);
+    }
+
+    var propose = document.createElement('button');
+    propose.type = 'button';
+    propose.className = 'btn btn-secondary action-btn-sm fc-propose';
+    propose.textContent = 'Propose Marriage';
+    propose.addEventListener('click', function (e) {
+      e.stopPropagation();
+      fcShowChildChooser(row);
+    });
+    row.appendChild(propose);
+
+    /* Right-click mirrors the existing game-context-menu interaction. */
+    row.addEventListener('contextmenu', function (e) {
+      e.preventDefault();
+      fcShowChildChooser(row);
+    });
+
+    return row;
+  }
+
+  function fcLoad() {
+    if (_loaded) return;
+    statusEl.textContent = 'Loading eligible nobles…';
+    listEl.innerHTML = '';
+    fetch(FC_FOREIGN_URL, { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var chars = (data && data.characters) || [];
+        if (!chars.length) {
+          statusEl.textContent = 'No eligible foreign nobles found.';
+          _loaded = true;
+          return;
+        }
+        statusEl.textContent = chars.length + ' eligible noble' + (chars.length === 1 ? '' : 's') +
+                               '. Right-click or use "Propose Marriage" to match an heir.';
+        chars.forEach(function (ch) { listEl.appendChild(fcRenderRow(ch)); });
+        _loaded = true;
+      })
+      .catch(function (err) {
+        console.error('Foreign court load error:', err);
+        statusEl.textContent = 'Failed to load the foreign court.';
+      });
+  }
+
+  function fcOpen() { panel.hidden = false; fcLoad(); }
+  function fcClose() { panel.hidden = true; }
+
+  openBtn.addEventListener('click', fcOpen);
+  if (closeBtn) closeBtn.addEventListener('click', fcClose);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !panel.hidden) fcClose();
+  });
+})();
+</script>
+{% endif %}
 {% endblock %}
