@@ -136,6 +136,7 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
     interrupt = None
     years_advanced = 0
     stalled_project_ids: list = []  # populated if a project stalls this turn
+    triggered_moment = None  # populated if a story moment fires this turn (Story 10-2)
     ps = ProjectSystem(db.session)
 
     while years_advanced < years_to_advance and interrupt is None:
@@ -233,6 +234,59 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
                                 break
                             # AI: flag only, no interrupt; keep scanning so all
                             # newly-major persons get marked this year.
+
+                # --- Story moment (Story 10-2) ---
+                # Lowest priority: only fires when nothing above interrupted
+                # AND the dynasty is human-controlled. No cooldown (Story 10-3
+                # adds it). On a trigger, stash the template and halt the turn
+                # like the other human interrupts.
+                if interrupt is None and not dynasty.is_ai_controlled:
+                    from models import story_moments
+
+                    # Current living monarch + traits.
+                    monarch_person = next(
+                        (p for p in living_persons if p.is_monarch), None
+                    )
+                    monarch_traits = monarch_person.get_traits() if monarch_person else []
+
+                    # Living non-monarch noble heir (if any) + age.
+                    heir_person = next(
+                        (p for p in living_persons if p.is_noble and not p.is_monarch),
+                        None,
+                    )
+                    has_living_heir = heir_person is not None
+                    heir_age = (current_year - heir_person.birth_year) if heir_person else None
+
+                    # At war: any active War with this dynasty as attacker or defender.
+                    from models.db_models import War as _War
+                    at_war = (
+                        db.session.query(_War)
+                        .filter(
+                            _War.is_active.is_(True),
+                            (_War.attacker_dynasty_id == dynasty.id)
+                            | (_War.defender_dynasty_id == dynasty.id),
+                        )
+                        .first()
+                        is not None
+                    )
+
+                    dynasty_state = {
+                        'prestige': dynasty.prestige or 0,
+                        'wealth': dynasty.current_wealth or 0,
+                        'infamy': getattr(dynasty, 'infamy', 0) or 0,
+                        'at_war': at_war,
+                        'has_living_heir': has_living_heir,
+                        'heir_age': heir_age,
+                        'monarch_traits': monarch_traits,
+                        'year': current_year,
+                        'relations': {},
+                    }
+
+                    tmpl = story_moments.maybe_trigger_story_moment(dynasty_state)
+                    if tmpl:
+                        triggered_moment = tmpl
+                        interrupt = ('story_moment', current_year)
+                        break
         except Exception as year_exc:
             logger.error(f"Error processing year {current_year} for dynasty {dynasty_id}: {year_exc}", exc_info=True)
             # Continue to next year rather than aborting entire turn
@@ -360,6 +414,61 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
         'current_wealth': current_wealth,
         'new_story_paragraph': new_paragraph,
     }
+
+    # --- Story moment narration (Story 10-2) ---
+    # When the turn halted on a story moment, attach narrated prose + the
+    # choice cards (label/description only — effects are applied in 10-3).
+    if interrupt[0] == 'story_moment' and triggered_moment is not None:
+        try:
+            from utils.llm_narration import narrate_event
+            from utils.llm_prompts import (
+                build_story_moment_prompt,
+                generate_story_moment_fallback,
+            )
+
+            sm_monarch = PersonDB.query.filter_by(
+                dynasty_id=dynasty_id, is_monarch=True, death_year=None
+            ).first()
+            sm_monarch_name = (
+                f"{sm_monarch.name} {sm_monarch.surname}" if sm_monarch else dynasty.name
+            )
+            sm_monarch_traits = sm_monarch.get_traits() if sm_monarch else []
+            recent_event_texts = [e.event_string for e in new_events if e.event_string]
+
+            prose = narrate_event(
+                build_story_moment_prompt(
+                    triggered_moment['title'],
+                    triggered_moment['summary'],
+                    sm_monarch_name,
+                    sm_monarch_traits,
+                    recent_event_texts,
+                    start_year if interrupt[1] is None else interrupt[1],
+                ),
+                generate_story_moment_fallback(
+                    triggered_moment['title'],
+                    triggered_moment['summary'],
+                    start_year if interrupt[1] is None else interrupt[1],
+                ),
+                max_tokens=200,
+            )
+            turn_summary['story_moment'] = {
+                'key': triggered_moment['key'],
+                'title': triggered_moment['title'],
+                'prose': prose,
+                'choices': [
+                    {
+                        'key': c['key'],
+                        'label': c['label'],
+                        'description': c['description'],
+                    }
+                    for c in triggered_moment['mechanical_choices']
+                ],
+            }
+        except Exception as sm_exc:
+            logger.error(
+                f"Error building story moment summary for dynasty {dynasty_id}: {sm_exc}",
+                exc_info=True,
+            )
 
     return True, f"Advanced {years_advanced} years from {start_year} to {dynasty.current_simulation_year}.", turn_summary
 
