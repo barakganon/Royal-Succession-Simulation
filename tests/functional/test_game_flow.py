@@ -8,6 +8,16 @@ from models.db_models import User, DynastyDB, PersonDB, Territory
 VALID_THEME_KEY = 'MEDIEVAL_EUROPEAN'
 
 
+@pytest.fixture(autouse=True)
+def _suppress_story_moments():
+    """Story 10-2 added a 5% random `story_moment` turn interrupt for human
+    dynasties. These game-flow tests assert turn/year/interaction mechanics, not
+    story moments, so suppress the random trigger for determinism. Story moments
+    are covered by tests/integration/test_story_moment_interrupt.py."""
+    with patch('models.story_moments.maybe_trigger_story_moment', return_value=None):
+        yield
+
+
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
