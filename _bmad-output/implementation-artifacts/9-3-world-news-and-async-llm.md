@@ -1,6 +1,6 @@
 # Story 9-3: World News + Async AI-Turn LLM
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -70,7 +70,10 @@ Async is applied at **one clean boundary — `process_ai_turns`** — not by ref
 ### Agent Model Used
 claude-opus-4-8[1m] — 3 worktree sub-agents via the Workflow tool + main-session integrator.
 ### Completion Notes List
-- _pending_
+- Full scope delivered per user decision (world-news + async AI-turn offload). Full suite **482 passed** (474 + 8 new), 0 failed. 3 worktree agents (run wf_e6cc6dab-567) + integrator; clean isolation, no drift.
+- Async at ONE boundary: `advance_turn` offloads `process_ai_turns` to a daemon thread via `run_in_background` when `should_offload_ai_turns` (LLM on + ai_dynasties*4 >= 5). LLM OFF (all tests) => predicate False => synchronous path unchanged => existing advance_turn/game-flow tests stay green. The LLM-on async path is unit-tested in isolation (not via the normal suite).
+- World-news: AI war declaration writes a `world_news` HistoryLogEntryDB to the player's dynasty (narrated, fallback when LLM off). B3 needed NO change — `view_dynasty` surfaces history filtered only by `dynasty_id`, so world_news already appears in the player's recent-events feed.
+- **Epic 9 complete.**
 ### File List
 - `utils/async_narration.py` — NEW (`run_in_background`, `should_offload_ai_turns`)
 - `models/game_manager.py` — MODIFIED (`_record_world_news` + war trigger)
