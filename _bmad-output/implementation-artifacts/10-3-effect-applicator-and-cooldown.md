@@ -1,6 +1,6 @@
 # Story 10-3: Story-Moment Effect Applicator + Cooldown
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 

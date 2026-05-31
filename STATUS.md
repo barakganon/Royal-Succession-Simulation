@@ -199,3 +199,4 @@ Task 1-4 remains (chronicle prompt update).
 | 9-3 | World-news 'letters from afar' on AI war + async process_ai_turns offload (daemon thread when LLM-on + 5+ calls; sync path preserved) (3 worktree agents) — 482 green. Epic 9 complete | Done |
 | 10-1 | Story-moment template library (9 vignettes) + precondition matcher + weighted trigger (2 worktree agents) — 509 green | Done |
 | 10-2 | Story-moment turn interrupt + LLM prose + full-screen choice modal + choice route (record/dismiss; effects in 10-3) (4 worktree agents) — 530 green | Done |
+| 10-3 | Story-moment effect applicator (prestige/wealth/infamy/trait; exile/relation narrative-only) + 25y (~5-turn) cooldown (3 worktree agents) — 542 green. Epic 10 complete | Done |
