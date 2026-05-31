@@ -52,6 +52,10 @@ INTERRUPT_REASONS = [
 # Pretender mechanics (Story 5-3): strength a living pretender gains per year.
 PRETENDER_STRENGTH_PER_YEAR = 5
 
+# Story moments (Story 10-3): minimum number of years between two resolved
+# story moments for the same dynasty, so they don't fire every turn.
+STORY_MOMENT_COOLDOWN_YEARS = 25
+
 # Civil war (Story 5-4): a living pretender at/above this strength triggers a
 # civil-war interrupt for human players (auto-resolved inline for AI dynasties).
 CIVIL_WAR_THRESHOLD = 50
@@ -282,7 +286,33 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
                         'relations': {},
                     }
 
-                    tmpl = story_moments.maybe_trigger_story_moment(dynasty_state)
+                    # Cooldown gate (Story 10-3): skip triggering if a story
+                    # moment was resolved for this dynasty within the last
+                    # STORY_MOMENT_COOLDOWN_YEARS years. On query error, proceed
+                    # without a cooldown.
+                    on_cooldown = False
+                    try:
+                        last_sm = (
+                            HistoryLogEntryDB.query.filter_by(
+                                dynasty_id=dynasty.id, event_type='story_moment'
+                            )
+                            .order_by(HistoryLogEntryDB.year.desc())
+                            .first()
+                        )
+                        if last_sm is not None and (
+                            current_year - last_sm.year
+                        ) < STORY_MOMENT_COOLDOWN_YEARS:
+                            on_cooldown = True
+                    except Exception as cooldown_exc:
+                        logger.warning(
+                            f"Story-moment cooldown check failed for dynasty "
+                            f"{dynasty.id}: {cooldown_exc}"
+                        )
+
+                    tmpl = (
+                        None if on_cooldown
+                        else story_moments.maybe_trigger_story_moment(dynasty_state)
+                    )
                     if tmpl:
                         triggered_moment = tmpl
                         interrupt = ('story_moment', current_year)

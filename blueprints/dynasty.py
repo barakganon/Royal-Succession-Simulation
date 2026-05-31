@@ -1451,15 +1451,80 @@ def civil_war_resolve(dynasty_id):
     return jsonify({"ok": True, "message": message})
 
 
+def _apply_story_moment_effects(dynasty, effects: dict) -> None:
+    """Apply a story-moment choice's mechanical effects to dynasty state (Story 10-3).
+
+    Defensive by design: a missing/None ``effects`` is a no-op, one malformed
+    effect never aborts the others, and this function never raises.
+
+    Supported effects:
+      - prestige_delta:int  -> dynasty.prestige clamped to >= 0
+      - wealth_delta:int    -> dynasty.current_wealth clamped to >= 0
+      - infamy_delta:int    -> dynasty.infamy clamped to >= 0
+      - add_trait_to_monarch:str -> idempotently add the trait to the living monarch
+
+    Narrative-only effects (NO state mutation, by contract — these generic
+    vignettes are not bound to a concrete person/dynasty relationship):
+      - chronicle_note  (already used as the chronicle event_string)
+      - exile_person
+      - relation_delta
+
+    Unknown keys are ignored.
+    """
+    if not effects or not isinstance(effects, dict):
+        return
+
+    # prestige_delta
+    try:
+        if 'prestige_delta' in effects and effects['prestige_delta'] is not None:
+            delta = int(effects['prestige_delta'])
+            dynasty.prestige = max(0, (dynasty.prestige or 0) + delta)
+    except Exception as e:
+        logger.warning(f"story_moment prestige_delta failed: {e}")
+
+    # wealth_delta
+    try:
+        if 'wealth_delta' in effects and effects['wealth_delta'] is not None:
+            delta = int(effects['wealth_delta'])
+            dynasty.current_wealth = max(0, (dynasty.current_wealth or 0) + delta)
+    except Exception as e:
+        logger.warning(f"story_moment wealth_delta failed: {e}")
+
+    # infamy_delta
+    try:
+        if 'infamy_delta' in effects and effects['infamy_delta'] is not None:
+            delta = int(effects['infamy_delta'])
+            dynasty.infamy = max(0, (dynasty.infamy or 0) + delta)
+    except Exception as e:
+        logger.warning(f"story_moment infamy_delta failed: {e}")
+
+    # add_trait_to_monarch (idempotent)
+    try:
+        trait = effects.get('add_trait_to_monarch')
+        if trait:
+            monarch = PersonDB.query.filter_by(
+                dynasty_id=dynasty.id, is_monarch=True, death_year=None
+            ).first()
+            if monarch is not None:
+                traits = monarch.get_traits()
+                if trait not in traits:
+                    traits.append(trait)
+                    monarch.set_traits(traits)
+    except Exception as e:
+        logger.warning(f"story_moment add_trait_to_monarch failed: {e}")
+
+    # chronicle_note / exile_person / relation_delta -> narrative-only, no-op.
+
+
 @dynasty_bp.route('/dynasty/<int:dynasty_id>/story_moment_choice', methods=['POST'])
 @login_required
 @block_if_turn_processing
 def story_moment_choice(dynasty_id):
-    """Record and dismiss a story-moment choice (Story 10-2).
+    """Record and dismiss a story-moment choice (Story 10-2 / 10-3).
 
-    Mechanical effects (prestige/wealth/trait changes) are NOT applied here;
-    that is Story 10-3. This route validates the chosen template + choice and
-    writes a story_moment chronicle line.
+    Validates the chosen template + choice, applies the choice's mechanical
+    effects to dynasty state (Story 10-3), and writes a single story_moment
+    chronicle line.
     """
     dynasty = DynastyDB.query.get_or_404(dynasty_id)
     if dynasty.owner_user != current_user:
@@ -1482,6 +1547,7 @@ def story_moment_choice(dynasty_id):
         return jsonify({"ok": False, "message": "Invalid choice."}), 400
 
     try:
+        _apply_story_moment_effects(dynasty, chosen.get('effects', {}))
         event_string = (
             chosen.get('effects', {}).get('chronicle_note')
             or chosen['description']
