@@ -278,7 +278,7 @@ development_status:
   # When AI dynasty does something significant, generate "letter from the east"
   # entry on player's chronicle; async background thread for turns with 5+ LLM calls;
   # per-event calls must not block the turn.
-  9-3-world-news-and-async-llm: backlog
+  9-3-world-news-and-async-llm: ready-for-dev
 
   epic-9-retrospective: optional
 
