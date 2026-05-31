@@ -1,6 +1,6 @@
 # Story 10-2: Story-Moment Interrupt + Choice Modal
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
