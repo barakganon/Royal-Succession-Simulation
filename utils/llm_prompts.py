@@ -665,3 +665,53 @@ def generate_construction_complete_fallback(building_name: str,
         f"In the year {year}, the {building_name} at {territory_name} was "
         f"completed for House {house}."
     )
+
+
+# --------------------------------------------------------------------------- #
+# Story 10-2: story-moment interrupt prose
+# --------------------------------------------------------------------------- #
+
+
+def build_story_moment_prompt(title: str, summary: str, monarch_name: str,
+                              monarch_traits, recent_events, year: int) -> str:
+    """Prompt for the narrated prose of a story-moment interrupt (Story 10-2).
+
+    max_tokens<=200. Style: second-person, medieval, present-tense dilemma.
+    Sets up the dilemma described by ``summary`` and references the monarch and
+    their traits, but must NOT enumerate the choices — those are shown as cards.
+    Handles empty/None ``monarch_traits`` and ``recent_events`` gracefully.
+    Fallback: generate_story_moment_fallback().
+    """
+    traits_str = _format_traits(monarch_traits)
+    recent_clause = ""
+    if recent_events:
+        try:
+            recent_list = [str(e).strip() for e in recent_events if str(e).strip()]
+        except TypeError:
+            recent_list = []
+        if recent_list:
+            recent_clause = (
+                f" Of late the court has spoken of: {recent_list[-1]}. "
+            )
+    return (
+        f"You are a medieval storyteller addressing the ruler directly in the "
+        f"year {year}. A moment has come upon the court: \"{title}\". {summary} "
+        f"The ruler, {monarch_name}, is known for being {traits_str}.{recent_clause}"
+        f"Write 2-3 sentences in the second person ('you'), in a formal, dramatic "
+        f"medieval voice, that set the scene and lay the weight of this dilemma "
+        f"upon {monarch_name}. Do not propose, list, or describe any choices — "
+        f"end on the tension of the decision yet to be made. No modern language, "
+        f"no lists."
+    )
+
+
+def generate_story_moment_fallback(title: str, summary: str, year: int) -> str:
+    """Deterministic, non-empty fallback when the LLM is unavailable (Story 10-2).
+
+    Always contains the title, the year, and uses the summary.
+    """
+    return (
+        f"In the year {year}, a moment of reckoning came to your court: "
+        f"\"{title}\". {summary} The decision now rests with you, and the realm "
+        f"awaits your word."
+    )

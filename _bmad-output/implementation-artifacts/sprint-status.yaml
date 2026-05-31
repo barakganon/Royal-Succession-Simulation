@@ -298,7 +298,7 @@ development_status:
   # story_moment interrupt in turn_processor; LLM prompt builder for prose generation
   # per template (receives monarch traits, relationships, recent events, choices);
   # templates/story_moment.html full-screen modal with prose + 3 choice cards.
-  10-2-story-moment-interrupt-and-modal: backlog
+  10-2-story-moment-interrupt-and-modal: done
 
   # Story 10-3: Effect applicator + chronicle integration
   # Effect applicator mutates dynasty state per chosen choice (trait add, relation
