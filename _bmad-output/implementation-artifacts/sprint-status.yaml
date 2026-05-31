@@ -304,7 +304,7 @@ development_status:
   # Effect applicator mutates dynasty state per chosen choice (trait add, relation
   # delta, prestige, exile, etc.); each chosen choice creates a chronicle entry with
   # LLM prose + choice description; 5-turn cooldown between story moments.
-  10-3-effect-applicator-and-cooldown: backlog
+  10-3-effect-applicator-and-cooldown: ready-for-dev
 
   epic-10-retrospective: optional
 
