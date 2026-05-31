@@ -1,15 +1,13 @@
 # models/__init__.py
 
 # This file makes the 'models' directory a Python package.
-# It also provides a convenient way to import all core model classes.
+# The live application uses the SQLAlchemy ORM models in db_models.py
+# (PersonDB, DynastyDB, ...) and the modern subsystem classes
+# (EconomySystem, MilitarySystem, ...). The legacy in-memory simulation
+# classes (Person, FamilyTree) were retired in Story 11-1.
 
-from .person import Person
 from .history import History
-from .family_tree import FamilyTree
 from utils.logging_config import setup_logger
 
-# You can define a list of all public objects of this module if desired:
-# __all__ = ['Person', 'History', 'FamilyTree']
-
 _logger = setup_logger('royal_succession.models')
-_logger.debug("Core simulation models (Person, History, FamilyTree) initialized for import.")
+_logger.debug("models package initialized for import.")

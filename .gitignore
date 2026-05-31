@@ -25,3 +25,5 @@ static/visualizations/
 
 # Claude internal
 .claude/worktrees/
+*.bak
+cookies.txt

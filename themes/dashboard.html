@@ -6,7 +6,7 @@
   <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">Your Dashboard</h1>
     <div class="btn-toolbar mb-2 mb-md-0">
-      <a href="{{ url_for('create_dynasty_placeholder') }}" class="btn btn-sm btn-outline-success">
+      <a href="{{ url_for('dynasty.create_dynasty') }}" class="btn btn-sm btn-outline-success">
         <!-- Add SVG icon for new dynasty -->
         <span data-feather="plus-circle"></span>
         Start New Dynasty
@@ -18,7 +18,7 @@
   {% if dynasties %}
     <div class="list-group">
       {% for dynasty in dynasties %}
-        <a href="{{ url_for('view_dynasty_placeholder', dynasty_id=dynasty.id) }}" class="list-group-item list-group-item-action">
+        <a href="{{ url_for('dynasty.view_dynasty', dynasty_id=dynasty.id) }}" class="list-group-item list-group-item-action">
           <div class="d-flex w-100 justify-content-between">
             <h5 class="mb-1">{{ dynasty.name }}</h5>
             <small>Year: {{ dynasty.current_simulation_year }}</small>

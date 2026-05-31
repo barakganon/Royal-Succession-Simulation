@@ -943,19 +943,3 @@ def game_advisor(dynasty_id):
     flask_session.modified = True
 
     return jsonify({'suggestions': suggestions})
-
-
-# ---------------------------------------------------------------------------
-# Placeholder routes for backward compatibility
-# ---------------------------------------------------------------------------
-
-@map_bp.route('/dynasty/create_placeholder')
-@login_required
-def create_dynasty_placeholder():
-    return redirect(url_for('dynasty.create_dynasty'))
-
-
-@map_bp.route('/dynasty/<int:dynasty_id>/view_placeholder')
-@login_required
-def view_dynasty_placeholder(dynasty_id):
-    return redirect(url_for('dynasty.view_dynasty', dynasty_id=dynasty_id))
