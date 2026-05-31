@@ -259,7 +259,7 @@ development_status:
 
   # ── EPIC 9: LLM Storytelling Spine (Sprint 9) ──────────────────────────────
   # Goal: LLM as connective tissue across all events. Names → characters, numbers → stakes.
-  epic-9: in-progress
+  epic-9: done
 
   # Story 9-1: Event flavor prompt builders
   # Add 7 prompt builders to utils/llm_prompts.py (each with deterministic fallback):
@@ -278,7 +278,7 @@ development_status:
   # When AI dynasty does something significant, generate "letter from the east"
   # entry on player's chronicle; async background thread for turns with 5+ LLM calls;
   # per-event calls must not block the turn.
-  9-3-world-news-and-async-llm: backlog
+  9-3-world-news-and-async-llm: done
 
   epic-9-retrospective: optional
 

@@ -1206,11 +1206,53 @@ class GameManager:
                         f"(strength {own_strength} vs {target_strength})"
                     )
                     dynasty.infamy += 10
+                    # World News: write a narrated 'letter from afar' to player
+                    # dynasties belonging to the AI dynasty's user.
+                    self._record_world_news(
+                        dynasty,
+                        f"declared war on House {target.name}",
+                        dynasty.current_simulation_year,
+                    )
                     self.session.commit()
                 return  # attempt at most one war declaration per turn
 
         except Exception as e:
             self.logger.error(f"Error in _consider_war for dynasty {dynasty_id}: {str(e)}")
+
+    def _record_world_news(self, actor_dynasty, action_desc: str, year: int) -> None:
+        """Write a narrated 'letter from afar' world-news event to the history
+        log of every PLAYER (non-AI) dynasty belonging to the actor's user.
+
+        LLM-guarded via narrate_event (falls back to a deterministic string
+        when no LLM is configured). Never raises.
+        """
+        try:
+            from utils.llm_narration import narrate_event
+            from utils.llm_prompts import (
+                build_world_news_prompt,
+                generate_world_news_fallback,
+            )
+
+            player_dynasties = self.session.query(DynastyDB).filter_by(
+                user_id=actor_dynasty.user_id, is_ai_controlled=False
+            ).all()
+
+            for player_dyn in player_dynasties:
+                event_string = narrate_event(
+                    build_world_news_prompt(
+                        actor_dynasty.name, action_desc, player_dyn.name, year
+                    ),
+                    generate_world_news_fallback(actor_dynasty.name, action_desc, year),
+                    max_tokens=120,
+                )
+                self.session.add(HistoryLogEntryDB(
+                    dynasty_id=player_dyn.id,
+                    year=year,
+                    event_type='world_news',
+                    event_string=event_string,
+                ))
+        except Exception as e:
+            self.logger.error(f"Error in _record_world_news: {str(e)}")
     
     def _make_diplomacy_decision(self, dynasty_id: int, risk_tolerance: float) -> None:
         """
