@@ -305,6 +305,19 @@ def view_dynasty(dynasty_id):
                            current_year=dynasty.current_simulation_year)
 
 
+def _ai_turns_job(user_id):
+    """Process AI dynasty turns for ``user_id``.
+
+    Runs inside the background thread's app context (see
+    ``utils.async_narration.run_in_background``). ``db.session`` here is a fresh
+    thread-local session; only the scalar ``user_id`` is passed across the thread
+    boundary — never ORM objects.
+    """
+    from models.game_manager import GameManager
+    from models.db_models import db
+    GameManager(db.session).process_ai_turns(user_id)
+
+
 @dynasty_bp.route('/dynasty/<int:dynasty_id>/advance_turn')
 @login_required
 @block_if_turn_processing
@@ -387,17 +400,29 @@ def advance_turn(dynasty_id):
         # controllers are auto-created on first run.  A fresh GameManager is created
         # with the current db.session so it shares the same transaction context.
         try:
-            game_manager = GameManager(db.session)
-            ai_success, ai_message = game_manager.process_ai_turns(user_id=current_user.id)
-            if not ai_success:
-                logger.warning(
-                    f"advance_turn: process_ai_turns returned failure for user "
-                    f"{current_user.id}: {ai_message}"
+            from utils.async_narration import run_in_background, should_offload_ai_turns
+            if should_offload_ai_turns(db.session, current_user.id):
+                # Heavy + LLM-on: offload AI processing to a daemon thread so the
+                # player's turn returns immediately. The thread re-queries with a
+                # fresh thread-local session inside its own app context.
+                run_in_background(
+                    current_app._get_current_object(),
+                    _ai_turns_job,
+                    current_user.id,
                 )
+                flash('The wider world stirs; distant courts act in the background.', 'info')
             else:
-                logger.info(
-                    f"advance_turn: AI turns complete for user {current_user.id}"
-                )
+                game_manager = GameManager(db.session)
+                ai_success, ai_message = game_manager.process_ai_turns(user_id=current_user.id)
+                if not ai_success:
+                    logger.warning(
+                        f"advance_turn: process_ai_turns returned failure for user "
+                        f"{current_user.id}: {ai_message}"
+                    )
+                else:
+                    logger.info(
+                        f"advance_turn: AI turns complete for user {current_user.id}"
+                    )
         except Exception as e:
             # AI turn failure must not abort the human player's turn result
             logger.error(
