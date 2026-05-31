@@ -197,3 +197,4 @@ Task 1-4 remains (chronicle prompt update).
 | 9-1 | 5 event-flavor prompt builders + deterministic fallbacks (birth/death/battle/world-news/construction) (2 worktree agents) — 468 green | Done |
 | 9-2 | Lifecycle event-flavor: birth/death/battle narrated via narrate_event + 9-1 prompts (fallback when LLM off) (3 worktree agents) — 474 green. Construction flavor descoped (pre-existing Building schema gap) | Done |
 | 9-3 | World-news 'letters from afar' on AI war + async process_ai_turns offload (daemon thread when LLM-on + 5+ calls; sync path preserved) (3 worktree agents) — 482 green. Epic 9 complete | Done |
+| 10-1 | Story-moment template library (9 vignettes) + precondition matcher + weighted trigger (2 worktree agents) — 509 green | Done |

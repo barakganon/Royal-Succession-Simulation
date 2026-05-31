@@ -292,7 +292,7 @@ development_status:
   # dueling_lords, bonds_of_kin, fading_heir, letter_from_east, etc.);
   # STORY_MOMENT_TEMPLATES list with preconditions, mechanical_choices, effects dicts;
   # maybe_trigger_story_moment(dynasty_state) with 5% base + state weighting.
-  10-1-story-moment-templates: ready-for-dev
+  10-1-story-moment-templates: done
 
   # Story 10-2: Story moment interrupt + modal template
   # story_moment interrupt in turn_processor; LLM prompt builder for prose generation

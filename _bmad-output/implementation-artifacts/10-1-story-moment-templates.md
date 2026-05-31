@@ -1,6 +1,6 @@
 # Story 10-1: Story-Moment Template Library + Trigger
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
