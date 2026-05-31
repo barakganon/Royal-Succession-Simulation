@@ -381,6 +381,9 @@
     </div>
   </div>
 
+  <!-- ══════════════ Story 10-2: STORY MOMENT MODAL ══════════════ -->
+  {% include 'story_moment.html' %}
+
 </div><!-- /game-viewport -->
 {% endblock %}
 
@@ -545,6 +548,12 @@ function endTurn(event) {
         if (reason === 'heir_majority') {
           _restoreEndTurnBtn();
           openHeirMajorityNotice();
+          return;
+        }
+        /* Story 10-2: a story moment interrupted the turn → present the dilemma. */
+        if (reason === 'story_moment') {
+          _restoreEndTurnBtn();
+          openStoryMomentModal(summary.story_moment);
           return;
         }
         window.location = data.redirect || (btn && btn.getAttribute('href')) || advanceTurnUrl;
@@ -766,6 +775,93 @@ function _wireCivilWarButtons() {
   });
 }
 window.openCivilWarModal = openCivilWarModal;
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Story 10-2: Story-moment modal — LLM prose + 2–3 choice cards.
+   Opens when a turn is interrupted with interrupt_reason === 'story_moment'.
+   Each choice POSTs {template, choice} JSON to story_moment_choice then reloads.
+   All user-facing text set via textContent (no innerHTML injection).
+   ══════════════════════════════════════════════════════════════════════════ */
+var STORY_MOMENT_CHOICE_URL = {% if dynasty_id %}"{{ url_for('dynasty.story_moment_choice', dynasty_id=dynasty_id) }}"{% else %}null{% endif %};
+
+function _hideStoryMomentModal() {
+  var modal = document.getElementById('story-moment-modal');
+  if (modal) {
+    modal.hidden = true;
+    modal.classList.remove('is-open');
+  }
+  if (typeof _setEndTurnDisabled === 'function') _setEndTurnDisabled(false);
+}
+
+function _resolveStoryMoment(templateKey, choiceKey) {
+  if (!STORY_MOMENT_CHOICE_URL) { _hideStoryMomentModal(); return; }
+  var btns = document.querySelectorAll('#story-moment-choices .story-moment-choice-btn');
+  btns.forEach(function (b) { b.disabled = true; });
+
+  fetch(STORY_MOMENT_CHOICE_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Accept': 'application/json'
+    },
+    credentials: 'same-origin',
+    body: JSON.stringify({ template: templateKey, choice: choiceKey })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data && data.ok) {
+        if (data.message && typeof _pushTurnToast === 'function') {
+          _pushTurnToast(data.message, 'world_event', '');
+        }
+        window.location.reload();
+        return;
+      }
+      btns.forEach(function (b) { b.disabled = false; });
+      if (data && data.message && typeof _pushTurnToast === 'function') {
+        _pushTurnToast(data.message, 'world_event', '');
+      }
+    })
+    .catch(function (err) {
+      console.error('Story moment resolve error:', err);
+      btns.forEach(function (b) { b.disabled = false; });
+    });
+}
+
+function openStoryMomentModal(sm) {
+  var modal = document.getElementById('story-moment-modal');
+  if (!modal || !sm) { _hideStoryMomentModal(); return; }
+
+  var titleEl = document.getElementById('story-moment-title');
+  var proseEl = document.getElementById('story-moment-prose');
+  var choicesEl = document.getElementById('story-moment-choices');
+
+  if (titleEl) titleEl.textContent = sm.title || 'A Moment of Decision';
+  if (proseEl) proseEl.textContent = sm.prose || '';
+
+  if (choicesEl) {
+    choicesEl.innerHTML = '';
+    var choices = sm.choices || [];
+    choices.forEach(function (choice) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'story-moment-choice-btn';
+      btn.textContent = choice.label || '';
+      if (choice.description) btn.title = choice.description;
+      btn.setAttribute('data-choice-key', choice.key || '');
+      btn.setAttribute('data-template-key', sm.key || '');
+      btn.addEventListener('click', function () {
+        _resolveStoryMoment(sm.key, choice.key);
+      });
+      choicesEl.appendChild(btn);
+    });
+  }
+
+  modal.hidden = false;
+  modal.classList.add('is-open');
+  if (typeof _setEndTurnDisabled === 'function') _setEndTurnDisabled(true);
+}
+window.openStoryMomentModal = openStoryMomentModal;
 
 /* ══════════════════════════════════════════════════════════════════════════
    Story 5-4: Heir-majority notice — lighter banner, no endpoint.
