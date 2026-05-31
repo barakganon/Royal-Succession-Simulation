@@ -285,14 +285,14 @@ development_status:
   # ── EPIC 10: Story Moment Events (Sprint 10) ───────────────────────────────
   # Goal: Occasional branching narrative vignettes with 2-3 player choices.
   # Depends on: Epic 6 (traits matter), Epic 9 (LLM hooked in).
-  epic-10: backlog
+  epic-10: in-progress
 
   # Story 10-1: Story moment template library
   # models/story_moments.py with 8 templates (forbidden_love, council_whispers,
   # dueling_lords, bonds_of_kin, fading_heir, letter_from_east, etc.);
   # STORY_MOMENT_TEMPLATES list with preconditions, mechanical_choices, effects dicts;
   # maybe_trigger_story_moment(dynasty_state) with 5% base + state weighting.
-  10-1-story-moment-templates: backlog
+  10-1-story-moment-templates: done
 
   # Story 10-2: Story moment interrupt + modal template
   # story_moment interrupt in turn_processor; LLM prompt builder for prose generation
