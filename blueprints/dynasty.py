@@ -1451,6 +1451,59 @@ def civil_war_resolve(dynasty_id):
     return jsonify({"ok": True, "message": message})
 
 
+@dynasty_bp.route('/dynasty/<int:dynasty_id>/story_moment_choice', methods=['POST'])
+@login_required
+@block_if_turn_processing
+def story_moment_choice(dynasty_id):
+    """Record and dismiss a story-moment choice (Story 10-2).
+
+    Mechanical effects (prestige/wealth/trait changes) are NOT applied here;
+    that is Story 10-3. This route validates the chosen template + choice and
+    writes a story_moment chronicle line.
+    """
+    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    if dynasty.owner_user != current_user:
+        return jsonify({"error": "Not authorized."}), 403
+
+    data = request.get_json(silent=True) or request.form
+    template_key = (data.get('template') or '').strip()
+    choice_key = (data.get('choice') or '').strip()
+
+    from models.story_moments import STORY_MOMENT_TEMPLATES
+
+    tmpl = next((t for t in STORY_MOMENT_TEMPLATES if t['key'] == template_key), None)
+    if tmpl is None:
+        return jsonify({"ok": False, "message": "Unknown story moment."}), 400
+
+    chosen = next(
+        (c for c in tmpl['mechanical_choices'] if c['key'] == choice_key), None
+    )
+    if chosen is None:
+        return jsonify({"ok": False, "message": "Invalid choice."}), 400
+
+    try:
+        event_string = (
+            chosen.get('effects', {}).get('chronicle_note')
+            or chosen['description']
+        )
+        db.session.add(HistoryLogEntryDB(
+            dynasty_id=dynasty_id,
+            year=dynasty.current_simulation_year,
+            event_type='story_moment',
+            event_string=event_string,
+        ))
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(
+            f"Error recording story moment choice for dynasty {dynasty_id}: {e}",
+            exc_info=True,
+        )
+        return jsonify({"ok": False, "message": "Failed to record the choice."}), 500
+
+    return jsonify({"ok": True, "message": chosen['label']})
+
+
 @dynasty_bp.route('/dynasty/<int:dynasty_id>/family_tree')
 @login_required
 def family_tree(dynasty_id):
