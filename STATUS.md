@@ -200,3 +200,4 @@ Task 1-4 remains (chronicle prompt update).
 | 10-1 | Story-moment template library (9 vignettes) + precondition matcher + weighted trigger (2 worktree agents) — 509 green | Done |
 | 10-2 | Story-moment turn interrupt + LLM prose + full-screen choice modal + choice route (record/dismiss; effects in 10-3) (4 worktree agents) — 530 green | Done |
 | 10-3 | Story-moment effect applicator (prestige/wealth/infamy/trait; exile/relation narrative-only) + 25y (~5-turn) cooldown (3 worktree agents) — 542 green. Epic 10 complete | Done |
+| 11-1 | Retire legacy simulation_engine + Person/FamilyTree/EconomyManager + dead routes/tests/junk (~1450 lines); repoint base.html nav to real routes — 536 green | Done |

@@ -311,14 +311,14 @@ development_status:
   # ── EPIC 11: Code Cleanup (Sprint 11) ──────────────────────────────────────
   # Goal: Pay down all technical debt from sprints 1-10.
   # Note: This sprint is also where deferred-work.md items land.
-  epic-11: backlog
+  epic-11: in-progress
 
   # Story 11-1: Delete dead code
   # simulation_engine.py.bak, models/economy.py, models/person.py, models/family_tree.py
   # (after Sprint 8), visualization/plotter.py (after Sprint 8), templates/action_phase.html
   # (after Sprint 3), all 99 visualizations/family_tree_*.png, cookies.txt, flask_app.log.
   # Two dead placeholder routes in blueprints/map.py.
-  11-1-delete-dead-code: backlog
+  11-1-delete-dead-code: done
 
   # Story 11-2: Flask-Migrate / Alembic adoption
   # Replace ad-hoc ALTER TABLE in db_initialization.py with Alembic; initial migration

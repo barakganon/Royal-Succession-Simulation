@@ -13,6 +13,9 @@ import sys
 import logging
 import atexit
 from functools import wraps
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(
@@ -38,7 +41,6 @@ from models.economy_system import EconomySystem
 from models.time_system import TimeSystem, Season, EventType, EventPriority, GamePhase
 from models.game_manager import GameManager
 from models.db_initialization import DatabaseInitializer
-from simulation_engine import SimulationEngine
 from models.military_system import MilitarySystem
 from visualization.map_renderer import MapRenderer
 from visualization.military_renderer import MilitaryRenderer
