@@ -1,6 +1,6 @@
 # Story 11-1: Retire the Legacy Simulation Engine + Delete Dead Code
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -53,7 +53,9 @@ The deletions are tightly coupled (each module + its importers + `models/__init_
 ### Agent Model Used
 claude-opus-4-8[1m] — single coordinated main-session pass (no sub-agents; coupled deletions).
 ### Completion Notes List
-- _pending_
+- Done as a single coordinated main-session pass. ~1,450 lines of dead code removed. Full suite **536 passed** (542 - 6 tests from the 4 deleted dead-test files), 0 failures; app imports clean; dashboard/create/world-map/dynasty-view/economy routes all 200 live.
+- **Correction to the plan:** the two `map.py` placeholder routes were NOT dead — `templates/base.html`'s nav ("New Dynasty") and `themes/{base,dashboard}.html` linked to `map.create_dynasty_placeholder` / `view_dynasty_placeholder`. Deleting them first broke every base.html-extending page (72 failures). Fixed by repointing those template links directly to the real `dynasty.create_dynasty` / `dynasty.view_dynasty` routes, then the shims stayed deleted. (4th plan-vs-code reconciliation this session.)
+- `models/history.py` left in place (out of scope); its `from .person import Person` is TYPE_CHECKING-only so it survives the `person.py` deletion at runtime.
 ### File List
 - DELETE: `simulation_engine.py`, `simulation_engine.py.bak`, `run_local_simulation.py`, `models/person.py`, `models/family_tree.py`, `models/economy.py`, `cookies.txt`, `tests/test_imports.py`, `tests/test_single_import.py`, `tests/test_flask.py`, `tests/unit/test_simulation_engine.py`
 - MODIFY: `main_flask_app.py` (drop unused import), `blueprints/economy.py` (drop add_holding), `blueprints/map.py` (drop 2 placeholder routes), `models/__init__.py` (drop re-exports), `.gitignore`
