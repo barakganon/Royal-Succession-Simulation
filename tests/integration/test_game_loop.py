@@ -156,7 +156,7 @@ class TestAdvanceTurn:
         with patch('models.turn_processor.process_death_check', return_value=False):
             dynasty_client.get(f'/dynasty/{dynasty_id}/advance_turn', follow_redirects=True)
         with app.app_context():
-            dynasty = db.session.query(DynastyDB).get(dynasty_id)
+            dynasty = db.session.get(DynastyDB, dynasty_id)
             assert dynasty.current_simulation_year == 1305
 
     def test_advance_turn_shows_flash(self, dynasty_client, app, db):
@@ -194,7 +194,7 @@ class TestAdvanceMultipleTurns:
                     f'/dynasty/{dynasty_id}/advance_turn', follow_redirects=True
                 )
         with app.app_context():
-            dynasty = db.session.query(DynastyDB).get(dynasty_id)
+            dynasty = db.session.get(DynastyDB, dynasty_id)
             # start 1300 + 3 turns × 5 years = 1315
             assert dynasty.current_simulation_year == 1315
 
@@ -256,7 +256,7 @@ class TestSuccession:
 
         with app.app_context():
             # Original monarch should now be dead
-            dead_monarch = db.session.query(PersonDB).get(original_monarch_id)
+            dead_monarch = db.session.get(PersonDB, original_monarch_id)
             assert dead_monarch.death_year is not None
 
             # Succession should have produced a new living monarch
@@ -327,7 +327,7 @@ class TestAdvanceTurnUnauthorized:
 
             # The dynasty's year must not have advanced
             with app.app_context():
-                dynasty = db.session.query(DynastyDB).get(dynasty_id)
+                dynasty = db.session.get(DynastyDB, dynasty_id)
                 assert dynasty.current_simulation_year == 1300
         finally:
             with app.app_context():

@@ -126,7 +126,7 @@ class TestGameFlow:
 
         # Check that the year was advanced by 5
         with app.app_context():
-            dynasty = db.session.query(DynastyDB).get(dynasty_id)
+            dynasty = db.session.get(DynastyDB, dynasty_id)
             assert dynasty.current_simulation_year == 1405
 
         # 5. View the world map
@@ -157,7 +157,7 @@ class TestGameFlow:
                 client.get(f'/dynasty/{dynasty_id}/advance_turn', follow_redirects=True)
 
         with app.app_context():
-            dynasty = db.session.query(DynastyDB).get(dynasty_id)
+            dynasty = db.session.get(DynastyDB, dynasty_id)
             # Started at 1400, advanced 4 turns × 5 years each = 1420
             assert dynasty.current_simulation_year == 1420
 
@@ -211,8 +211,8 @@ class TestMultiDynastyInteraction:
 
         # Verify both dynasties advanced 5 years
         with app.app_context():
-            dynasty_a = db.session.query(DynastyDB).get(dynasty_a_id)
-            dynasty_b = db.session.query(DynastyDB).get(dynasty_b_id)
+            dynasty_a = db.session.get(DynastyDB, dynasty_a_id)
+            dynasty_b = db.session.get(DynastyDB, dynasty_b_id)
             assert dynasty_a.current_simulation_year == 1405
             assert dynasty_b.current_simulation_year == 1405
 

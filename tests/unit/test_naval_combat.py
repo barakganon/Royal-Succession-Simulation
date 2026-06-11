@@ -30,14 +30,14 @@ def _make_army(army_id: int, dynasty_id: int, units) -> MagicMock:
 
 
 def _make_military_system(armies: dict) -> MilitarySystem:
-    """Return a MilitarySystem whose session.query(Army).get() resolves from *armies*."""
+    """Return a MilitarySystem whose session.get() resolves from *armies*."""
     session = MagicMock()
 
-    # Make session.query(Army).get(x) return armies[x]
-    def _get(army_id):
-        return armies.get(army_id)
+    # Make session.get(Model, id) return armies[id] (SQLAlchemy 2.0 API)
+    def _session_get(model_class, pk):
+        return armies.get(pk)
 
-    session.query.return_value.get.side_effect = _get
+    session.get.side_effect = _session_get
 
     # Also mock DynastyDB query to return None (no winter season)
     ms = MilitarySystem.__new__(MilitarySystem)

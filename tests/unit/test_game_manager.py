@@ -35,7 +35,7 @@ class TestGameManager:
             assert success is True, f"create_new_game failed: {message}"
             assert dynasty_id is not None
 
-            dynasty = session.query(DynastyDB).get(dynasty_id)
+            dynasty = session.get(DynastyDB, dynasty_id)
             assert dynasty is not None
             assert dynasty.user_id == user.id
 
