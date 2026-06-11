@@ -358,7 +358,7 @@ def generate_family_tree_svg(dynasty_id: int, session, current_year=None,
 
         # --- Resolve current_year ---
         if current_year is None:
-            dynasty = session.query(DynastyDB).get(dynasty_id)
+            dynasty = session.get(DynastyDB, dynasty_id)
             current_year = getattr(dynasty, 'current_simulation_year', None) if dynasty else None
         if current_year is None:
             years = [p.birth_year for p in people if p.birth_year is not None]
@@ -379,7 +379,7 @@ def generate_family_tree_svg(dynasty_id: int, session, current_year=None,
             spouse_of[p.id] = sid
             sp_obj = people_by_id.get(sid)
             if sp_obj is None:
-                sp_obj = session.query(PersonDB).get(sid)
+                sp_obj = session.get(PersonDB, sid)
             if sp_obj is not None:
                 spouse_dynasty[sid] = sp_obj.dynasty_id
                 spouse_obj_by_id[sid] = sp_obj

@@ -95,7 +95,7 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
     The 3-tuple shape is preserved exactly so existing callers in
     ``blueprints/dynasty.py`` (advance_turn, submit_actions) keep working.
     """
-    dynasty = DynastyDB.query.get(dynasty_id)
+    dynasty = db.session.get(DynastyDB, dynasty_id)
     if not dynasty:
         return False, "Dynasty not found"
 
@@ -431,7 +431,7 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
         logger.error(f"Error generating turn story for dynasty {dynasty_id}: {story_err}", exc_info=True)
 
     living_count = PersonDB.query.filter_by(dynasty_id=dynasty_id, death_year=None).count()
-    dynasty_obj = DynastyDB.query.get(dynasty_id)
+    dynasty_obj = db.session.get(DynastyDB, dynasty_id)
     current_wealth = dynasty_obj.current_wealth if dynasty_obj else 0
 
     turn_summary = {
@@ -550,7 +550,7 @@ def process_death_check(person: PersonDB, current_year: int, theme_config: dict)
         from utils.llm_narration import narrate_event
         from utils.llm_prompts import build_death_flavor_prompt, generate_death_flavor_fallback
 
-        death_dynasty = DynastyDB.query.get(person.dynasty_id)
+        death_dynasty = db.session.get(DynastyDB, person.dynasty_id)
         death_house = death_dynasty.name if death_dynasty else "their house"
         person_full_name = f"{person.name} {person.surname}"
 
@@ -633,7 +633,7 @@ def process_marriage_check(dynasty: DynastyDB, person: PersonDB, current_year: i
                 generate_wedding_fallback,
             )
 
-            partner_dynasty = DynastyDB.query.get(partner.dynasty_id)
+            partner_dynasty = db.session.get(DynastyDB, partner.dynasty_id)
             person_house = dynasty.name
             partner_house = partner_dynasty.name if partner_dynasty else partner.surname
 
@@ -826,7 +826,7 @@ def process_childbirth_check(dynasty: DynastyDB, woman: PersonDB, current_year: 
     if woman.spouse_sim_id is None:
         return False
 
-    spouse = PersonDB.query.get(woman.spouse_sim_id)
+    spouse = db.session.get(PersonDB, woman.spouse_sim_id)
     if not spouse or spouse.death_year is not None:
         return False
 
@@ -882,7 +882,7 @@ def process_childbirth_check(dynasty: DynastyDB, woman: PersonDB, current_year: 
         # Each parent trait is inherited with probability 0.30, deduplicated,
         # capped at 3 inherited traits total.
         parent_traits = list(woman.get_traits())
-        father = PersonDB.query.get(woman.spouse_sim_id) if woman.spouse_sim_id else None
+        father = db.session.get(PersonDB, woman.spouse_sim_id) if woman.spouse_sim_id else None
         if father:
             parent_traits.extend(father.get_traits())
 

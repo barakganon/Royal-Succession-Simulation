@@ -52,7 +52,7 @@ class MarriageSystem:
         results = []
         try:
             if year is None:
-                requesting = self.session.query(DynastyDB).get(dynasty_id)
+                requesting = self.session.get(DynastyDB, dynasty_id)
                 year = requesting.current_simulation_year if requesting else 0
 
             candidates = (
@@ -74,7 +74,7 @@ class MarriageSystem:
 
                 dyn = dynasty_cache.get(person.dynasty_id)
                 if dyn is None and person.dynasty_id is not None:
-                    dyn = self.session.query(DynastyDB).get(person.dynasty_id)
+                    dyn = self.session.get(DynastyDB, person.dynasty_id)
                     dynasty_cache[person.dynasty_id] = dyn
 
                 results.append({
@@ -111,7 +111,7 @@ class MarriageSystem:
         """
         results = []
         try:
-            requesting = self.session.query(DynastyDB).get(dynasty_id)
+            requesting = self.session.get(DynastyDB, dynasty_id)
             year = requesting.current_simulation_year if requesting else 0
 
             opposite = 'FEMALE' if (target_gender or '').upper() == 'MALE' else 'MALE'
@@ -172,8 +172,8 @@ class MarriageSystem:
         )
 
         try:
-            proposer = self.session.query(PersonDB).get(proposer_person_id)
-            target = self.session.query(PersonDB).get(target_person_id)
+            proposer = self.session.get(PersonDB, proposer_person_id)
+            target = self.session.get(PersonDB, target_person_id)
 
             if proposer is None or target is None:
                 return {'ok': False, 'accepted': False,
@@ -196,8 +196,8 @@ class MarriageSystem:
                         'message': 'The betrothed must belong to different dynasties.',
                         'offer_id': None}
 
-            proposer_dynasty = self.session.query(DynastyDB).get(proposer.dynasty_id)
-            target_dynasty = self.session.query(DynastyDB).get(target.dynasty_id)
+            proposer_dynasty = self.session.get(DynastyDB, proposer.dynasty_id)
+            target_dynasty = self.session.get(DynastyDB, target.dynasty_id)
 
             offer = MarriageOfferDB(
                 proposer_dynasty_id=proposer.dynasty_id,

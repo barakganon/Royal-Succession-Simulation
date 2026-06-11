@@ -169,7 +169,7 @@ class MapGenerator:
                 else:
                     # 30% chance for different terrain
                     terrain_weights = self._get_terrain_weights_for_climate(
-                        self.session.query(Region).get(province.region_id).base_climate
+                        self.session.get(Region, province.region_id).base_climate
                     )
                     terrain_type = random.choices(
                         list(TerrainType), 
@@ -824,7 +824,7 @@ class TerritoryManager:
         Returns:
             The updated territory
         """
-        territory = self.session.query(Territory).get(territory_id)
+        territory = self.session.get(Territory, territory_id)
         if not territory:
             raise ValueError(f"Territory with ID {territory_id} not found")
         
@@ -835,7 +835,7 @@ class TerritoryManager:
         # If this is the capital, update the dynasty's capital territory
         if is_capital:
             from models.db_models import DynastyDB
-            dynasty = self.session.query(DynastyDB).get(dynasty_id)
+            dynasty = self.session.get(DynastyDB, dynasty_id)
             if dynasty:
                 dynasty.capital_territory_id = territory_id
         
@@ -853,7 +853,7 @@ class TerritoryManager:
         Returns:
             The updated territory
         """
-        territory = self.session.query(Territory).get(territory_id)
+        territory = self.session.get(Territory, territory_id)
         if not territory:
             raise ValueError(f"Territory with ID {territory_id} not found")
         
@@ -1086,11 +1086,11 @@ class MovementSystem:
         Returns:
             Tuple of (success, message)
         """
-        unit = self.session.query(MilitaryUnit).get(unit_id)
+        unit = self.session.get(MilitaryUnit, unit_id)
         if not unit:
             return False, f"Unit with ID {unit_id} not found"
         
-        target_territory = self.session.query(Territory).get(target_territory_id)
+        target_territory = self.session.get(Territory, target_territory_id)
         if not target_territory:
             return False, f"Territory with ID {target_territory_id} not found"
         
@@ -1103,7 +1103,7 @@ class MovementSystem:
             return False, "Unit is part of an army and cannot move independently"
         
         # Get current territory
-        current_territory = self.session.query(Territory).get(unit.territory_id) if unit.territory_id else None
+        current_territory = self.session.get(Territory, unit.territory_id) if unit.territory_id else None
         if not current_territory:
             # Unit is not currently on the map, can be placed anywhere
             unit.territory_id = target_territory_id
@@ -1142,11 +1142,11 @@ class MovementSystem:
         Returns:
             Tuple of (success, message)
         """
-        army = self.session.query(Army).get(army_id)
+        army = self.session.get(Army, army_id)
         if not army:
             return False, f"Army with ID {army_id} not found"
         
-        target_territory = self.session.query(Territory).get(target_territory_id)
+        target_territory = self.session.get(Territory, target_territory_id)
         if not target_territory:
             return False, f"Territory with ID {target_territory_id} not found"
         
@@ -1155,7 +1155,7 @@ class MovementSystem:
             return True, "Army is already in the target territory"
         
         # Get current territory
-        current_territory = self.session.query(Territory).get(army.territory_id) if army.territory_id else None
+        current_territory = self.session.get(Territory, army.territory_id) if army.territory_id else None
         if not current_territory:
             # Army is not currently on the map, can be placed anywhere
             army.territory_id = target_territory_id
@@ -1247,8 +1247,8 @@ class MovementSystem:
         """
         # In a real implementation, this would check a territory adjacency graph
         # For now, we'll use a simple distance-based approach
-        territory1 = self.session.query(Territory).get(territory1_id)
-        territory2 = self.session.query(Territory).get(territory2_id)
+        territory1 = self.session.get(Territory, territory1_id)
+        territory2 = self.session.get(Territory, territory2_id)
         
         if not territory1 or not territory2:
             return False
@@ -1277,8 +1277,8 @@ class MovementSystem:
             List of territory IDs representing the path
         """
         # Get territories
-        start_territory = self.session.query(Territory).get(start_territory_id)
-        end_territory = self.session.query(Territory).get(end_territory_id)
+        start_territory = self.session.get(Territory, start_territory_id)
+        end_territory = self.session.get(Territory, end_territory_id)
         
         if not start_territory or not end_territory:
             return []
@@ -1286,7 +1286,7 @@ class MovementSystem:
         # Get unit if provided
         unit = None
         if unit_id:
-            unit = self.session.query(MilitaryUnit).get(unit_id)
+            unit = self.session.get(MilitaryUnit, unit_id)
         
         # A* algorithm
         open_set = []
@@ -1322,7 +1322,7 @@ class MovementSystem:
             closed_set.add(current_id)
             
             # Get current territory
-            current_territory = self.session.query(Territory).get(current_id)
+            current_territory = self.session.get(Territory, current_id)
             
             # Get all territories
             all_territories = self.session.query(Territory).all()

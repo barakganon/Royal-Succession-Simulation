@@ -118,7 +118,7 @@ class MilitaryRenderer:
             Base64 encoded PNG image
         """
         # Get army
-        army = self.session.query(Army).get(army_id)
+        army = self.session.get(Army, army_id)
         if not army:
             return ""
         
@@ -169,7 +169,7 @@ class MilitaryRenderer:
         
         # Add commander info if available
         if army.commander_id:
-            commander = self.session.query(PersonDB).get(army.commander_id)
+            commander = self.session.get(PersonDB, army.commander_id)
             if commander:
                 commander_text = f"Commander: {commander.name} {commander.surname}\nMilitary Skill: {commander.military_skill}"
                 fig.text(0.5, 0.02, commander_text, ha='center', fontsize=10, bbox=dict(facecolor='white', alpha=0.5))
@@ -201,7 +201,7 @@ class MilitaryRenderer:
             Base64 encoded PNG image
         """
         # Get battle
-        battle = self.session.query(Battle).get(battle_id)
+        battle = self.session.get(Battle, battle_id)
         if not battle:
             return ""
         
@@ -266,9 +266,9 @@ class MilitaryRenderer:
         ax3.grid(True)
         
         # Add battle outcome
-        attacker_dynasty = self.session.query(DynastyDB).get(battle.attacker_dynasty_id)
-        defender_dynasty = self.session.query(DynastyDB).get(battle.defender_dynasty_id)
-        winner_dynasty = self.session.query(DynastyDB).get(battle.winner_dynasty_id) if battle.winner_dynasty_id else None
+        attacker_dynasty = self.session.get(DynastyDB, battle.attacker_dynasty_id)
+        defender_dynasty = self.session.get(DynastyDB, battle.defender_dynasty_id)
+        winner_dynasty = self.session.get(DynastyDB, battle.winner_dynasty_id) if battle.winner_dynasty_id else None
         
         if attacker_dynasty and defender_dynasty:
             battle_title = f"Battle between {attacker_dynasty.name} and {defender_dynasty.name}"
@@ -304,7 +304,7 @@ class MilitaryRenderer:
             Base64 encoded PNG image
         """
         # Get siege
-        siege = self.session.query(Siege).get(siege_id)
+        siege = self.session.get(Siege, siege_id)
         if not siege:
             return ""
         
@@ -326,9 +326,9 @@ class MilitaryRenderer:
         ax.set_yticks([])
         
         # Get territory and dynasties
-        territory = self.session.query(Territory).get(siege.territory_id)
-        attacker_dynasty = self.session.query(DynastyDB).get(siege.attacker_dynasty_id)
-        defender_dynasty = self.session.query(DynastyDB).get(siege.defender_dynasty_id)
+        territory = self.session.get(Territory, siege.territory_id)
+        attacker_dynasty = self.session.get(DynastyDB, siege.attacker_dynasty_id)
+        defender_dynasty = self.session.get(DynastyDB, siege.defender_dynasty_id)
         
         # Add siege information
         if territory and attacker_dynasty and defender_dynasty:
@@ -373,7 +373,7 @@ class MilitaryRenderer:
             Base64 encoded PNG image
         """
         # Get dynasty
-        dynasty = self.session.query(DynastyDB).get(dynasty_id)
+        dynasty = self.session.get(DynastyDB, dynasty_id)
         if not dynasty:
             return ""
         

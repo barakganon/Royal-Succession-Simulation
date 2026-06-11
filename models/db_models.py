@@ -255,7 +255,7 @@ class PersonDB(db.Model):
             age = 30  # sensible default
             if self.birth_year:
                 import datetime as _dt
-                age = max(0, _dt.datetime.utcnow().year - self.birth_year)
+                age = max(0, _dt.datetime.now(_dt.timezone.utc).year - self.birth_year)
             self.portrait_svg = _gen(
                 person_id=self.id if self.id is not None else hash(self.name + self.surname),
                 traits=traits,
@@ -828,7 +828,7 @@ class MilitaryUnit(db.Model):
             from sqlalchemy.orm import object_session
             session = object_session(self)
             if session:
-                commander = session.query(PersonDB).get(self.commander_id)
+                commander = session.get(PersonDB, self.commander_id)
                 if commander:
                     strength *= (1.0 + commander.calculate_command_bonus())
         
@@ -1021,7 +1021,7 @@ class War(db.Model):
             from sqlalchemy.orm import object_session
             session = object_session(self)
             if session:
-                territory = session.query(Territory).get(self.target_territory_id)
+                territory = session.get(Territory, self.target_territory_id)
                 if territory and territory.controller_dynasty_id == self.attacker_dynasty_id:
                     battle_score += 50  # Big bonus for achieving the war goal
         

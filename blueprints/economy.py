@@ -353,7 +353,7 @@ def territory_economy(territory_id):
 
     # Check if user has access to this territory
     if territory.controller_dynasty_id:
-        dynasty = DynastyDB.query.get(territory.controller_dynasty_id)
+        dynasty = db.session.get(DynastyDB, territory.controller_dynasty_id)
         if dynasty and dynasty.owner_user != current_user:
             flash("Not authorized.", "warning")
             return redirect(url_for('auth.dashboard'))

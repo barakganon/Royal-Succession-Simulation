@@ -4,6 +4,7 @@ Map renderer for the multi-agent strategic game.
 Handles rendering the game map for the web interface.
 """
 
+import logging
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import matplotlib.colors as mcolors
@@ -13,6 +14,8 @@ import base64
 import os
 from typing import Dict, List, Tuple, Optional, Any
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger('royal_succession.map_renderer')
 from models.db_models import (
     Territory, Region, Province, TerrainType, Settlement,
     Resource, TerritoryResource, Building, MilitaryUnit, Army
@@ -105,14 +108,14 @@ class MapRenderer:
             Base64 encoded PNG image
         """
         # Create figure
-        print("DEBUG: render_world_map - Creating figure")
+        logger.debug("render_world_map - Creating figure")
         fig, ax = plt.subplots(figsize=(width, height))
-        print("DEBUG: render_world_map - Figure created")
+        logger.debug("render_world_map - Figure created")
         
         # Get all territories
-        print("DEBUG: render_world_map - Getting all territories")
+        logger.debug("render_world_map - Getting all territories")
         territories = self.session.query(Territory).all()
-        print(f"DEBUG: render_world_map - Number of territories: {len(territories)}")
+        logger.debug(f"render_world_map - Number of territories: {len(territories)}")
         
         # Get dynasty-color mapping
         dynasty_colors = self._get_dynasty_colors()
@@ -160,7 +163,7 @@ class MapRenderer:
             
             for settlement in settlements:
                 # Get territory position
-                territory = self.session.query(Territory).get(settlement.territory_id)
+                territory = self.session.get(Territory, settlement.territory_id)
                 if not territory:
                     continue
                 
@@ -186,12 +189,12 @@ class MapRenderer:
             
             for tr in territory_resources:
                 # Get territory position
-                territory = self.session.query(Territory).get(tr.territory_id)
+                territory = self.session.get(Territory, tr.territory_id)
                 if not territory:
                     continue
                 
                 # Get resource
-                resource = self.session.query(Resource).get(tr.resource_id)
+                resource = self.session.get(Resource, tr.resource_id)
                 if not resource:
                     continue
                 
@@ -223,7 +226,7 @@ class MapRenderer:
             
             for army in armies:
                 # Get territory position
-                territory = self.session.query(Territory).get(army.territory_id)
+                territory = self.session.get(Territory, army.territory_id)
                 if not territory:
                     continue
                 
@@ -249,7 +252,7 @@ class MapRenderer:
             
             for unit in units:
                 # Get territory position
-                territory = self.session.query(Territory).get(unit.territory_id)
+                territory = self.session.get(Territory, unit.territory_id)
                 if not territory:
                     continue
                 
@@ -293,7 +296,7 @@ class MapRenderer:
             for dynasty_id, color in dynasty_colors.items():
                 # Get dynasty name
                 from models.db_models import DynastyDB
-                dynasty = self.session.query(DynastyDB).get(dynasty_id)
+                dynasty = self.session.get(DynastyDB, dynasty_id)
                 if dynasty:
                     legend_elements.append(
                         mpatches.Patch(color=color, label=dynasty.name)
@@ -346,7 +349,7 @@ class MapRenderer:
         # Convert to base64 string
         buf.seek(0)
         img_str = base64.b64encode(buf.read()).decode('utf-8')
-        print("DEBUG: render_world_map - Image encoded to base64")
+        logger.debug("render_world_map - Image encoded to base64")
         return img_str
     
 def save_map_to_static(map_renderer: MapRenderer, filename: str, **kwargs) -> str:
@@ -377,7 +380,7 @@ def save_map_to_static(map_renderer: MapRenderer, filename: str, **kwargs) -> st
     with open(filepath, 'wb') as f:
         f.write(img_data)
     
-    print(f"Map saved to {filepath}")
+    logger.info(f"Map saved to {filepath}")
     return filepath
 
 def render_territory_map(self, territory_id: int, width: int = 8, height: int = 6) -> str:
@@ -393,7 +396,7 @@ def render_territory_map(self, territory_id: int, width: int = 8, height: int = 
         Base64 encoded PNG image
     """
     # Get territory
-    territory = self.session.query(Territory).get(territory_id)
+    territory = self.session.get(Territory, territory_id)
     if not territory:
         return ""
 
@@ -428,7 +431,7 @@ def render_territory_map(self, territory_id: int, width: int = 8, height: int = 
     # Add controller if any
     if territory.controller_dynasty_id:
         from models.db_models import DynastyDB
-        dynasty = self.session.query(DynastyDB).get(territory.controller_dynasty_id)
+        dynasty = self.session.get(DynastyDB, territory.controller_dynasty_id)
         if dynasty:
             ax.text(x, y + 30, f"Controlled by: {dynasty.name}",
                    fontsize=10, ha='center', va='center', zorder=3, color='black')
@@ -464,7 +467,7 @@ def render_territory_map(self, territory_id: int, width: int = 8, height: int = 
     # Draw resources
     for i, tr in enumerate(territory_resources):
         # Get resource
-        resource = self.session.query(Resource).get(tr.resource_id)
+        resource = self.session.get(Resource, tr.resource_id)
         if not resource:
             continue
 

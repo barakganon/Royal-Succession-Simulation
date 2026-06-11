@@ -150,7 +150,7 @@ class DiplomacyRenderer:
         
         # Set title
         if dynasty_id:
-            dynasty = self.session.query(DynastyDB).get(dynasty_id)
+            dynasty = self.session.get(DynastyDB, dynasty_id)
             if dynasty:
                 ax.set_title(f"Diplomatic Relations for {dynasty.name}")
             else:
@@ -206,7 +206,7 @@ class DiplomacyRenderer:
         # Add edges (treaties)
         for treaty in treaties:
             # Get diplomatic relation
-            relation = self.session.query(DiplomaticRelation).get(treaty.diplomatic_relation_id)
+            relation = self.session.get(DiplomaticRelation, treaty.diplomatic_relation_id)
             if not relation:
                 continue
                 
@@ -294,7 +294,7 @@ class DiplomacyRenderer:
         # Get dynasties
         dynasties = []
         for dynasty_id in dynasty_ids:
-            dynasty = self.session.query(DynastyDB).get(dynasty_id)
+            dynasty = self.session.get(DynastyDB, dynasty_id)
             if dynasty:
                 dynasties.append(dynasty)
         
@@ -354,7 +354,7 @@ class DiplomacyRenderer:
             Base64 encoded PNG image
         """
         # Get dynasty
-        dynasty = self.session.query(DynastyDB).get(dynasty_id)
+        dynasty = self.session.get(DynastyDB, dynasty_id)
         if not dynasty:
             return ""
             

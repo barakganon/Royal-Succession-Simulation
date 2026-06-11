@@ -423,8 +423,8 @@ def battle_details(battle_id):
     battle = Battle.query.get_or_404(battle_id)
 
     # Check if user has access to this battle
-    attacker_dynasty = DynastyDB.query.get(battle.attacker_dynasty_id)
-    defender_dynasty = DynastyDB.query.get(battle.defender_dynasty_id)
+    attacker_dynasty = db.session.get(DynastyDB, battle.attacker_dynasty_id)
+    defender_dynasty = db.session.get(DynastyDB, battle.defender_dynasty_id)
 
     if (attacker_dynasty and attacker_dynasty.owner_user == current_user) or \
        (defender_dynasty and defender_dynasty.owner_user == current_user):
@@ -450,8 +450,8 @@ def siege_details(siege_id):
     siege = Siege.query.get_or_404(siege_id)
 
     # Check if user has access to this siege
-    attacker_dynasty = DynastyDB.query.get(siege.attacker_dynasty_id)
-    defender_dynasty = DynastyDB.query.get(siege.defender_dynasty_id)
+    attacker_dynasty = db.session.get(DynastyDB, siege.attacker_dynasty_id)
+    defender_dynasty = db.session.get(DynastyDB, siege.defender_dynasty_id)
 
     if (attacker_dynasty and attacker_dynasty.owner_user == current_user) or \
        (defender_dynasty and defender_dynasty.owner_user == current_user):

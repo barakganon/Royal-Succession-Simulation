@@ -333,7 +333,7 @@ class AIController:
         }
 
         try:
-            dynasty = self.session.query(DynastyDB).get(self.dynasty_id)
+            dynasty = self.session.get(DynastyDB, self.dynasty_id)
             if dynasty is None:
                 logger.warning(f"AIController._build_game_state: dynasty {self.dynasty_id} not found")
                 return state
@@ -617,7 +617,7 @@ class AIController:
         """Return the dynasty name, caching after the first DB hit."""
         if self._dynasty_name is None:
             try:
-                dynasty = self.session.query(DynastyDB).get(self.dynasty_id)
+                dynasty = self.session.get(DynastyDB, self.dynasty_id)
                 self._dynasty_name = dynasty.name if dynasty else f"Dynasty#{self.dynasty_id}"
             except Exception:
                 self._dynasty_name = f"Dynasty#{self.dynasty_id}"

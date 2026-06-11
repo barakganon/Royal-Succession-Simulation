@@ -66,7 +66,7 @@ def diplomacy_view(dynasty_id):
     wars_as_defender = War.query.filter_by(defender_dynasty_id=dynasty_id, is_active=True).all()
 
     for war in wars_as_attacker:
-        defender = DynastyDB.query.get(war.defender_dynasty_id)
+        defender = db.session.get(DynastyDB, war.defender_dynasty_id)
         if defender:
             active_wars.append({
                 'war': war,
@@ -78,7 +78,7 @@ def diplomacy_view(dynasty_id):
             })
 
     for war in wars_as_defender:
-        attacker = DynastyDB.query.get(war.attacker_dynasty_id)
+        attacker = db.session.get(DynastyDB, war.attacker_dynasty_id)
         if attacker:
             active_wars.append({
                 'war': war,
@@ -129,7 +129,7 @@ def treaty_view(dynasty_id):
 
     for relation in relations:
         other_dynasty_id = relation.dynasty2_id if relation.dynasty1_id == dynasty_id else relation.dynasty1_id
-        other_dynasty = DynastyDB.query.get(other_dynasty_id)
+        other_dynasty = db.session.get(DynastyDB, other_dynasty_id)
 
         if other_dynasty:
             relation_treaties = Treaty.query.filter_by(diplomatic_relation_id=relation.id).all()

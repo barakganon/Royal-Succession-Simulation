@@ -245,7 +245,7 @@ class TimeSystem:
         probabilities = self.weather_probabilities.get(season, {})
         
         # Get region for climate adjustment
-        region = self.session.query(Region).get(region_id)
+        region = self.session.get(Region, region_id)
         if not region:
             # Default to random weather based on season probabilities
             weather_types = list(probabilities.keys())
@@ -404,24 +404,24 @@ class TimeSystem:
         actor_dynasty_id = data["actor_dynasty_id"]
         
         # Get actor dynasty
-        actor_dynasty = self.session.query(DynastyDB).get(actor_dynasty_id)
+        actor_dynasty = self.session.get(DynastyDB, actor_dynasty_id)
         if not actor_dynasty:
             return
         
         # Process based on action type
         if action == "treaty_expiration" and "treaty_id" in data:
             treaty_id = data["treaty_id"]
-            treaty = self.session.query(Treaty).get(treaty_id)
+            treaty = self.session.get(Treaty, treaty_id)
             
             if treaty and treaty.active:
                 # Get diplomatic relation
-                relation = self.session.query(DiplomaticRelation).get(treaty.diplomatic_relation_id)
+                relation = self.session.get(DiplomaticRelation, treaty.diplomatic_relation_id)
                 if not relation:
                     return
                 
                 # Get dynasties
-                dynasty1 = self.session.query(DynastyDB).get(relation.dynasty1_id)
-                dynasty2 = self.session.query(DynastyDB).get(relation.dynasty2_id)
+                dynasty1 = self.session.get(DynastyDB, relation.dynasty1_id)
+                dynasty2 = self.session.get(DynastyDB, relation.dynasty2_id)
                 
                 if not dynasty1 or not dynasty2:
                     return
@@ -471,7 +471,7 @@ class TimeSystem:
         # Process based on action type
         if action == "siege_progress" and "siege_id" in data:
             siege_id = data["siege_id"]
-            siege = self.session.query(Siege).get(siege_id)
+            siege = self.session.get(Siege, siege_id)
             
             if siege and siege.is_active:
                 # Update siege progress
@@ -498,7 +498,7 @@ class TimeSystem:
         # Process based on action type
         if action == "building_completion" and "building_id" in data:
             building_id = data["building_id"]
-            building = self.session.query(Building).get(building_id)
+            building = self.session.get(Building, building_id)
             
             if building and building.under_construction:
                 # Complete building construction
@@ -506,11 +506,11 @@ class TimeSystem:
                 building.condition = 1.0  # Full condition
                 
                 # Get territory and dynasty
-                territory = self.session.query(Territory).get(building.territory_id)
+                territory = self.session.get(Territory, building.territory_id)
                 if not territory or not territory.controller_dynasty_id:
                     return
                 
-                dynasty = self.session.query(DynastyDB).get(territory.controller_dynasty_id)
+                dynasty = self.session.get(DynastyDB, territory.controller_dynasty_id)
                 if not dynasty:
                     return
                 
@@ -558,7 +558,7 @@ class TimeSystem:
         territory_id = data["territory_id"]
         
         # Get territory and dynasty
-        territory = self.session.query(Territory).get(territory_id)
+        territory = self.session.get(Territory, territory_id)
         if not territory:
             return
         
@@ -571,7 +571,7 @@ class TimeSystem:
             # Reduce food production in territory
             territory_resources = self.session.query(TerritoryResource).filter_by(territory_id=territory_id).all()
             for tr in territory_resources:
-                resource = self.session.query(Resource).get(tr.resource_id)
+                resource = self.session.get(Resource, tr.resource_id)
                 if resource and resource.resource_type == ResourceType.FOOD:
                     tr.base_production *= 0.7  # 30% reduction
             
@@ -654,7 +654,7 @@ class TimeSystem:
             threshold = condition["threshold"]
             comparison = condition.get("comparison", ">=")
             
-            dynasty = self.session.query(DynastyDB).get(dynasty_id)
+            dynasty = self.session.get(DynastyDB, dynasty_id)
             if dynasty:
                 if comparison == ">=" and dynasty.current_wealth >= threshold:
                     condition_met = True
@@ -684,7 +684,7 @@ class TimeSystem:
         Returns:
             Number of action points
         """
-        dynasty = self.session.query(DynastyDB).get(dynasty_id)
+        dynasty = self.session.get(DynastyDB, dynasty_id)
         if not dynasty:
             return 0
         
@@ -724,7 +724,7 @@ class TimeSystem:
         Returns:
             Tuple of (success, message)
         """
-        dynasty = self.session.query(DynastyDB).get(dynasty_id)
+        dynasty = self.session.get(DynastyDB, dynasty_id)
         if not dynasty:
             return False, f"Dynasty with ID {dynasty_id} not found"
         
@@ -810,8 +810,8 @@ class TimeSystem:
                         treaty.active = False
                         
                         # Create history log entries
-                        dynasty1 = self.session.query(DynastyDB).get(relation.dynasty1_id)
-                        dynasty2 = self.session.query(DynastyDB).get(relation.dynasty2_id)
+                        dynasty1 = self.session.get(DynastyDB, relation.dynasty1_id)
+                        dynasty2 = self.session.get(DynastyDB, relation.dynasty2_id)
                         
                         if dynasty1 and dynasty2:
                             treaty_name = treaty.treaty_type.value.replace('_', ' ').title()
@@ -890,11 +890,11 @@ class TimeSystem:
             
             for territory in territories:
                 # Get region for weather
-                province = self.session.query(Province).get(territory.province_id)
+                province = self.session.get(Province, territory.province_id)
                 if not province:
                     continue
                 
-                region = self.session.query(Region).get(province.region_id)
+                region = self.session.get(Region, province.region_id)
                 if not region:
                     continue
                 
@@ -905,7 +905,7 @@ class TimeSystem:
                 territory_resources = self.session.query(TerritoryResource).filter_by(territory_id=territory.id).all()
                 
                 for tr in territory_resources:
-                    resource = self.session.query(Resource).get(tr.resource_id)
+                    resource = self.session.get(Resource, tr.resource_id)
                     if not resource:
                         continue
                     
@@ -1075,7 +1075,7 @@ class TimeSystem:
         # Get all dynasties
         dynasties = []
         for dynasty_id in dynasty_ids:
-            dynasty = self.session.query(DynastyDB).get(dynasty_id)
+            dynasty = self.session.get(DynastyDB, dynasty_id)
             if not dynasty:
                 return False, f"Dynasty with ID {dynasty_id} not found"
             dynasties.append(dynasty)
@@ -1109,7 +1109,7 @@ class TimeSystem:
             List of historical events
         """
         # Get dynasty
-        dynasty = self.session.query(DynastyDB).get(dynasty_id)
+        dynasty = self.session.get(DynastyDB, dynasty_id)
         if not dynasty:
             return []
         
@@ -1158,7 +1158,7 @@ class TimeSystem:
             List of scheduled events
         """
         # Get dynasty
-        dynasty = self.session.query(DynastyDB).get(dynasty_id)
+        dynasty = self.session.get(DynastyDB, dynasty_id)
         if not dynasty:
             return []
         
@@ -1180,7 +1180,7 @@ class TimeSystem:
             elif "dynasty_id" in data and data["dynasty_id"] == dynasty_id:
                 is_relevant = True
             elif "territory_id" in data:
-                territory = self.session.query(Territory).get(data["territory_id"])
+                territory = self.session.get(Territory, data["territory_id"])
                 if territory and territory.controller_dynasty_id == dynasty_id:
                     is_relevant = True
             
@@ -1215,7 +1215,7 @@ class TimeSystem:
             threshold = condition["threshold"]
             comparison = condition.get("comparison", ">=")
             
-            dynasty = self.session.query(DynastyDB).get(dynasty_id)
+            dynasty = self.session.get(DynastyDB, dynasty_id)
             if dynasty:
                 if comparison == ">=" and dynasty.current_wealth >= threshold:
                     condition_met = True

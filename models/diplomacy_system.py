@@ -231,8 +231,8 @@ class DiplomacySystem:
             Tuple of (success, message)
         """
         # Get dynasties
-        actor_dynasty = self.session.query(DynastyDB).get(actor_dynasty_id)
-        target_dynasty = self.session.query(DynastyDB).get(target_dynasty_id)
+        actor_dynasty = self.session.get(DynastyDB, actor_dynasty_id)
+        target_dynasty = self.session.get(DynastyDB, target_dynasty_id)
         
         if not actor_dynasty or not target_dynasty:
             return False, "One or both dynasties not found"
@@ -376,8 +376,8 @@ class DiplomacySystem:
             Tuple of (success, message, treaty)
         """
         # Get dynasties
-        dynasty1 = self.session.query(DynastyDB).get(dynasty1_id)
-        dynasty2 = self.session.query(DynastyDB).get(dynasty2_id)
+        dynasty1 = self.session.get(DynastyDB, dynasty1_id)
+        dynasty2 = self.session.get(DynastyDB, dynasty2_id)
         
         if not dynasty1 or not dynasty2:
             return False, "One or both dynasties not found", None
@@ -485,7 +485,7 @@ class DiplomacySystem:
             Tuple of (success, message)
         """
         # Get treaty
-        treaty = self.session.query(Treaty).get(treaty_id)
+        treaty = self.session.get(Treaty, treaty_id)
         if not treaty:
             return False, "Treaty not found"
             
@@ -494,13 +494,13 @@ class DiplomacySystem:
             return False, "Treaty is already inactive"
             
         # Get diplomatic relation
-        relation = self.session.query(DiplomaticRelation).get(treaty.diplomatic_relation_id)
+        relation = self.session.get(DiplomaticRelation, treaty.diplomatic_relation_id)
         if not relation:
             return False, "Diplomatic relation not found"
             
         # Get dynasties
-        dynasty1 = self.session.query(DynastyDB).get(relation.dynasty1_id)
-        dynasty2 = self.session.query(DynastyDB).get(relation.dynasty2_id)
+        dynasty1 = self.session.get(DynastyDB, relation.dynasty1_id)
+        dynasty2 = self.session.get(DynastyDB, relation.dynasty2_id)
         
         if not dynasty1 or not dynasty2:
             return False, "One or both dynasties not found"
@@ -560,8 +560,8 @@ class DiplomacySystem:
             Tuple of (success, message, war)
         """
         # Get dynasties
-        attacker = self.session.query(DynastyDB).get(attacker_dynasty_id)
-        defender = self.session.query(DynastyDB).get(defender_dynasty_id)
+        attacker = self.session.get(DynastyDB, attacker_dynasty_id)
+        defender = self.session.get(DynastyDB, defender_dynasty_id)
         
         if not attacker or not defender:
             return False, "One or both dynasties not found", None
@@ -594,7 +594,7 @@ class DiplomacySystem:
         
         # For conquest wars, verify target territory
         if war_goal == WarGoal.CONQUEST and target_territory_id:
-            territory = self.session.query(Territory).get(target_territory_id)
+            territory = self.session.get(Territory, target_territory_id)
             if not territory:
                 return False, "Target territory not found", None
                 
@@ -669,7 +669,7 @@ def negotiate_peace(self, war_id: int, enforced_by_attacker: bool,
             Tuple of (success, message)
         """
         # Get war
-        war = self.session.query(War).get(war_id)
+        war = self.session.get(War, war_id)
         if not war:
             return False, "War not found"
             
@@ -678,8 +678,8 @@ def negotiate_peace(self, war_id: int, enforced_by_attacker: bool,
             return False, "War is already over"
             
         # Get dynasties
-        attacker = self.session.query(DynastyDB).get(war.attacker_dynasty_id)
-        defender = self.session.query(DynastyDB).get(war.defender_dynasty_id)
+        attacker = self.session.get(DynastyDB, war.attacker_dynasty_id)
+        defender = self.session.get(DynastyDB, war.defender_dynasty_id)
         
         if not attacker or not defender:
             return False, "One or both dynasties not found"
@@ -694,7 +694,7 @@ def negotiate_peace(self, war_id: int, enforced_by_attacker: bool,
         # Process peace terms
         if "territory_transfer" in terms and terms["territory_transfer"]:
             territory_id = terms["territory_transfer"]
-            territory = self.session.query(Territory).get(territory_id)
+            territory = self.session.get(Territory, territory_id)
             
             if not territory:
                 return False, "Territory not found"
@@ -730,7 +730,7 @@ def negotiate_peace(self, war_id: int, enforced_by_attacker: bool,
                 # This could be a defensive war where defender gets attacker's territory
                 if "attacker_territory_id" in terms:
                     attacker_territory_id = terms["attacker_territory_id"]
-                    attacker_territory = self.session.query(Territory).get(attacker_territory_id)
+                    attacker_territory = self.session.get(Territory, attacker_territory_id)
                     
                     if attacker_territory and attacker_territory.controller_dynasty_id == war.attacker_dynasty_id:
                         attacker_territory.controller_dynasty_id = war.defender_dynasty_id

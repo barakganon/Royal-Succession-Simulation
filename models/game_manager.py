@@ -124,7 +124,7 @@ class GameManager:
         """
         try:
             # Check if user exists
-            user = self.session.query(User).get(user_id)
+            user = self.session.get(User, user_id)
             if not user:
                 return False, f"User with ID {user_id} not found", None
             
@@ -301,7 +301,7 @@ class GameManager:
             start_year: Starting year
         """
         try:
-            dynasty = self.session.query(DynastyDB).get(dynasty_id)
+            dynasty = self.session.get(DynastyDB, dynasty_id)
             if not dynasty:
                 self.logger.error(f"Dynasty with ID {dynasty_id} not found during founder initialization")
                 return
@@ -482,7 +482,7 @@ class GameManager:
             dynasty_id: ID of the AI dynasty
         """
         try:
-            dynasty = self.session.query(DynastyDB).get(dynasty_id)
+            dynasty = self.session.get(DynastyDB, dynasty_id)
             if not dynasty:
                 return
 
@@ -601,7 +601,7 @@ class GameManager:
                 self.logger.debug(f"Cache expired for dynasty {dynasty_id} (age: {cache_age:.1f}s)")
         
         # Cache miss or expired, load from database
-        dynasty = self.session.query(DynastyDB).get(dynasty_id)
+        dynasty = self.session.get(DynastyDB, dynasty_id)
         if not dynasty:
             error_msg = f"Dynasty with ID {dynasty_id} not found"
             self.logger.error(error_msg)
@@ -703,7 +703,7 @@ class GameManager:
                 other_dynasty_id = relation.dynasty1_id
             
             if other_dynasty_id:
-                other_dynasty = self.session.query(DynastyDB).get(other_dynasty_id)
+                other_dynasty = self.session.get(DynastyDB, other_dynasty_id)
                 if other_dynasty:
                     status, score = self.diplomacy_system.get_relation_status(
                         dynasty_id, other_dynasty_id
@@ -726,7 +726,7 @@ class GameManager:
             (War.end_year == None)
         ).all():
             other_dynasty_id = war.defender_dynasty_id if war.attacker_dynasty_id == dynasty_id else war.attacker_dynasty_id
-            other_dynasty = self.session.query(DynastyDB).get(other_dynasty_id)
+            other_dynasty = self.session.get(DynastyDB, other_dynasty_id)
             
             wars.append({
                 'id': war.id,
@@ -786,7 +786,7 @@ class GameManager:
             # This method could be expanded to create save files or snapshots
             
             # Update last played timestamp
-            dynasty = self.session.query(DynastyDB).get(dynasty_id)
+            dynasty = self.session.get(DynastyDB, dynasty_id)
             if not dynasty:
                 return False, f"Dynasty with ID {dynasty_id} not found"
             
@@ -812,7 +812,7 @@ class GameManager:
         
         try:
             # Get dynasty
-            dynasty = self.session.query(DynastyDB).get(dynasty_id)
+            dynasty = self.session.get(DynastyDB, dynasty_id)
             if not dynasty:
                 error_msg = f"Dynasty with ID {dynasty_id} not found"
                 self.logger.error(error_msg)
@@ -1015,7 +1015,7 @@ class GameManager:
             dynasty_id: ID of the AI dynasty
         """
         try:
-            dynasty = self.session.query(DynastyDB).get(dynasty_id)
+            dynasty = self.session.get(DynastyDB, dynasty_id)
             if not dynasty or not dynasty.is_ai_controlled:
                 return
             
@@ -1072,7 +1072,7 @@ class GameManager:
             risk_tolerance: Risk tolerance factor (0-1)
         """
         try:
-            dynasty = self.session.query(DynastyDB).get(dynasty_id)
+            dynasty = self.session.get(DynastyDB, dynasty_id)
             if not dynasty:
                 return
 
@@ -1155,7 +1155,7 @@ class GameManager:
         Only proceeds when the AI has a clear military advantage and is not already at war.
         """
         try:
-            dynasty = self.session.query(DynastyDB).get(dynasty_id)
+            dynasty = self.session.get(DynastyDB, dynasty_id)
             if not dynasty:
                 return
 
@@ -1268,7 +1268,7 @@ class GameManager:
             risk_tolerance: Risk tolerance factor (0-1)
         """
         try:
-            dynasty = self.session.query(DynastyDB).get(dynasty_id)
+            dynasty = self.session.get(DynastyDB, dynasty_id)
             if not dynasty:
                 return
 
@@ -1283,7 +1283,7 @@ class GameManager:
             # Prefer dynasties we already have a relationship with
             related_ids = self._get_related_dynasties(dynasty_id)
             if related_ids and random.random() < 0.7:
-                target_dynasty = self.session.query(DynastyDB).get(random.choice(related_ids))
+                target_dynasty = self.session.get(DynastyDB, random.choice(related_ids))
             else:
                 target_dynasty = random.choice(other_dynasties)
 
@@ -1348,7 +1348,7 @@ class GameManager:
             risk_tolerance: Risk tolerance factor (0-1)
         """
         try:
-            dynasty = self.session.query(DynastyDB).get(dynasty_id)
+            dynasty = self.session.get(DynastyDB, dynasty_id)
             if not dynasty:
                 return
                 
@@ -1473,8 +1473,8 @@ class GameManager:
         
         # Get active players
         for token, session in self.active_sessions.items():
-            dynasty = self.session.query(DynastyDB).get(session['dynasty_id'])
-            user = self.session.query(User).get(session['user_id'])
+            dynasty = self.session.get(DynastyDB, session['dynasty_id'])
+            user = self.session.get(User, session['user_id'])
             
             if dynasty and user:
                 active_players.append({
@@ -1541,7 +1541,7 @@ class GameManager:
                 sync_data['game_state_fresh'] = True
             
             # Add additional synchronization data
-            dynasty = self.session.query(DynastyDB).get(dynasty_id)
+            dynasty = self.session.get(DynastyDB, dynasty_id)
             if dynasty:
                 sync_data['dynasty_year'] = dynasty.current_simulation_year
                 

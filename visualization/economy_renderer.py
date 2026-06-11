@@ -81,7 +81,7 @@ class EconomyRenderer:
             Path to the saved visualization
         """
         # Get dynasty data
-        dynasty = self.session.query(DynastyDB).get(dynasty_id)
+        dynasty = self.session.get(DynastyDB, dynasty_id)
         if not dynasty:
             raise ValueError(f"Dynasty with ID {dynasty_id} not found")
         
@@ -314,7 +314,7 @@ class EconomyRenderer:
             Path to the saved visualization
         """
         # Get territory data
-        territory = self.session.query(Territory).get(territory_id)
+        territory = self.session.get(Territory, territory_id)
         if not territory:
             raise ValueError(f"Territory with ID {territory_id} not found")
         
@@ -416,7 +416,7 @@ class EconomyRenderer:
             Path to the saved visualization
         """
         # Get dynasty data
-        dynasty = self.session.query(DynastyDB).get(dynasty_id)
+        dynasty = self.session.get(DynastyDB, dynasty_id)
         if not dynasty:
             raise ValueError(f"Dynasty with ID {dynasty_id} not found")
         

@@ -213,7 +213,7 @@ class MilitarySystem:
         """
         logger.debug(f"recruit_unit called with dynasty_id={dynasty_id}, unit_type={unit_type}, size={size}, territory_id={territory_id}, name={name}")
         # Get dynasty
-        dynasty = self.session.query(DynastyDB).get(dynasty_id)
+        dynasty = self.session.get(DynastyDB, dynasty_id)
         if not dynasty:
             return False, f"Dynasty with ID {dynasty_id} not found", None
         
@@ -232,7 +232,7 @@ class MilitarySystem:
         # Check territory if provided
         territory = None
         if territory_id:
-            territory = self.session.query(Territory).get(territory_id)
+            territory = self.session.get(Territory, territory_id)
             if not territory:
                 return False, f"Territory with ID {territory_id} not found", None
             
@@ -318,14 +318,14 @@ class MilitarySystem:
         """
         logger.debug(f"form_army called with dynasty_id={dynasty_id}, unit_ids={unit_ids}, name={name}, commander_id={commander_id}")
         # Get dynasty
-        dynasty = self.session.query(DynastyDB).get(dynasty_id)
+        dynasty = self.session.get(DynastyDB, dynasty_id)
         if not dynasty:
             return False, f"Dynasty with ID {dynasty_id} not found", None
         
         # Check if units exist and belong to dynasty
         units = []
         for unit_id in unit_ids:
-            unit = self.session.query(MilitaryUnit).get(unit_id)
+            unit = self.session.get(MilitaryUnit, unit_id)
             if not unit:
                 return False, f"Unit with ID {unit_id} not found", None
             if unit.dynasty_id != dynasty_id:
@@ -346,7 +346,7 @@ class MilitarySystem:
         # Check commander if provided
         commander = None
         if commander_id:
-            commander = self.session.query(PersonDB).get(commander_id)
+            commander = self.session.get(PersonDB, commander_id)
             if not commander:
                 return False, f"Person with ID {commander_id} not found", None
             if commander.dynasty_id != dynasty_id:
@@ -394,12 +394,12 @@ class MilitarySystem:
         """
         logger.debug(f"assign_commander called with army_id={army_id}, commander_id={commander_id}")
         # Get army
-        army = self.session.query(Army).get(army_id)
+        army = self.session.get(Army, army_id)
         if not army:
             return False, f"Army with ID {army_id} not found"
         
         # Get commander
-        commander = self.session.query(PersonDB).get(commander_id)
+        commander = self.session.get(PersonDB, commander_id)
         if not commander:
             return False, f"Person with ID {commander_id} not found"
         
@@ -418,7 +418,7 @@ class MilitarySystem:
         # Create history log entry
         log_entry = HistoryLogEntryDB(
             dynasty_id=army.dynasty_id,
-            year=self.session.query(DynastyDB).get(army.dynasty_id).current_simulation_year,
+            year=self.session.get(DynastyDB, army.dynasty_id).current_simulation_year,
             event_string=f"{commander.name} {commander.surname} was assigned to command the army '{army.name}'",
             event_type="commander_assignment",
             person1_sim_id=commander.id
@@ -461,7 +461,7 @@ class MilitarySystem:
         """
         logger.debug(f"apply_maintenance called with dynasty_id={dynasty_id}")
         # Get dynasty
-        dynasty = self.session.query(DynastyDB).get(dynasty_id)
+        dynasty = self.session.get(DynastyDB, dynasty_id)
         if not dynasty:
             return False, f"Dynasty with ID {dynasty_id} not found", {}
         
@@ -513,8 +513,8 @@ class MilitarySystem:
         """
         logger.debug(f"initiate_battle called with attacker_army_id={attacker_army_id}, defender_army_id={defender_army_id}, territory_id={territory_id}, war_id={war_id}")
         # Get armies
-        attacker_army = self.session.query(Army).get(attacker_army_id)
-        defender_army = self.session.query(Army).get(defender_army_id)
+        attacker_army = self.session.get(Army, attacker_army_id)
+        defender_army = self.session.get(Army, defender_army_id)
 
         if not attacker_army:
             return False, f"Attacker army with ID {attacker_army_id} not found", None
@@ -526,13 +526,13 @@ class MilitarySystem:
             return False, "Both armies must be in the specified territory", None
         
         # Get territory
-        territory = self.session.query(Territory).get(territory_id)
+        territory = self.session.get(Territory, territory_id)
         if not territory:
             return False, f"Territory with ID {territory_id} not found", None
         
         # Get dynasties
-        attacker_dynasty = self.session.query(DynastyDB).get(attacker_army.dynasty_id)
-        defender_dynasty = self.session.query(DynastyDB).get(defender_army.dynasty_id)
+        attacker_dynasty = self.session.get(DynastyDB, attacker_army.dynasty_id)
+        defender_dynasty = self.session.get(DynastyDB, defender_army.dynasty_id)
         
         if not attacker_dynasty or not defender_dynasty:
             return False, "Could not find dynasties for armies", None
@@ -567,7 +567,7 @@ class MilitarySystem:
         
         # Update war score if part of a war
         if war_id:
-            war = self.session.query(War).get(war_id)
+            war = self.session.get(War, war_id)
             if war:
                 war.calculate_war_score()
         
@@ -815,8 +815,8 @@ class MilitarySystem:
         """
         logger.debug(f"resolve_naval_battle called: army1_id={army1_id}, army2_id={army2_id}")
 
-        army1 = self.session.query(Army).get(army1_id)
-        army2 = self.session.query(Army).get(army2_id)
+        army1 = self.session.get(Army, army1_id)
+        army2 = self.session.get(Army, army2_id)
 
         if army1 is None:
             raise ValueError(f"Army with ID {army1_id} not found")
@@ -875,7 +875,7 @@ class MilitarySystem:
         # Flask app context.  We look for a ``current_season`` attribute on the dynasty object.
         is_winter = False
         try:
-            attacker_dynasty = self.session.query(DynastyDB).get(army1.dynasty_id)
+            attacker_dynasty = self.session.get(DynastyDB, army1.dynasty_id)
             if attacker_dynasty is not None and hasattr(attacker_dynasty, "current_season"):
                 is_winter = str(getattr(attacker_dynasty, "current_season", "")).lower() == "winter"
         except Exception:
@@ -1019,12 +1019,12 @@ def _apply_battle_casualties(self, army: Army, total_casualties: int) -> None:
                 Tuple of (success, message, siege)
             """
         # Get army
-        army = self.session.query(Army).get(army_id)
+        army = self.session.get(Army, army_id)
         if not army:
             return False, f"Army with ID {army_id} not found", None
         
         # Get territory
-        territory = self.session.query(Territory).get(territory_id)
+        territory = self.session.get(Territory, territory_id)
         if not territory:
             return False, f"Territory with ID {territory_id} not found", None
         
@@ -1039,7 +1039,7 @@ def _apply_battle_casualties(self, army: Army, total_casualties: int) -> None:
             return False, "Cannot siege own territory", None
         
         # Get defender dynasty
-        defender_dynasty = self.session.query(DynastyDB).get(territory.controller_dynasty_id)
+        defender_dynasty = self.session.get(DynastyDB, territory.controller_dynasty_id)
         if not defender_dynasty:
             return False, "Defender dynasty not found", None
         
@@ -1054,7 +1054,7 @@ def _apply_battle_casualties(self, army: Army, total_casualties: int) -> None:
             attacker_dynasty_id=army.dynasty_id,
             defender_dynasty_id=territory.controller_dynasty_id,
             attacker_army_id=army_id,
-            start_year=self.session.query(DynastyDB).get(army.dynasty_id).current_simulation_year,
+            start_year=self.session.get(DynastyDB, army.dynasty_id).current_simulation_year,
             progress=0.0,
             is_active=True,
             successful=False
@@ -1068,7 +1068,7 @@ def _apply_battle_casualties(self, army: Army, total_casualties: int) -> None:
         self.session.commit()
         
         # Create history log entry
-        attacker_dynasty = self.session.query(DynastyDB).get(army.dynasty_id)
+        attacker_dynasty = self.session.get(DynastyDB, army.dynasty_id)
         log_entry = HistoryLogEntryDB(
             dynasty_id=army.dynasty_id,
             year=attacker_dynasty.current_simulation_year,
@@ -1106,7 +1106,7 @@ def _apply_battle_casualties(self, army: Army, total_casualties: int) -> None:
                 Tuple of (success, message, siege)
             """
         # Get siege
-        siege = self.session.query(Siege).get(siege_id)
+        siege = self.session.get(Siege, siege_id)
         if not siege:
             return False, f"Siege with ID {siege_id} not found", None
         
@@ -1115,8 +1115,8 @@ def _apply_battle_casualties(self, army: Army, total_casualties: int) -> None:
             return False, "Siege is no longer active", None
         
         # Get army and territory
-        army = self.session.query(Army).get(siege.attacker_army_id)
-        territory = self.session.query(Territory).get(siege.territory_id)
+        army = self.session.get(Army, siege.attacker_army_id)
+        territory = self.session.get(Territory, siege.territory_id)
         
         if not army or not territory:
             return False, "Army or territory not found", None
@@ -1125,7 +1125,7 @@ def _apply_battle_casualties(self, army: Army, total_casualties: int) -> None:
         if army.territory_id != territory.id:
             # End siege if army has moved
             siege.is_active = False
-            siege.end_year = self.session.query(DynastyDB).get(siege.attacker_dynasty_id).current_simulation_year
+            siege.end_year = self.session.get(DynastyDB, siege.attacker_dynasty_id).current_simulation_year
             self.session.commit()
             return False, "Siege ended because army is no longer in the territory", siege
         
@@ -1153,7 +1153,7 @@ def _apply_battle_casualties(self, army: Army, total_casualties: int) -> None:
         if siege.progress >= 1.0:
             siege.is_active = False
             siege.successful = True
-            siege.end_year = self.session.query(DynastyDB).get(siege.attacker_dynasty_id).current_simulation_year
+            siege.end_year = self.session.get(DynastyDB, siege.attacker_dynasty_id).current_simulation_year
             
             # Transfer control of territory
             territory.controller_dynasty_id = siege.attacker_dynasty_id
@@ -1163,13 +1163,13 @@ def _apply_battle_casualties(self, army: Army, total_casualties: int) -> None:
             
             # Update war score if part of a war
             if siege.war_id:
-                war = self.session.query(War).get(siege.war_id)
+                war = self.session.get(War, siege.war_id)
                 if war:
                     war.calculate_war_score()
             
             # Create history log entries
-            attacker_dynasty = self.session.query(DynastyDB).get(siege.attacker_dynasty_id)
-            defender_dynasty = self.session.query(DynastyDB).get(siege.defender_dynasty_id)
+            attacker_dynasty = self.session.get(DynastyDB, siege.attacker_dynasty_id)
+            defender_dynasty = self.session.get(DynastyDB, siege.defender_dynasty_id)
             
             log_entry = HistoryLogEntryDB(
                 dynasty_id=siege.attacker_dynasty_id,

@@ -79,7 +79,7 @@ class TimeRenderer:
             Path to the generated image file
         """
         # Get dynasty
-        dynasty = self.session.query(DynastyDB).get(dynasty_id)
+        dynasty = self.session.get(DynastyDB, dynasty_id)
         if not dynasty:
             return ""
         
@@ -183,7 +183,7 @@ class TimeRenderer:
             Path to the generated image file
         """
         # Get dynasty
-        dynasty = self.session.query(DynastyDB).get(dynasty_id)
+        dynasty = self.session.get(DynastyDB, dynasty_id)
         if not dynasty:
             return ""
         
@@ -307,11 +307,11 @@ class TimeRenderer:
             y_coords.append(territory.y_coordinate)
             
             # Get province and region for this territory
-            province = self.session.query(Province).get(territory.province_id)
+            province = self.session.get(Province, territory.province_id)
             if not province:
                 continue
                 
-            region = self.session.query(Region).get(province.region_id)
+            region = self.session.get(Region, province.region_id)
             if not region:
                 continue
             

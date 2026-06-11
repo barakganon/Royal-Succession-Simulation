@@ -113,7 +113,7 @@ class FreeActionSystem:
         if action_type not in VALID_FREE_ACTIONS:
             return False, f"Unknown free action: {action_type}"
 
-        dynasty = self.session.query(DynastyDB).get(dynasty_id)
+        dynasty = self.session.get(DynastyDB, dynasty_id)
         if dynasty is None:
             return False, f"Dynasty {dynasty_id} not found"
 
@@ -374,7 +374,7 @@ class FreeActionSystem:
         if heir_id is None:
             return False, "name_heir requires 'heir_person_id'"
 
-        heir = self.session.query(PersonDB).get(heir_id)
+        heir = self.session.get(PersonDB, heir_id)
         if heir is None:
             return False, f"Person {heir_id} not found"
         if heir.dynasty_id != dynasty.id:

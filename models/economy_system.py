@@ -318,7 +318,7 @@ class EconomySystem:
         Returns:
             Dictionary mapping resource types to production amounts
         """
-        territory = self.session.query(Territory).get(territory_id)
+        territory = self.session.get(Territory, territory_id)
         if not territory:
             return {}
         
@@ -332,7 +332,7 @@ class EconomySystem:
         # Get production from territory resources
         territory_resources = self.session.query(TerritoryResource).filter_by(territory_id=territory_id).all()
         for tr in territory_resources:
-            resource = self.session.query(Resource).get(tr.resource_id)
+            resource = self.session.get(Resource, tr.resource_id)
             if resource:
                 resource_type = resource.resource_type
                 base_production = tr.base_production * (1.0 - tr.current_depletion)
@@ -365,7 +365,7 @@ class EconomySystem:
         
         # Apply governor bonus if present
         if territory.governor_id:
-            governor = self.session.query(PersonDB).get(territory.governor_id)
+            governor = self.session.get(PersonDB, territory.governor_id)
             if governor:
                 stewardship_bonus = 1.0 + (governor.stewardship_skill * 0.01)  # +1% per point
                 for resource_type in production:
@@ -383,7 +383,7 @@ class EconomySystem:
         Returns:
             Dictionary mapping resource types to consumption amounts
         """
-        territory = self.session.query(Territory).get(territory_id)
+        territory = self.session.get(Territory, territory_id)
         if not territory:
             return {}
         
@@ -429,7 +429,7 @@ class EconomySystem:
         Returns:
             Tax income in gold
         """
-        territory = self.session.query(Territory).get(territory_id)
+        territory = self.session.get(Territory, territory_id)
         if not territory:
             return 0.0
         
@@ -446,7 +446,7 @@ class EconomySystem:
         
         # Apply governor bonus if present
         if territory.governor_id:
-            governor = self.session.query(PersonDB).get(territory.governor_id)
+            governor = self.session.get(PersonDB, territory.governor_id)
             if governor:
                 stewardship_bonus = 1.0 + (governor.stewardship_skill * 0.02)  # +2% per point
                 tax_income *= stewardship_bonus
@@ -505,7 +505,7 @@ class EconomySystem:
         Returns:
             Dictionary with economic data
         """
-        dynasty = self.session.query(DynastyDB).get(dynasty_id)
+        dynasty = self.session.get(DynastyDB, dynasty_id)
         if not dynasty:
             return {}
         
@@ -575,7 +575,7 @@ class EconomySystem:
                 trade_data.append({
                     "id": route.id,
                     "type": "export",
-                    "partner": self.session.query(DynastyDB).get(route.target_dynasty_id).name,
+                    "partner": self.session.get(DynastyDB, route.target_dynasty_id).name,
                     "resource": route.resource_type.value,
                     "amount": route.resource_amount,
                     "profit": route.profit_source
@@ -586,7 +586,7 @@ class EconomySystem:
                 trade_data.append({
                     "id": route.id,
                     "type": "import",
-                    "partner": self.session.query(DynastyDB).get(route.source_dynasty_id).name,
+                    "partner": self.session.get(DynastyDB, route.source_dynasty_id).name,
                     "resource": route.resource_type.value,
                     "amount": route.resource_amount,
                     "profit": route.profit_target
@@ -625,7 +625,7 @@ class EconomySystem:
         Returns:
             Dictionary with updated economic data
         """
-        dynasty = self.session.query(DynastyDB).get(dynasty_id)
+        dynasty = self.session.get(DynastyDB, dynasty_id)
         if not dynasty:
             return {"success": False, "message": "Dynasty not found"}
         
@@ -731,7 +731,7 @@ class EconomySystem:
         Returns:
             Tuple of (success, message)
         """
-        territory = self.session.query(Territory).get(territory_id)
+        territory = self.session.get(Territory, territory_id)
         if not territory:
             return False, "Territory not found"
         
@@ -739,7 +739,7 @@ class EconomySystem:
         if not territory.controller_dynasty_id:
             return False, "Territory has no controller"
         
-        dynasty = self.session.query(DynastyDB).get(territory.controller_dynasty_id)
+        dynasty = self.session.get(DynastyDB, territory.controller_dynasty_id)
         if not dynasty:
             return False, "Controlling dynasty not found"
         
@@ -810,7 +810,7 @@ class EconomySystem:
         Returns:
             Tuple of (success, message)
         """
-        building = self.session.query(Building).get(building_id)
+        building = self.session.get(Building, building_id)
         if not building:
             return False, "Building not found"
         
@@ -822,11 +822,11 @@ class EconomySystem:
         if building.level >= 5:
             return False, "Building is already at maximum level"
         
-        territory = self.session.query(Territory).get(building.territory_id)
+        territory = self.session.get(Territory, building.territory_id)
         if not territory:
             return False, "Territory not found"
         
-        dynasty = self.session.query(DynastyDB).get(territory.controller_dynasty_id)
+        dynasty = self.session.get(DynastyDB, territory.controller_dynasty_id)
         if not dynasty:
             return False, "Controlling dynasty not found"
         
@@ -864,7 +864,7 @@ class EconomySystem:
         Returns:
             Tuple of (success, message)
         """
-        building = self.session.query(Building).get(building_id)
+        building = self.session.get(Building, building_id)
         if not building:
             return False, "Building not found"
         
@@ -872,11 +872,11 @@ class EconomySystem:
         if building.condition >= 0.9:
             return False, "Building doesn't need repair"
         
-        territory = self.session.query(Territory).get(building.territory_id)
+        territory = self.session.get(Territory, building.territory_id)
         if not territory:
             return False, "Territory not found"
         
-        dynasty = self.session.query(DynastyDB).get(territory.controller_dynasty_id)
+        dynasty = self.session.get(DynastyDB, territory.controller_dynasty_id)
         if not dynasty:
             return False, "Controlling dynasty not found"
         
@@ -918,8 +918,8 @@ class EconomySystem:
             Tuple of (success, message, trade_route)
         """
         # Check dynasties
-        source_dynasty = self.session.query(DynastyDB).get(source_dynasty_id)
-        target_dynasty = self.session.query(DynastyDB).get(target_dynasty_id)
+        source_dynasty = self.session.get(DynastyDB, source_dynasty_id)
+        target_dynasty = self.session.get(DynastyDB, target_dynasty_id)
         
         if not source_dynasty or not target_dynasty:
             return False, "One or both dynasties not found", None
@@ -984,7 +984,7 @@ class EconomySystem:
         Returns:
             Tuple of (success, message)
         """
-        trade_route = self.session.query(TradeRoute).get(trade_route_id)
+        trade_route = self.session.get(TradeRoute, trade_route_id)
         if not trade_route:
             return False, "Trade route not found"
         
@@ -1010,7 +1010,7 @@ class EconomySystem:
         Returns:
             Tuple of (success, message)
         """
-        territory = self.session.query(Territory).get(territory_id)
+        territory = self.session.get(Territory, territory_id)
         if not territory:
             return False, "Territory not found"
         
@@ -1018,7 +1018,7 @@ class EconomySystem:
         if not territory.controller_dynasty_id:
             return False, "Territory has no controller"
         
-        dynasty = self.session.query(DynastyDB).get(territory.controller_dynasty_id)
+        dynasty = self.session.get(DynastyDB, territory.controller_dynasty_id)
         if not dynasty:
             return False, "Controlling dynasty not found"
         
@@ -1058,7 +1058,7 @@ class EconomySystem:
         Returns:
             Tuple of (success, message)
         """
-        dynasty = self.session.query(DynastyDB).get(dynasty_id)
+        dynasty = self.session.get(DynastyDB, dynasty_id)
         if not dynasty:
             return False, "Dynasty not found"
         
@@ -1080,7 +1080,7 @@ class EconomySystem:
         Returns:
             Dictionary with integrated data
         """
-        territory = self.session.query(Territory).get(territory_id)
+        territory = self.session.get(Territory, territory_id)
         if not territory:
             return {"success": False, "message": "Territory not found"}
         
@@ -1120,7 +1120,7 @@ class EconomySystem:
         Returns:
             Dictionary with integrated data
         """
-        dynasty = self.session.query(DynastyDB).get(dynasty_id)
+        dynasty = self.session.get(DynastyDB, dynasty_id)
         if not dynasty:
             return {"success": False, "message": "Dynasty not found"}
         
@@ -1166,7 +1166,7 @@ class EconomySystem:
         Returns:
             Dictionary with integrated data
         """
-        dynasty = self.session.query(DynastyDB).get(dynasty_id)
+        dynasty = self.session.get(DynastyDB, dynasty_id)
         if not dynasty:
             return {"success": False, "message": "Dynasty not found"}
         
@@ -1232,7 +1232,7 @@ class EconomySystem:
         Returns:
             Dictionary with integrated data
         """
-        dynasty = self.session.query(DynastyDB).get(dynasty_id)
+        dynasty = self.session.get(DynastyDB, dynasty_id)
         if not dynasty:
             return {"success": False, "message": "Dynasty not found"}
         
@@ -1264,7 +1264,7 @@ class EconomySystem:
         governor_effects = {}
         for territory in territories:
             if territory.governor_id:
-                governor = self.session.query(PersonDB).get(territory.governor_id)
+                governor = self.session.get(PersonDB, territory.governor_id)
                 if governor:
                     governor_effects[territory.id] = {
                         "territory_name": territory.name,

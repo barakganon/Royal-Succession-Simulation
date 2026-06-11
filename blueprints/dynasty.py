@@ -100,7 +100,7 @@ def block_if_turn_processing(f):
     def decorated(*args, **kwargs):
         dynasty_id = kwargs.get('dynasty_id')
         if dynasty_id:
-            dynasty = DynastyDB.query.get(dynasty_id)
+            dynasty = db.session.get(DynastyDB, dynasty_id)
             if dynasty and dynasty.is_turn_processing:
                 flash("A turn is already in progress. Please wait until it completes.", "warning")
                 return redirect(url_for('dynasty.view_dynasty', dynasty_id=dynasty_id))
@@ -421,7 +421,7 @@ def advance_turn(dynasty_id):
             )
 
         # Update last played timestamp
-        dynasty.last_played_at = datetime.datetime.utcnow()
+        dynasty.last_played_at = datetime.datetime.now(datetime.timezone.utc)
 
     finally:
         # Always release the processing lock, even if an exception propagated
@@ -636,7 +636,7 @@ def submit_actions(dynasty_id):
         except Exception as e:
             logger.error(f"submit_actions: AI turn error for user {current_user.id}: {e}", exc_info=True)
 
-        dynasty.last_played_at = datetime.datetime.utcnow()
+        dynasty.last_played_at = datetime.datetime.now(datetime.timezone.utc)
     finally:
         dynasty.is_turn_processing = False
         try:
@@ -978,7 +978,7 @@ def delete_dynasty(dynasty_id):
 
 def initialize_dynasty_founder(dynasty_id: int, theme_config: dict, start_year: int, succession_rule: str):
     """Initialize the founder and spouse for a newly created dynasty."""
-    dynasty = DynastyDB.query.get(dynasty_id)
+    dynasty = db.session.get(DynastyDB, dynasty_id)
     if not dynasty:
         return False, "Dynasty not found"
 
@@ -1610,7 +1610,7 @@ def person_detail_json(dynasty_id, person_id):
     if dynasty.owner_user != current_user:
         return jsonify({"error": "Not authorized."}), 403
 
-    person = PersonDB.query.get(person_id)
+    person = db.session.get(PersonDB, person_id)
     if person is None:
         abort(404)
 

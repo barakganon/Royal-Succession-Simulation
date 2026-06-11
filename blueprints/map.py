@@ -189,8 +189,8 @@ def world_map():
                 .all()
             )
             for w in wars:
-                attacker = DynastyDB.query.get(w.attacker_dynasty_id)
-                defender = DynastyDB.query.get(w.defender_dynasty_id)
+                attacker = db.session.get(DynastyDB, w.attacker_dynasty_id)
+                defender = db.session.get(DynastyDB, w.defender_dynasty_id)
                 active_wars.append({
                     'id': w.id,
                     'attacker_dynasty_id': w.attacker_dynasty_id,
@@ -290,7 +290,7 @@ def territory_details_json(territory_id):
     # Controller dict (or null when the hex is unclaimed).
     controller = None
     if territory.controller_dynasty_id is not None:
-        controller_dyn = DynastyDB.query.get(territory.controller_dynasty_id)
+        controller_dyn = db.session.get(DynastyDB, territory.controller_dynasty_id)
         if controller_dyn is not None:
             controller = {'id': controller_dyn.id, 'name': controller_dyn.name}
 
@@ -819,7 +819,7 @@ def synchronize_turns():
         return redirect(url_for('auth.dashboard'))
 
     for dynasty_id in dynasty_ids:
-        dynasty = DynastyDB.query.get(dynasty_id)
+        dynasty = db.session.get(DynastyDB, dynasty_id)
         if not dynasty or dynasty.owner_user != current_user:
             flash("You can only synchronize dynasties that you own.", "warning")
             return redirect(url_for('auth.dashboard'))
