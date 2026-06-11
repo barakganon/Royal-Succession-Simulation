@@ -127,7 +127,7 @@ _Critical rules and patterns for implementing code in this project. Focuses on u
 - **Circular FK between `DynastyDB` ↔ `PersonDB`**: Any new FK between these two tables MUST use `use_alter=True, name='fk_<name>'` on the `db.ForeignKey(...)` call.
 - **Never `backref=`**: Always `back_populates=` with explicit relationship on both sides.
 - **Explicit `foreign_keys=`**: Required on any relationship where SQLAlchemy cannot infer the join condition (multiple FKs between same tables).
-- **Schema changes require migration**: Never alter DB models without updating `models/db_initialization.py`. Do not rely on `db.create_all()` for schema evolution.
+- **Schema changes require a Flask-Migrate migration**: Schema is managed by Flask-Migrate / Alembic (Story 11-2). Never hand-write ALTER TABLE or update `models/db_initialization.py` for schema evolution. Workflow: change the ORM model → `flask db migrate -m "..."` → `flask db upgrade` → commit both files. Set `FLASK_APP=main_flask_app.py` before running CLI commands. `render_as_batch=True` is set in `migrations/env.py` for SQLite support.
 - **`__tablename__` always explicit**: Every DB model class must declare `__tablename__`.
 - **Do not rewrite working subsystems**: `MilitarySystem`, `EconomySystem`, `DiplomacySystem`, `AIController`, `GameManager`, `MapGenerator`, `TerritoryManager`, `BorderSystem`, `TimeSystem`, and all `visualization/` renderers are complete and tested. Extend via public API; never rewrite internals.
 - **LLM must always have a fallback**: The app must be fully functional when `GOOGLE_API_KEY` is absent. Every LLM code path needs a working non-LLM fallback.
