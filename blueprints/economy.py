@@ -11,7 +11,7 @@ from models.db_models import (
     BuildingType, ResourceType,
 )
 from models.map_system import TerritoryManager
-from utils.theme_manager import get_all_theme_names, get_theme
+from utils.theme_manager import get_all_theme_names, get_theme, get_dynasty_theme_config
 
 logger = logging.getLogger('royal_succession.economy')
 
@@ -31,18 +31,8 @@ def dynasty_economy(dynasty_id):
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
 
-    # Load theme configuration
-    theme_config = {}
-    if dynasty.theme_identifier_or_json:
-        if dynasty.theme_identifier_or_json in get_all_theme_names():
-            # Predefined theme
-            theme_config = get_theme(dynasty.theme_identifier_or_json)
-        else:
-            # Custom theme stored as JSON
-            try:
-                theme_config = json.loads(dynasty.theme_identifier_or_json)
-            except json.JSONDecodeError:
-                pass
+    # Load theme configuration (cached per dynasty+theme string — Story 11-3)
+    theme_config = get_dynasty_theme_config(dynasty)
 
     # Get economy data for this dynasty
     economy_data = None

@@ -332,6 +332,11 @@ class HistoryLogEntryDB(db.Model):
     # Timestamp for when the log entry was created in the database
     recorded_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
+    # Composite index for the hot query that filters dynasty_id and orders by year (Story 11-3)
+    __table_args__ = (
+        db.Index('ix_history_dynasty_year', 'dynasty_id', 'year'),
+    )
+
     def __repr__(self):
         return f"<HistoryLogEntryDB ID:{self.id} (Dynasty:{self.dynasty_id}, Year:{self.year}, Type:{self.event_type})>"
 
@@ -678,6 +683,12 @@ class Project(db.Model):
     target_person = db.relationship('PersonDB', foreign_keys=[target_person_id])
     initiator_monarch = db.relationship('PersonDB', foreign_keys=[initiated_by_monarch_id])
     completer_monarch = db.relationship('PersonDB', foreign_keys=[completed_by_monarch_id])
+
+    # Composite index for active-project queries that filter dynasty_id + status
+    # and order/filter by completion_year (Story 11-3)
+    __table_args__ = (
+        db.Index('ix_project_dynasty_status_completion', 'dynasty_id', 'status', 'completion_year'),
+    )
 
     def get_params(self) -> dict:
         return json.loads(self.params_json or '{}')

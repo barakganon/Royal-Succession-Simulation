@@ -27,7 +27,7 @@ from models.turn_processor import (
     process_dynasty_turn, get_succession_candidates, crown_heir,
     CIVIL_WAR_THRESHOLD,
 )
-from utils.theme_manager import get_all_theme_names, generate_theme_from_story_llm, get_theme
+from utils.theme_manager import get_all_theme_names, generate_theme_from_story_llm, get_theme, get_dynasty_theme_config
 from utils.llm_prompts import (
     build_succession_card_prompt,
     generate_succession_card_fallback,
@@ -230,21 +230,11 @@ def view_dynasty(dynasty_id):
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
 
-    # Load theme configuration
-    theme_config = {}
-    theme_description = "Custom Theme"
-    if dynasty.theme_identifier_or_json:
-        if dynasty.theme_identifier_or_json in get_all_theme_names():
-            # Predefined theme
-            theme_config = get_theme(dynasty.theme_identifier_or_json)
-            theme_description = theme_config.get('description', dynasty.theme_identifier_or_json)
-        else:
-            # Custom theme stored as JSON
-            try:
-                theme_config = json.loads(dynasty.theme_identifier_or_json)
-                theme_description = theme_config.get('description', "Custom Theme")
-            except json.JSONDecodeError:
-                theme_description = "Invalid Theme Configuration"
+    # Load theme configuration (cached per dynasty+theme string — Story 11-3)
+    theme_config = get_dynasty_theme_config(dynasty)
+    theme_description = theme_config.get('description', "Custom Theme") if theme_config else "Custom Theme"
+    if dynasty.theme_identifier_or_json and not theme_config and dynasty.theme_identifier_or_json not in get_all_theme_names():
+        theme_description = "Invalid Theme Configuration"
 
     # Get current monarch
     current_monarch = None

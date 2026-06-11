@@ -255,6 +255,44 @@ For events, ensure the 'narrative' uses placeholders like {{dynasty_name}} and {
         return None
 
 
+# ---------------------------------------------------------------------------
+# Theme-config cache (AC2 — Story 11-3)
+# Keyed on (dynasty.id, theme_identifier_or_json) so the cache invalidates
+# automatically when the theme string changes.  Stores a plain dict — never
+# a mutable ORM object.
+# ---------------------------------------------------------------------------
+_THEME_CONFIG_CACHE: dict = {}
+
+
+def get_dynasty_theme_config(dynasty) -> dict:
+    """Return the resolved theme-config dict for *dynasty*, using an in-memory cache.
+
+    The cache key is ``(dynasty.id, dynasty.theme_identifier_or_json)`` so a
+    changed theme string produces a cache miss and re-parses.  Returns an empty
+    dict when the theme is absent or unparseable (matching legacy fallback
+    behaviour).
+    """
+    theme_str = dynasty.theme_identifier_or_json
+    cache_key = (dynasty.id, theme_str)
+    if cache_key in _THEME_CONFIG_CACHE:
+        return _THEME_CONFIG_CACHE[cache_key]
+
+    result: dict = {}
+    if theme_str:
+        theme_names = get_all_theme_names()
+        if theme_str in theme_names:
+            resolved = get_theme(theme_str)
+            result = resolved if resolved is not None else {}
+        else:
+            try:
+                result = json.loads(theme_str)
+            except (json.JSONDecodeError, ValueError):
+                result = {}
+
+    _THEME_CONFIG_CACHE[cache_key] = result
+    return result
+
+
 # Attempt to load themes when this module is imported
 load_cultural_themes()
 logger.debug("utils.theme_manager initialized and themes loaded (if file found).")

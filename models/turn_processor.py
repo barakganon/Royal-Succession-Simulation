@@ -112,7 +112,15 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
             except json.JSONDecodeError:
                 return False, "Invalid theme configuration"
 
-    # Get all living persons in the dynasty
+    # Get all living persons in the dynasty.
+    # Story 11-3 N+1 audit: the per-person loop (lines ~174-254) accesses only
+    # scalar PersonDB columns (birth_year, death_year, is_monarch, is_noble,
+    # gender, spouse_sim_id, pretender_strength, traits_json via get_traits()).
+    # No ORM relationships (mother, father, spouse, commanded_units, etc.) are
+    # navigated inside the loop; individual lifecycle helpers that need related
+    # rows issue their own explicit queries rather than traversing relationships.
+    # Therefore no joinedload/selectinload is added here — adding one for
+    # un-accessed relationships would waste memory without eliminating any query.
     living_persons = PersonDB.query.filter_by(
         dynasty_id=dynasty_id,
         death_year=None
