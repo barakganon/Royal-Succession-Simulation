@@ -72,6 +72,10 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # Recommended to disable
 # Initialize SQLAlchemy with the Flask app
 db.init_app(app)
 
+# Initialize Flask-Migrate for Alembic-managed schema migrations
+from flask_migrate import Migrate
+migrate = Migrate(app, db)
+
 # Initialize SocketIO for real-time battle ticker
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
@@ -259,16 +263,11 @@ if __name__ == '__main__':
     try:
         # Initialize database with integrity checks and migrations
         with app.app_context():
-            # Initialize database
+            # Initialize database (create_all for fresh DBs; for schema changes use `flask db upgrade`)
             success = db_initializer.initialize_database()
             if not success:
                 logger.error("Database initialization failed. Attempting to continue anyway.")
-            
-            # Perform migrations if needed
-            migration_success = db_initializer.perform_migrations()
-            if not migration_success:
-                logger.warning("Database migrations failed. Some features may not work correctly.")
-            
+
             # Initialize test user
             initialize_test_user()
 

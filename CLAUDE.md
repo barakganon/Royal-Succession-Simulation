@@ -139,8 +139,36 @@ ChronicleEntryDB   id, game_id, turn, year, text, created_at
 - SVG strings rendered with `{{ svg_string | safe }}`
 - Flash messages via `get_flashed_messages(with_categories=true)` already in `base.html`
 
+### Database Migrations (Alembic / Flask-Migrate)
+
+Schema is managed by Flask-Migrate (Alembic). **Never hand-write ALTER TABLE.**
+
+```bash
+# Required env var for CLI commands
+export FLASK_APP=main_flask_app.py
+
+# After changing a model field: generate a new migration
+flask db migrate -m "add foo_column to dynasty"
+
+# Apply pending migrations (dev + CI)
+flask db upgrade
+
+# One-time stamp for an existing DB that predates Alembic
+flask db stamp head
+
+# Show migration history
+flask db history
+```
+
+**Rules:**
+- Every schema change = one model field change + one `flask db migrate` (two commits minimum)
+- Commit the generated `migrations/versions/*.py` file alongside the model change
+- `render_as_batch=True` is set in `migrations/env.py` — required for SQLite and circular FKs
+- Fresh DBs are bootstrapped by `db.create_all()` inside `initialize_database()`; `flask db upgrade` is the deploy step for existing DBs
+- The circular `dynasty ↔ person_db` FK uses `use_alter=True, name='fk_...'` — keep that pattern
+
 ### Tests
-- Run `pytest` after every change — must stay at 187 passed, 0 failed
+- Run `pytest` after every change — must stay at 536 passed, 0 failed
 - New routes need at least one integration test in `tests/integration/`
 - New game mechanics need a unit test in `tests/unit/`
 - Never skip a test without a comment explaining why
