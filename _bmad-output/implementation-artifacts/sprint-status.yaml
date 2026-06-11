@@ -39,7 +39,7 @@
 # - Each story should have a corresponding file: {story_key}.md in story_location
 
 generated: 2026-05-02
-last_updated: 2026-06-11  # updated: Story 11-3 done — perf (indexes, theme cache, N+1 audit) 536 green
+last_updated: 2026-06-11  # updated: Epic 11 complete (11-2 Alembic, 11-3 perf, 11-4 logging/warnings) 536 green
 project: Royal-Succession-Simulation
 project_key: RSS
 tracking_system: file-system
@@ -311,7 +311,7 @@ development_status:
   # ── EPIC 11: Code Cleanup (Sprint 11) ──────────────────────────────────────
   # Goal: Pay down all technical debt from sprints 1-10.
   # Note: This sprint is also where deferred-work.md items land.
-  epic-11: in-progress
+  epic-11: done
 
   # Story 11-1: Delete dead code
   # simulation_engine.py.bak, models/economy.py, models/person.py, models/family_tree.py
@@ -335,7 +335,7 @@ development_status:
   # RotatingFileHandler (5MB, 3 backups); replace remaining print() with logger.*;
   # conditional atexit handler (skip in pytest); switch .query.get(id) → session.get();
   # datetime.utcnow() → datetime.now(UTC). Target: <50 warnings.
-  11-4-logging-and-warnings: ready-for-dev
+  11-4-logging-and-warnings: done
 
   epic-11-retrospective: optional
 
