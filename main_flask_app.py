@@ -11,6 +11,7 @@ import datetime
 import signal
 import sys
 import logging
+import logging.handlers
 import atexit
 from functools import wraps
 from dotenv import load_dotenv
@@ -22,7 +23,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("flask_app.log"),
+        logging.handlers.RotatingFileHandler("flask_app.log", maxBytes=5*1024*1024, backupCount=3),
         logging.StreamHandler(sys.stdout)
     ]
 )
@@ -153,14 +154,15 @@ def cleanup():
     except Exception as e:
         logger.error(f"Error during cleanup: {str(e)}")
 
-# Register cleanup function
-atexit.register(cleanup)
+# Register cleanup function only when not running under pytest
+if 'pytest' not in sys.modules:
+    atexit.register(cleanup)
 
 
 @login_manager.user_loader
 def load_user(user_id: str) -> User | None:
     """Flask-Login user loader callback."""
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 
 
