@@ -329,7 +329,7 @@ development_status:
   # joinedload for PersonDB relationships in turn_processor (N+1 kill);
   # cache theme_config per dynasty in app.config; index HistoryLogEntryDB(dynasty_id, year);
   # index Project(dynasty_id, status, completion_year).
-  11-3-performance-optimizations: backlog
+  11-3-performance-optimizations: ready-for-dev
 
   # Story 11-4: Logging + SQLAlchemy warnings
   # RotatingFileHandler (5MB, 3 backups); replace remaining print() with logger.*;
