@@ -1,6 +1,6 @@
 # Royal Succession Simulation - Development Status
-Last updated: 2026-05-30
-Last commit: Story 7-2 — AI marriage acceptance + wedding chronicle
+Last updated: 2026-06-11
+Last commit: Story 11-2 — Flask-Migrate/Alembic adoption (536 green)
 
 ---
 
@@ -201,3 +201,4 @@ Task 1-4 remains (chronicle prompt update).
 | 10-2 | Story-moment turn interrupt + LLM prose + full-screen choice modal + choice route (record/dismiss; effects in 10-3) (4 worktree agents) — 530 green | Done |
 | 10-3 | Story-moment effect applicator (prestige/wealth/infamy/trait; exile/relation narrative-only) + 25y (~5-turn) cooldown (3 worktree agents) — 542 green. Epic 10 complete | Done |
 | 11-1 | Retire legacy simulation_engine + Person/FamilyTree/EconomyManager + dead routes/tests/junk (~1450 lines); repoint base.html nav to real routes — 536 green | Done |
+| 11-2 | Flask-Migrate/Alembic adoption: baseline migration (24 tables, circular FKs via use_alter, render_as_batch); retired ad-hoc ALTER TABLE + db_version path; live DB stamped; CLAUDE.md migration workflow. Verified fresh-DB `flask db upgrade` == `create_all()` schema; app boots 8091 (Sonnet worktree agent; Opus verify+integrate) — 536 green | Done |
