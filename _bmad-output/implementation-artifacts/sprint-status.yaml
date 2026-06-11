@@ -335,7 +335,7 @@ development_status:
   # RotatingFileHandler (5MB, 3 backups); replace remaining print() with logger.*;
   # conditional atexit handler (skip in pytest); switch .query.get(id) → session.get();
   # datetime.utcnow() → datetime.now(UTC). Target: <50 warnings.
-  11-4-logging-and-warnings: backlog
+  11-4-logging-and-warnings: ready-for-dev
 
   epic-11-retrospective: optional
 
