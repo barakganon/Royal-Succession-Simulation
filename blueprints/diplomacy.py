@@ -6,6 +6,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_required, current_user
 
 from models.db_models import (
+    db,
     db, DynastyDB, DiplomaticRelation, Treaty, TreatyType, War, WarGoal,
 )
 from models.diplomacy_system import DiplomacySystem
@@ -24,7 +25,7 @@ diplomacy_bp = Blueprint('diplomacy', __name__)
 @login_required
 def diplomacy_view(dynasty_id):
     """View and manage diplomatic relations for a dynasty."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -117,7 +118,7 @@ def diplomacy_view(dynasty_id):
 @login_required
 def treaty_view(dynasty_id):
     """View and manage treaties for a dynasty."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -159,7 +160,7 @@ def treaty_view(dynasty_id):
 @login_required
 def perform_diplomatic_action(dynasty_id):
     """Perform a diplomatic action."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -192,7 +193,7 @@ def perform_diplomatic_action(dynasty_id):
 @login_required
 def create_treaty(dynasty_id):
     """Create a treaty between dynasties."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -233,7 +234,7 @@ def create_treaty(dynasty_id):
 @login_required
 def break_treaty(dynasty_id, treaty_id):
     """Break a treaty."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -256,7 +257,7 @@ def break_treaty(dynasty_id, treaty_id):
 @login_required
 def declare_war(dynasty_id):
     """Declare war on another dynasty."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -297,13 +298,13 @@ def declare_war(dynasty_id):
 @login_required
 def negotiate_peace(dynasty_id, war_id):
     """Negotiate peace to end a war."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
 
     # Get war
-    war = War.query.get_or_404(war_id)
+    war = db.get_or_404(War, war_id)
 
     # Check if dynasty is involved in the war
     if war.attacker_dynasty_id != dynasty_id and war.defender_dynasty_id != dynasty_id:
@@ -358,7 +359,7 @@ def foreign_characters_json(dynasty_id):
     """Return JSON list of foreign marriageable nobles for the given dynasty."""
     from models.marriage_system import MarriageSystem
 
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.user_id != current_user.id:
         abort(403)
 
@@ -373,7 +374,7 @@ def eligible_children_json(dynasty_id):
     """Return JSON list of the dynasty's own eligible children for marriage."""
     from models.marriage_system import MarriageSystem
 
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.user_id != current_user.id:
         abort(403)
 
@@ -389,7 +390,7 @@ def propose_marriage(dynasty_id):
     """Propose a cross-dynasty marriage between an own child and a foreign noble."""
     from models.marriage_system import MarriageSystem
 
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.user_id != current_user.id:
         abort(403)
 

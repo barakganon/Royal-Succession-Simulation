@@ -9,6 +9,7 @@ from flask import (
 from flask_login import login_required, current_user
 
 from models.db_models import (
+    db,
     db, DynastyDB, Territory, ChronicleEntryDB,
     War, DiplomaticRelation, Treaty, TreatyType
 )
@@ -225,7 +226,7 @@ def project_catalogue(dynasty_id):
     preview from this endpoint instead of inlining the catalogue in the
     template. The data is canonical and shared with `models.project_system`.
     """
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.user_id != current_user.id:
         return jsonify({'error': 'Access denied'}), 403
 
@@ -274,7 +275,7 @@ def territory_details_json(territory_id):
     """
     from models.db_models import Building, MilitaryUnit, Project
 
-    territory = Territory.query.get_or_404(territory_id)
+    territory = db.get_or_404(Territory, territory_id)
 
     # Resolve player ownership against ALL of the current user's dynasties
     # (a user can in theory own more than one — same convention as the
@@ -385,7 +386,7 @@ def territory_details_json(territory_id):
 def territory_details(territory_id):
     """View details of a specific territory."""
     # Get territory
-    territory = Territory.query.get_or_404(territory_id)
+    territory = db.get_or_404(Territory, territory_id)
 
     # Check if territory is controlled by user's dynasty
     user_dynasties = DynastyDB.query.filter_by(user_id=current_user.id).all()
@@ -434,7 +435,7 @@ def territory_details(territory_id):
 def dynasty_territories(dynasty_id):
     """View and manage territories controlled by a dynasty."""
     # Get dynasty
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
 
     # Check ownership
     if dynasty.owner_user != current_user:
@@ -524,7 +525,7 @@ def generate_map():
 @login_required
 def time_view(dynasty_id):
     """View time management interface for a dynasty."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -605,7 +606,7 @@ def time_view(dynasty_id):
 @login_required
 def advance_time(dynasty_id):
     """Advance time for a dynasty by processing a turn."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -631,7 +632,7 @@ def advance_time(dynasty_id):
 @login_required
 def schedule_event(dynasty_id):
     """Schedule a new event for a dynasty."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -691,7 +692,7 @@ def schedule_event(dynasty_id):
 @login_required
 def cancel_event(dynasty_id, event_id):
     """Cancel a scheduled event."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -717,7 +718,7 @@ def cancel_event(dynasty_id, event_id):
 @login_required
 def timeline_view(dynasty_id):
     """View the historical timeline for a dynasty."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -849,7 +850,7 @@ def synchronize_turns():
 @login_required
 def view_chronicle(dynasty_id):
     """Display the LLM-narrated living chronicle for a dynasty."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.user_id != current_user.id:
         flash('Access denied.', 'danger')
         return redirect(url_for('auth.dashboard'))
@@ -873,7 +874,7 @@ def game_advisor(dynasty_id):
     """
     from utils.llm_prompts import build_advisor_prompt, generate_advisor_fallback
 
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.user_id != current_user.id:
         return jsonify({'error': 'Access denied'}), 403
 

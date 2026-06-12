@@ -7,6 +7,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
 
 from models.db_models import (
+    db,
     db, DynastyDB, HistoryLogEntryDB, Territory, TradeRoute, Resource,
     BuildingType, ResourceType,
 )
@@ -26,7 +27,7 @@ economy_bp = Blueprint('economy', __name__)
 @login_required
 def dynasty_economy(dynasty_id):
     """View a dynasty's economic details."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -138,7 +139,7 @@ def world_economy_view():
 @login_required
 def construct_building(dynasty_id):
     """Construct a new building in a territory."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -178,7 +179,7 @@ def construct_building(dynasty_id):
 @login_required
 def upgrade_building(dynasty_id, building_id):
     """Upgrade an existing building."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -210,7 +211,7 @@ def upgrade_building(dynasty_id, building_id):
 @login_required
 def repair_building(dynasty_id, building_id):
     """Repair a damaged building."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -242,7 +243,7 @@ def repair_building(dynasty_id, building_id):
 @login_required
 def develop_territory_economy(dynasty_id, territory_id):
     """Develop a territory to increase its development level."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -274,7 +275,7 @@ def develop_territory_economy(dynasty_id, territory_id):
 @login_required
 def establish_trade(dynasty_id):
     """Establish a trade route with another dynasty."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -317,7 +318,7 @@ def establish_trade(dynasty_id):
 @login_required
 def cancel_trade(dynasty_id, trade_route_id):
     """Cancel an existing trade route."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -349,7 +350,7 @@ def cancel_trade(dynasty_id, trade_route_id):
 @login_required
 def territory_economy(territory_id):
     """View economic details for a specific territory."""
-    territory = Territory.query.get_or_404(territory_id)
+    territory = db.get_or_404(Territory, territory_id)
 
     # Check if user has access to this territory
     if territory.controller_dynasty_id:
@@ -399,7 +400,7 @@ def territory_economy(territory_id):
 def develop_territory(dynasty_id):
     """Develop a territory by increasing its development level or adding buildings."""
     # Get dynasty
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
 
     # Check ownership
     if dynasty.owner_user != current_user:
@@ -415,7 +416,7 @@ def develop_territory(dynasty_id):
         return redirect(url_for('map.dynasty_territories', dynasty_id=dynasty_id))
 
     # Check if territory is controlled by this dynasty
-    territory = Territory.query.get_or_404(territory_id)
+    territory = db.get_or_404(Territory, territory_id)
     if territory.controller_dynasty_id != dynasty_id:
         flash("You don't control this territory.", "danger")
         return redirect(url_for('map.dynasty_territories', dynasty_id=dynasty_id))
@@ -464,7 +465,7 @@ from models.db_models import Loan
 @login_required
 def banking_view(dynasty_id):
     """Display the banking / loans overview for a dynasty."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash('Not authorized to view this dynasty.', 'danger')
         return redirect(url_for('auth.dashboard'))
@@ -490,7 +491,7 @@ def banking_view(dynasty_id):
 @login_required
 def banking_borrow(dynasty_id):
     """Take out a new loan."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash('Not authorized.', 'danger')
         return redirect(url_for('auth.dashboard'))
@@ -511,7 +512,7 @@ def banking_borrow(dynasty_id):
 @login_required
 def banking_repay(dynasty_id):
     """Repay gold toward a specific loan."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash('Not authorized.', 'danger')
         return redirect(url_for('auth.dashboard'))

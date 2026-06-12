@@ -13,6 +13,7 @@ from flask_login import login_required, current_user
 from flask import jsonify
 
 from models.db_models import (
+    db,
     db, DynastyDB, PersonDB, HistoryLogEntryDB, Territory,
     DiplomaticRelation, War, TradeRoute, Army
 )
@@ -225,7 +226,7 @@ def create_dynasty():
 @login_required
 def view_dynasty(dynasty_id):
     """View a dynasty's details and family tree."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -325,7 +326,7 @@ def advance_turn(dynasty_id):
     # Frozen interface contract: XHR detection for animated turn (Story 3-5).
     is_xhr = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
 
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         if is_xhr:
@@ -467,7 +468,7 @@ def advance_turn(dynasty_id):
 @login_required
 def turn_report(dynasty_id):
     """Display a rich summary of everything that happened during the last turn."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         return redirect(url_for('auth.dashboard'))
 
@@ -516,7 +517,7 @@ def turn_report(dynasty_id):
 def submit_actions(dynasty_id):
     """Accept a JSON list of player actions, execute up to 3, then advance the turn."""
     # legacy: retained for tests / non-map submit
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         return jsonify({'error': 'Not authorized'}), 403
 
@@ -676,7 +677,7 @@ def free_action(dynasty_id):
     # lazy-import pattern used elsewhere in this blueprint.
     from models.free_action_system import FreeActionSystem
 
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         return jsonify({"ok": False, "message": "Not authorized"}), 403
 
@@ -733,7 +734,7 @@ def free_action_catalogue(dynasty_id):
     Returns one entry per VALID_FREE_ACTIONS with display label, category,
     whether the action needs a target dynasty, and whether it is undoable.
     """
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         return jsonify({"error": "Not authorized"}), 403
 
@@ -779,7 +780,7 @@ def free_action_undo(dynasty_id):
     """
     from models.free_action_system import FreeActionSystem
 
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         return jsonify({"ok": False, "message": "Not authorized"}), 403
 
@@ -874,7 +875,7 @@ def check_victory_conditions(dynasty, current_year):
 @login_required
 def victory(dynasty_id):
     """Display the victory screen for a dynasty that has achieved a win condition."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         return redirect(url_for('auth.dashboard'))
     victory_data = flask_session.pop('victory', None)
@@ -892,7 +893,7 @@ def victory(dynasty_id):
 @login_required
 def delete_dynasty(dynasty_id):
     """Delete a dynasty and all associated data."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
 
     # Check ownership
     if dynasty.owner_user != current_user:
@@ -951,6 +952,18 @@ def delete_dynasty(dynasty_id):
                 {"spouse_sim_id": None, "mother_sim_id": None, "father_sim_id": None},
                 synchronize_session=False
             )
+            # Also null out references INTO this dynasty's persons from OTHER dynasties
+            # (cross-dynasty marriages leave a stranger spouse pointing back at a
+            # deleted person → CircularDependencyError otherwise).
+            person_ids = [
+                pid for (pid,) in PersonDB.query.filter_by(dynasty_id=dynasty_id)
+                .with_entities(PersonDB.id).all()
+            ]
+            if person_ids:
+                for fk in ("spouse_sim_id", "mother_sim_id", "father_sim_id"):
+                    PersonDB.query.filter(getattr(PersonDB, fk).in_(person_ids)).update(
+                        {fk: None}, synchronize_session=False
+                    )
             db.session.flush()
 
             # 6. Delete the dynasty - this will cascade to persons and history logs
@@ -1155,7 +1168,7 @@ def _default_candidate_id(dynasty: DynastyDB, candidates: list) -> int:
 @login_required
 def succession_candidates_json(dynasty_id):
     """Return the pending-succession state and serialized heir candidates."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         return jsonify({"error": "Not authorized."}), 403
 
@@ -1249,7 +1262,7 @@ def succession_candidates_json(dynasty_id):
 @block_if_turn_processing
 def succession_choice(dynasty_id):
     """Crown the player-chosen heir for a pending succession."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         return jsonify({"error": "Not authorized."}), 403
 
@@ -1347,7 +1360,7 @@ def _find_pending_civil_war(dynasty_id: int):
 @block_if_turn_processing
 def civil_war_resolve(dynasty_id):
     """Resolve a pending civil war by fighting, negotiating, or abdicating."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         return jsonify({"error": "Not authorized."}), 403
 
@@ -1516,7 +1529,7 @@ def story_moment_choice(dynasty_id):
     effects to dynasty state (Story 10-3), and writes a single story_moment
     chronicle line.
     """
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         return jsonify({"error": "Not authorized."}), 403
 
@@ -1564,7 +1577,7 @@ def story_moment_choice(dynasty_id):
 @login_required
 def family_tree(dynasty_id):
     """Render the interactive family tree page for a dynasty."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -1583,7 +1596,7 @@ def family_tree(dynasty_id):
 @login_required
 def family_tree_svg_route(dynasty_id):
     """Return the raw family-tree SVG for a dynasty."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         return jsonify({"error": "Not authorized."}), 403
 
@@ -1606,7 +1619,7 @@ def family_tree_svg_route(dynasty_id):
 @login_required
 def person_detail_json(dynasty_id, person_id):
     """Return JSON details for a person belonging to (or married into) a dynasty."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         return jsonify({"error": "Not authorized."}), 403
 

@@ -6,6 +6,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
 
 from models.db_models import (
+    db,
     db, DynastyDB, PersonDB, Territory,
     MilitaryUnit, UnitType, Army, Battle, Siege
 )
@@ -25,7 +26,7 @@ military_bp = Blueprint('military', __name__)
 def military_view(dynasty_id):
     """View and manage military units and armies for a dynasty."""
     logger.info(f"Rendering military_view for dynasty_id: {dynasty_id}")
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -64,7 +65,7 @@ def military_view(dynasty_id):
 @login_required
 def recruit_unit(dynasty_id):
     """Recruit a new military unit."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -111,7 +112,7 @@ def recruit_unit(dynasty_id):
 @login_required
 def form_army(dynasty_id):
     """Form a new army from individual units."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -149,7 +150,7 @@ def form_army(dynasty_id):
 @login_required
 def assign_commander(dynasty_id):
     """Assign a commander to an army."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -184,7 +185,7 @@ def assign_commander(dynasty_id):
 def military_gameplay(dynasty_id):
     """Interactive military gameplay view that combines the map with military actions."""
     # Get dynasty
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -249,7 +250,7 @@ def military_gameplay(dynasty_id):
 def move_unit_gameplay(dynasty_id):
     """Move a military unit to a target territory from the gameplay view."""
     # Get dynasty
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -288,7 +289,7 @@ def move_unit_gameplay(dynasty_id):
 def attack_gameplay(dynasty_id):
     """Initiate a battle between two armies from the gameplay view."""
     # Get dynasty
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -327,7 +328,7 @@ def attack_gameplay(dynasty_id):
 def siege_gameplay(dynasty_id):
     """Initiate a siege of a territory from the gameplay view."""
     # Get dynasty
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -364,7 +365,7 @@ def siege_gameplay(dynasty_id):
 def end_turn(dynasty_id):
     """End the current turn and process game events."""
     # Get dynasty
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -388,8 +389,8 @@ def end_turn(dynasty_id):
 @login_required
 def army_details(army_id):
     """View details of an army."""
-    army = Army.query.get_or_404(army_id)
-    dynasty = DynastyDB.query.get_or_404(army.dynasty_id)
+    army = db.get_or_404(Army, army_id)
+    dynasty = db.get_or_404(DynastyDB, army.dynasty_id)
 
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
@@ -420,7 +421,7 @@ def army_details(army_id):
 @login_required
 def battle_details(battle_id):
     """View details of a battle."""
-    battle = Battle.query.get_or_404(battle_id)
+    battle = db.get_or_404(Battle, battle_id)
 
     # Check if user has access to this battle
     attacker_dynasty = db.session.get(DynastyDB, battle.attacker_dynasty_id)
@@ -447,7 +448,7 @@ def battle_details(battle_id):
 @login_required
 def siege_details(siege_id):
     """View details of a siege."""
-    siege = Siege.query.get_or_404(siege_id)
+    siege = db.get_or_404(Siege, siege_id)
 
     # Check if user has access to this siege
     attacker_dynasty = db.session.get(DynastyDB, siege.attacker_dynasty_id)
@@ -474,7 +475,7 @@ def siege_details(siege_id):
 @login_required
 def initiate_battle(dynasty_id):
     """Initiate a battle between two armies."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -514,7 +515,7 @@ def initiate_battle(dynasty_id):
 @login_required
 def initiate_siege(dynasty_id):
     """Initiate a siege of a territory."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -552,7 +553,7 @@ def initiate_siege(dynasty_id):
 @login_required
 def naval_battle(dynasty_id):
     """Resolve a naval battle between two armies."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash('Access denied.', 'danger')
         return redirect(url_for('auth.dashboard'))
@@ -589,7 +590,7 @@ def naval_battle(dynasty_id):
 @login_required
 def update_siege(dynasty_id, siege_id):
     """Update the progress of a siege."""
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
     if dynasty.owner_user != current_user:
         flash("Not authorized.", "warning")
         return redirect(url_for('auth.dashboard'))
@@ -613,7 +614,7 @@ def update_siege(dynasty_id, siege_id):
 def move_unit(dynasty_id):
     """Move a military unit to a target territory."""
     # Get dynasty
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
 
     # Check ownership
     if dynasty.owner_user != current_user:
@@ -648,7 +649,7 @@ def move_unit(dynasty_id):
 def move_army(dynasty_id):
     """Move an army to a target territory."""
     # Get dynasty
-    dynasty = DynastyDB.query.get_or_404(dynasty_id)
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
 
     # Check ownership
     if dynasty.owner_user != current_user:
