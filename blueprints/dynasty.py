@@ -1,5 +1,6 @@
 """Dynasty Blueprint — handles dynasty creation, viewing, turn advancement, and deletion."""
 
+import io
 import os
 import json
 import random
@@ -34,7 +35,12 @@ from utils.llm_prompts import (
     generate_succession_card_fallback,
     build_coronation_prompt,
     generate_coronation_fallback,
+    build_foreword_prompt,
+    generate_foreword_fallback,
+    build_epilogue_prompt,
+    generate_epilogue_fallback,
 )
+from models.chronicle_compiler import compile_chronicle
 from visualization.heraldry_renderer import generate_coat_of_arms
 
 logger = logging.getLogger('royal_succession.dynasty')
@@ -1652,3 +1658,180 @@ def person_detail_json(dynasty_id, person_id):
         "is_pretender": bool(person.is_pretender),
         "reign_start_year": person.reign_start_year,
     })
+
+
+# ---------------------------------------------------------------------------
+# Story 12-3: Chronicle Book + PDF Export
+# ---------------------------------------------------------------------------
+
+def _build_chronicle_book(dynasty_id: int):
+    """Shared helper: compile ChronicleBook and wire foreword/epilogue.
+
+    Returns (dynasty, book) on success, or None if dynasty not found or
+    compile_chronicle returns None.
+    """
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
+    book = compile_chronicle(dynasty_id)
+    if book is None:
+        logger.warning("_build_chronicle_book: compile_chronicle returned None for dynasty %s", dynasty_id)
+        return None
+
+    # Gather context for foreword/epilogue prompts
+    all_paragraphs = [p for ch in book.chapters for p in ch.paragraphs]
+    first_paragraphs = all_paragraphs[:3]
+    last_paragraphs = all_paragraphs[-5:] if len(all_paragraphs) >= 5 else all_paragraphs
+
+    first_monarch_name = ""
+    if book.chapters:
+        first_monarch_name = book.chapters[0].monarch_name or ""
+
+    founding_year = dynasty.start_year
+    current_year = dynasty.current_simulation_year
+
+    territory_count = Territory.query.filter_by(controller_dynasty_id=dynasty.id).count()
+    living_monarch = PersonDB.query.filter_by(
+        dynasty_id=dynasty.id, is_monarch=True, death_year=None
+    ).first()
+    current_state = {
+        'prestige': dynasty.prestige,
+        'territories': territory_count,
+        'is_extinct': living_monarch is None,
+    }
+
+    llm_model = current_app.config.get('FLASK_APP_LLM_MODEL')
+
+    # Foreword
+    if llm_model is not None:
+        try:
+            prompt = build_foreword_prompt(dynasty.name, founding_year, first_paragraphs, first_monarch_name)
+            response = llm_model.generate_content(
+                prompt,
+                generation_config={'max_output_tokens': 200}
+            )
+            book.foreword = response.text.strip()
+        except Exception as e:
+            logger.warning("Chronicle foreword LLM call failed for dynasty %s: %s", dynasty_id, e)
+            book.foreword = generate_foreword_fallback(dynasty.name, founding_year, first_monarch_name)
+    else:
+        book.foreword = generate_foreword_fallback(dynasty.name, founding_year, first_monarch_name)
+
+    # Epilogue
+    if llm_model is not None:
+        try:
+            prompt = build_epilogue_prompt(dynasty.name, current_year, last_paragraphs, current_state)
+            response = llm_model.generate_content(
+                prompt,
+                generation_config={'max_output_tokens': 200}
+            )
+            book.epilogue = response.text.strip()
+        except Exception as e:
+            logger.warning("Chronicle epilogue LLM call failed for dynasty %s: %s", dynasty_id, e)
+            book.epilogue = generate_epilogue_fallback(dynasty.name, current_year, current_state)
+    else:
+        book.epilogue = generate_epilogue_fallback(dynasty.name, current_year, current_state)
+
+    return dynasty, book
+
+
+@dynasty_bp.route('/dynasty/<int:dynasty_id>/chronicle_book')
+@login_required
+def chronicle_book(dynasty_id):
+    """Render the Chronicle Book reader page for a dynasty."""
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
+    if dynasty.user_id != current_user.id:
+        flash("You do not have permission to view that dynasty's chronicle.", "warning")
+        return redirect(url_for('auth.dashboard'))
+
+    result = _build_chronicle_book(dynasty_id)
+    if result is None:
+        flash("Could not compile the Chronicle — no history recorded yet.", "danger")
+        return redirect(url_for('auth.dashboard'))
+
+    dynasty, book = result
+    return render_template('chronicle_book.html', dynasty=dynasty, book=book)
+
+
+@dynasty_bp.route('/dynasty/<int:dynasty_id>/chronicle_book.pdf')
+@login_required
+def chronicle_book_pdf(dynasty_id):
+    """Return the Chronicle Book as a downloadable PDF (reportlab Platypus).
+
+    SVG heraldry is intentionally NOT embedded: reportlab cannot render inline
+    SVG without additional system dependencies (svglib + lxml) which are outside
+    spec scope. The PDF is text-focused.
+    """
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
+    if dynasty.user_id != current_user.id:
+        flash("You do not have permission to download that dynasty's chronicle.", "warning")
+        return redirect(url_for('auth.dashboard'))
+
+    result = _build_chronicle_book(dynasty_id)
+    if result is None:
+        flash("Could not compile the Chronicle — no history recorded yet.", "danger")
+        return redirect(url_for('auth.dashboard'))
+
+    dynasty, book = result
+
+    # Build PDF with reportlab Platypus
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.units import inch
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, rightMargin=inch, leftMargin=inch, topMargin=inch, bottomMargin=inch)
+    styles = getSampleStyleSheet()
+    story = []
+
+    # Title page
+    story.append(Paragraph(f"The Chronicle of {book.dynasty_name}", styles['Title']))
+    story.append(Spacer(1, 0.3 * inch))
+    founding_year = dynasty.start_year
+    current_year = dynasty.current_simulation_year
+    story.append(Paragraph(f"{founding_year} - {current_year}", styles['Normal']))
+    story.append(PageBreak())
+
+    # Foreword
+    if book.foreword:
+        story.append(Paragraph("Foreword", styles['Heading1']))
+        story.append(Spacer(1, 0.15 * inch))
+        story.append(Paragraph(book.foreword, styles['Normal']))
+        story.append(PageBreak())
+
+    # Chapters
+    for chapter in book.chapters:
+        heading = chapter.monarch_name if chapter.monarch_name else "The Founding"
+        end_label = str(chapter.end_year) if chapter.end_year else "present"
+        story.append(Paragraph(heading, styles['Heading1']))
+        story.append(Paragraph(f"Reign: {chapter.start_year} - {end_label}", styles['Normal']))
+        story.append(Spacer(1, 0.15 * inch))
+
+        for para in chapter.paragraphs:
+            story.append(Paragraph(para, styles['Normal']))
+            story.append(Spacer(1, 0.1 * inch))
+
+        if chapter.highlights:
+            story.append(Spacer(1, 0.1 * inch))
+            story.append(Paragraph("Key Events of the Reign", styles['Heading2']))
+            for hl in chapter.highlights:
+                # Avoid Unicode sub/superscripts — use plain ASCII dashes only
+                story.append(Paragraph(f"{hl.year} -- {hl.text}", styles['Normal']))
+            story.append(Spacer(1, 0.15 * inch))
+
+        story.append(PageBreak())
+
+    # Epilogue
+    if book.epilogue:
+        story.append(Paragraph("Epilogue", styles['Heading1']))
+        story.append(Spacer(1, 0.15 * inch))
+        story.append(Paragraph(book.epilogue, styles['Normal']))
+
+    doc.build(story)
+    buf.seek(0)
+
+    return Response(
+        buf.getvalue(),
+        mimetype='application/pdf',
+        headers={
+            'Content-Disposition': f'attachment; filename="chronicle_{dynasty_id}.pdf"'
+        }
+    )
