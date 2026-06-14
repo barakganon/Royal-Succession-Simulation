@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% block title %}The Chronicle of {{ dynasty.name }}{% endblock %}
+
+{% block content %}
+<div class="chronicle-book-container">
+
+  {# ── Cover ── #}
+  <div class="chronicle-cover">
+    {% if dynasty.coat_of_arms_svg %}
+      <div class="chronicle-coa">{{ dynasty.coat_of_arms_svg | safe }}</div>
+    {% endif %}
+    <h1 class="chronicle-title">The Chronicle of {{ dynasty.name }}</h1>
+    <p class="chronicle-subtitle">{{ dynasty.start_year }} &ndash; {{ dynasty.current_simulation_year }}</p>
+  </div>
+
+  {# ── Foreword ── #}
+  {% if book.foreword %}
+  <div class="chronicle-section chronicle-foreword">
+    <h2>Foreword</h2>
+    <p>{{ book.foreword }}</p>
+  </div>
+  {% endif %}
+
+  {# ── Chapters ── #}
+  {% for chapter in book.chapters %}
+  <div class="chronicle-chapter">
+    <h2 class="chronicle-chapter-heading">
+      {{ chapter.monarch_name if chapter.monarch_name else "The Founding" }}
+    </h2>
+    <p class="chronicle-reign-years">
+      Reign: {{ chapter.start_year }} &ndash; {{ chapter.end_year if chapter.end_year else "present" }}
+    </p>
+
+    {% if chapter.portrait_svg %}
+    <div class="chronicle-portrait">
+      {{ chapter.portrait_svg | safe }}
+    </div>
+    {% endif %}
+
+    {% for para in chapter.paragraphs %}
+    <p class="chronicle-para">{{ para }}</p>
+    {% endfor %}
+
+    {% if chapter.highlights %}
+    <div class="chronicle-highlights-box">
+      <h3>Key Events of the Reign</h3>
+      <ul>
+        {% for hl in chapter.highlights %}
+        <li><strong>{{ hl.year }}</strong> &mdash; {{ hl.text }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  {# ── Family Tree ── #}
+  {% if dynasty.family_tree_svg %}
+  <div class="chronicle-section chronicle-family-tree">
+    <h2>The Family Tree</h2>
+    <div class="chronicle-tree-svg">{{ dynasty.family_tree_svg | safe }}</div>
+  </div>
+  {% endif %}
+
+  {# ── Epilogue ── #}
+  {% if book.epilogue %}
+  <div class="chronicle-section chronicle-epilogue">
+    <h2>Epilogue</h2>
+    <p>{{ book.epilogue }}</p>
+  </div>
+  {% endif %}
+
+  {# ── Navigation links ── #}
+  <div class="chronicle-nav-links">
+    <a href="{{ url_for('dynasty.chronicle_book_pdf', dynasty_id=dynasty.id) }}" class="btn btn-secondary">
+      &#x1F4C4; Download PDF
+    </a>
+    <a href="{{ url_for('map.world_map', dynasty_id=dynasty.id) }}" class="btn btn-primary">
+      &#x1F5FA; Back to Map
+    </a>
+  </div>
+
+</div><!-- /chronicle-book-container -->
+{% endblock %}
+
+{% block extra_styles %}
+<style>
+  .chronicle-book-container {
+    max-width: 860px;
+    margin: 2rem auto;
+    padding: 0 1rem 4rem;
+    font-family: var(--font-body, 'Crimson Text', serif);
+    color: var(--color-text, #e8d8b0);
+  }
+
+  .chronicle-cover {
+    text-align: center;
+    padding: 3rem 1rem 2rem;
+    border-bottom: 2px solid var(--color-accent, #8b1a1a);
+    margin-bottom: 2.5rem;
+  }
+
+  .chronicle-coa {
+    margin: 0 auto 1.5rem;
+    max-width: 120px;
+  }
+
+  .chronicle-coa svg {
+    width: 100%;
+    height: auto;
+  }
+
+  .chronicle-title {
+    font-family: var(--font-heading, 'Cinzel', serif);
+    font-size: 2.2rem;
+    margin-bottom: 0.4rem;
+  }
+
+  .chronicle-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.75;
+  }
+
+  .chronicle-section {
+    margin-bottom: 2.5rem;
+  }
+
+  .chronicle-section h2,
+  .chronicle-chapter-heading {
+    font-family: var(--font-heading, 'Cinzel', serif);
+    font-size: 1.6rem;
+    color: var(--color-accent, #c9a84c);
+    border-bottom: 1px solid var(--color-accent, #8b1a1a);
+    padding-bottom: 0.3rem;
+    margin-bottom: 0.8rem;
+  }
+
+  .chronicle-chapter {
+    margin-bottom: 3rem;
+  }
+
+  .chronicle-reign-years {
+    font-style: italic;
+    opacity: 0.8;
+    margin-bottom: 1rem;
+  }
+
+  .chronicle-portrait {
+    float: right;
+    margin: 0 0 1rem 1.5rem;
+    max-width: 90px;
+  }
+
+  .chronicle-portrait svg {
+    width: 100%;
+    height: auto;
+  }
+
+  .chronicle-para {
+    margin-bottom: 0.9rem;
+    line-height: 1.7;
+    text-align: justify;
+  }
+
+  .chronicle-highlights-box {
+    background: rgba(139, 26, 26, 0.12);
+    border-left: 4px solid var(--color-accent, #8b1a1a);
+    padding: 1rem 1.2rem;
+    margin-top: 1.2rem;
+    border-radius: 4px;
+  }
+
+  .chronicle-highlights-box h3 {
+    font-family: var(--font-heading, 'Cinzel', serif);
+    font-size: 1rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .chronicle-highlights-box ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .chronicle-highlights-box li {
+    padding: 0.25rem 0;
+    font-size: 0.95rem;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+  }
+
+  .chronicle-highlights-box li:last-child {
+    border-bottom: none;
+  }
+
+  .chronicle-tree-svg svg {
+    max-width: 100%;
+    height: auto;
+  }
+
+  .chronicle-nav-links {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-top: 3rem;
+  }
+
+  /* Print styles */
+  @media print {
+    .chronicle-nav-links { display: none; }
+    .chronicle-cover { page-break-after: always; }
+    .chronicle-chapter { page-break-inside: avoid; }
+    body { background: white; color: black; }
+    .chronicle-book-container { color: black; }
+    .chronicle-highlights-box { border-left-color: #333; background: #f5f5f5; }
+  }
+</style>
+{% endblock %}

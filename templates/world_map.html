@@ -145,6 +145,13 @@
               title="Foreign Court — Royal Matches">&#x1F48D;</button>
       {% endif %}
 
+      {% if dynasty_id %}
+      <a class="game-rail-btn"
+         href="{{ url_for('dynasty.chronicle_book', dynasty_id=dynasty_id) }}"
+         aria-label="Compile Chronicle — view your dynasty book"
+         title="Compile Chronicle">&#x1F4DC;</a>
+      {% endif %}
+
     </div><!-- /game-left-rail -->
 
     <!-- ─────────── MAP PANEL ─────────── -->
