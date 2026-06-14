@@ -715,3 +715,151 @@ def generate_story_moment_fallback(title: str, summary: str, year: int) -> str:
         f"\"{title}\". {summary} The decision now rests with you, and the realm "
         f"awaits your word."
     )
+
+
+# ---------------------------------------------------------------------------
+# Story 12-2 — Chronicle book foreword & epilogue prompts
+# ---------------------------------------------------------------------------
+
+def build_foreword_prompt(dynasty_name: str, founding_year: int,
+                          first_paragraphs: list,
+                          first_monarch_name: str = "") -> str:
+    """Prompt for a short framing FOREWORD for the dynasty's Chronicle book.
+
+    Story 12-2. max_tokens<=200. Style: medieval chronicler/archivist voice,
+    third-person, 2-4 sentences, sets the stage and introduces the saga,
+    does NOT spoil the ending. Fallback: generate_foreword_fallback().
+
+    Args:
+        dynasty_name: Name of the dynasty (primitive str, never ORM object).
+        founding_year: The year the dynasty was founded.
+        first_paragraphs: Opening chronicle paragraphs for context (list of str).
+            Only the first 3 are embedded to respect the token budget.
+        first_monarch_name: Optional name of the dynasty's first ruler.
+    """
+    context_paras = first_paragraphs[:3]
+    context_str = (
+        "\n".join(context_paras)
+        if context_paras
+        else "(No opening chronicle passages recorded yet.)"
+    )
+    monarch_hint = (
+        f" The dynasty was founded by {first_monarch_name}."
+        if first_monarch_name
+        else ""
+    )
+    return (
+        f"You are a medieval archivist writing the opening foreword of a great "
+        f"dynasty's chronicle book.\n"
+        f"Dynasty: {dynasty_name}\n"
+        f"Founded: {founding_year}{monarch_hint}\n\n"
+        f"Opening passages from the chronicle:\n{context_str}\n\n"
+        f"Write exactly 2-4 sentences as a formal medieval foreword — in the "
+        f"voice of a humble archivist introducing the saga of {dynasty_name} "
+        f"to the reader. Third-person, solemn, sets the stage. "
+        f"Do NOT spoil the ending or reveal how the dynasty's story concludes. "
+        f"No bullet points, no headings, pure flowing prose only. "
+        f"Stay within 200 tokens."
+    )
+
+
+def generate_foreword_fallback(dynasty_name: str, founding_year: int,
+                               first_monarch_name: str = "") -> str:
+    """Deterministic, non-empty foreword when the LLM is unavailable (Story 12-2).
+
+    Returns 2-3 sentences naming the house and founding year.
+    """
+    founder_clause = (
+        f", founded by {first_monarch_name},"
+        if first_monarch_name
+        else ""
+    )
+    return (
+        f"Here begins the Chronicle of {dynasty_name}{founder_clause} "
+        f"a noble house whose story commenced in the year {founding_year}. "
+        f"The deeds herein — of conquest and loss, of love and succession — "
+        f"are set down faithfully that they may endure beyond the lives of "
+        f"those who lived them. Let the reader turn these pages in the spirit "
+        f"of one who seeks to understand the ways of great houses."
+    )
+
+
+def build_epilogue_prompt(dynasty_name: str, current_year: int,
+                          last_paragraphs: list,
+                          current_state: dict = None) -> str:
+    """Prompt for a reflective EPILOGUE closing the dynasty's Chronicle book.
+
+    Story 12-2. max_tokens<=200. Style: medieval chronicler voice, third-person,
+    2-4 sentences, reflective, describes where the dynasty stands now (or how it
+    ended). Fallback: generate_epilogue_fallback().
+
+    Args:
+        dynasty_name: Name of the dynasty (primitive str).
+        current_year: The current simulation year.
+        last_paragraphs: Most recent chronicle paragraphs (list of str).
+            Only the last 5 are embedded to respect the token budget.
+        current_state: Optional dict with keys such as 'prestige', 'territories',
+            'is_extinct'. Pass None if unavailable.
+    """
+    context_paras = last_paragraphs[-5:] if last_paragraphs else []
+    context_str = (
+        "\n".join(context_paras)
+        if context_paras
+        else "(No closing chronicle passages recorded yet.)"
+    )
+    state_lines = []
+    if current_state:
+        if "prestige" in current_state:
+            state_lines.append(f"Prestige: {current_state['prestige']}")
+        if "territories" in current_state:
+            state_lines.append(f"Territories held: {current_state['territories']}")
+        if current_state.get("is_extinct"):
+            state_lines.append("The dynasty has fallen — its line is extinct.")
+    state_str = (
+        "Current standing — " + "; ".join(state_lines)
+        if state_lines
+        else ""
+    )
+    extinct_hint = (
+        " The dynasty has perished — write this epilogue as a closing elegy."
+        if (current_state or {}).get("is_extinct")
+        else " The dynasty endures — close with a sense of living legacy."
+    )
+    return (
+        f"You are a medieval archivist writing the closing epilogue of a great "
+        f"dynasty's chronicle book.\n"
+        f"Dynasty: {dynasty_name}\n"
+        f"Year: {current_year}\n"
+        f"{state_str}\n\n"
+        f"Final chronicle passages:\n{context_str}\n\n"
+        f"Write exactly 2-4 sentences as a formal medieval epilogue reflecting "
+        f"on the saga of {dynasty_name} as it stands in {current_year}. "
+        f"Third-person, solemn, reflective.{extinct_hint} "
+        f"No bullet points, no headings, pure flowing prose only. "
+        f"Stay within 200 tokens."
+    )
+
+
+def generate_epilogue_fallback(dynasty_name: str, current_year: int,
+                               current_state: dict = None) -> str:
+    """Deterministic, non-empty epilogue when the LLM is unavailable (Story 12-2).
+
+    If current_state indicates extinction, phrases the epilogue as an ending;
+    otherwise as an ongoing legacy. Non-empty, LLM-free.
+    """
+    is_extinct = bool((current_state or {}).get("is_extinct"))
+    if is_extinct:
+        return (
+            f"Thus ends the Chronicle of {dynasty_name}, whose flame was "
+            f"extinguished in the year {current_year}. "
+            f"The halls that once rang with the laughter of kings fell silent, "
+            f"and the name of this house passed into the keeping of memory alone. "
+            f"May the scribes who preserved these pages do justice to all that "
+            f"{dynasty_name} was, and all it strived to be."
+        )
+    return (
+        f"So the Chronicle of {dynasty_name} stands as of the year {current_year}, "
+        f"its story not yet concluded, its banners still raised against the sky. "
+        f"The house endures, and future scribes shall yet have deeds to record "
+        f"before the final page of this great saga is set down."
+    )
