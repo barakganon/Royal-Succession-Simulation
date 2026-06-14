@@ -354,7 +354,7 @@ development_status:
   # build_foreword_prompt(dynasty, first_3_paragraphs) → 200 tokens;
   # build_epilogue_prompt(dynasty, last_5_paragraphs, current_state) → 200 tokens;
   # both in utils/llm_prompts.py with deterministic fallbacks.
-  12-2-foreword-epilogue-prompts: backlog
+  12-2-foreword-epilogue-prompts: ready-for-dev
 
   # Story 12-3: Chronicle book template + PDF export
   # templates/chronicle_book.html paginated reader; PDF export route using pdf skill;
