@@ -39,7 +39,7 @@
 # - Each story should have a corresponding file: {story_key}.md in story_location
 
 generated: 2026-05-02
-last_updated: 2026-06-14  # updated: Story 12-1 done (chronicle compiler, 547 green)
+last_updated: 2026-06-14  # updated: Story 12-2 done (foreword/epilogue prompts, 576 green)
 project: Royal-Succession-Simulation
 project_key: RSS
 tracking_system: file-system
@@ -354,7 +354,7 @@ development_status:
   # build_foreword_prompt(dynasty, first_3_paragraphs) → 200 tokens;
   # build_epilogue_prompt(dynasty, last_5_paragraphs, current_state) → 200 tokens;
   # both in utils/llm_prompts.py with deterministic fallbacks.
-  12-2-foreword-epilogue-prompts: ready-for-dev
+  12-2-foreword-epilogue-prompts: done
 
   # Story 12-3: Chronicle book template + PDF export
   # templates/chronicle_book.html paginated reader; PDF export route using pdf skill;
