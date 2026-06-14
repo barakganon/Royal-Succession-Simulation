@@ -39,7 +39,7 @@
 # - Each story should have a corresponding file: {story_key}.md in story_location
 
 generated: 2026-05-02
-last_updated: 2026-06-14  # updated: Story 12-2 done (foreword/epilogue prompts, 576 green)
+last_updated: 2026-06-14  # updated: Epic 12 complete (chronicle compile + book + PDF) 590 green
 project: Royal-Succession-Simulation
 project_key: RSS
 tracking_system: file-system
@@ -342,7 +342,7 @@ development_status:
   # ── EPIC 12: Compile the Chronicle (Sprint 12) ─────────────────────────────
   # Goal: Stitch dynasty saga into a publishable Chronicle the player wants to keep.
   # Depends on: Epic 9 (narrative events accumulated).
-  epic-12: in-progress
+  epic-12: done
 
   # Story 12-1: chronicle_compiler.py
   # models/chronicle_compiler.py with compile_chronicle(dynasty_id); highlight
@@ -360,7 +360,7 @@ development_status:
   # templates/chronicle_book.html paginated reader; PDF export route using pdf skill;
   # family_tree_svg embedded in book; coat_of_arms_svg embedded;
   # "Compile Chronicle" button on left rail (always available, not end-game only).
-  12-3-chronicle-book-and-pdf: ready-for-dev
+  12-3-chronicle-book-and-pdf: done
 
   epic-12-retrospective: optional
 

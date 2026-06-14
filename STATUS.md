@@ -1,6 +1,6 @@
 # Royal Succession Simulation - Development Status
 Last updated: 2026-06-14
-Last commit: Story 12-1 — chronicle compiler (reign chapters + weighted highlights, 547 green)
+Last commit: Epic 12 complete — Chronicle compile + foreword/epilogue + book reader & reportlab PDF (590 green)
 
 ---
 
