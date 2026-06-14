@@ -79,6 +79,8 @@ class ChronicleBook:
 
 def _year_in_chapter(year: int, chapter: ChronicleChapter) -> bool:
     """Return True if year falls within [chapter.start_year, chapter.end_year] (inclusive)."""
+    if year is None:
+        return False
     if year < chapter.start_year:
         return False
     if chapter.end_year is None:
@@ -156,6 +158,10 @@ def compile_chronicle(dynasty_id: int) -> ChronicleBook | None:
     chapter_highlight_candidates: list[list[ChronicleHighlight]] = [[] for _ in chapters]
 
     for log in history_logs:
+        # HistoryLogEntryDB.year is nullable (system messages); a year-less event
+        # cannot be placed in a reign chapter, so it is not a datable highlight.
+        if log.year is None:
+            continue
         weight = EVENT_WEIGHTS.get(log.event_type or '', DEFAULT_WEIGHT)
         highlight = ChronicleHighlight(
             year=log.year,

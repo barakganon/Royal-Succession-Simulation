@@ -128,6 +128,25 @@ class TestCompileChronicleBasic:
 
 
 @pytest.mark.unit
+class TestYearlessHistoryLog:
+
+    def test_yearless_history_log_excluded_without_crash(self, session, app):
+        """HistoryLogEntryDB.year is nullable (system messages); such events must be
+        skipped as highlights, not crash with a None < int comparison."""
+        dynasty_id, dynasty_name = _make_dynasty(session, app, start_year=1000)
+        _add_monarch(session, app, dynasty_id, dynasty_name, "Aldric", reign_start=1000)
+        _add_history_log(session, app, dynasty_id, None, "generic_event", "A system message.")
+        _add_history_log(session, app, dynasty_id, 1005, "battle", "A real battle.")
+        with app.app_context():
+            book = compile_chronicle(dynasty_id)
+        assert book is not None
+        all_highlights = [h for ch in book.chapters for h in ch.highlights]
+        texts = [h.text for h in all_highlights]
+        assert "A real battle." in texts
+        assert "A system message." not in texts
+
+
+@pytest.mark.unit
 class TestFoundingChapter:
 
     def test_founding_chapter_emitted_when_early_prose_exists(self, session, app):
