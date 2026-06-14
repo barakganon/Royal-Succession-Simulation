@@ -933,8 +933,8 @@ def delete_dynasty(dynasty_id):
             logger.debug(f"Deleting trade routes for dynasty {dynasty_id}")
             try:
                 TradeRoute.query.filter(
-                    (TradeRoute.exporter_dynasty_id == dynasty_id) |
-                    (TradeRoute.importer_dynasty_id == dynasty_id)
+                    (TradeRoute.source_dynasty_id == dynasty_id) |
+                    (TradeRoute.target_dynasty_id == dynasty_id)
                 ).delete(synchronize_session=False)
             except Exception as trade_error:
                 logger.warning(f"Error deleting trade routes: {str(trade_error)}")
