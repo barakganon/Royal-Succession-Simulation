@@ -362,7 +362,7 @@ development_status:
   # "Compile Chronicle" button on left rail (always available, not end-game only).
   12-3-chronicle-book-and-pdf: done
 
-  epic-12-retrospective: optional
+  epic-12-retrospective: done
 
   # ── EPIC L: Legacy Polish (pre-master-plan, from old CLAUDE.md Sprint 10) ──
   # These tasks predate the master plan. They are independent of Epics 1-12 and
