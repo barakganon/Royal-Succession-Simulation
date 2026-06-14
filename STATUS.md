@@ -1,6 +1,6 @@
 # Royal Succession Simulation - Development Status
-Last updated: 2026-06-11
-Last commit: Story 11-4 — logging + SQLAlchemy 2.0 warnings cleanup (536 green). Epic 11 complete.
+Last updated: 2026-06-14
+Last commit: Story 12-1 — chronicle compiler (reign chapters + weighted highlights, 547 green)
 
 ---
 
@@ -201,6 +201,7 @@ Task 1-4 remains (chronicle prompt update).
 | 10-2 | Story-moment turn interrupt + LLM prose + full-screen choice modal + choice route (record/dismiss; effects in 10-3) (4 worktree agents) — 530 green | Done |
 | 10-3 | Story-moment effect applicator (prestige/wealth/infamy/trait; exile/relation narrative-only) + 25y (~5-turn) cooldown (3 worktree agents) — 542 green. Epic 10 complete | Done |
 | 11-1 | Retire legacy simulation_engine + Person/FamilyTree/EconomyManager + dead routes/tests/junk (~1450 lines); repoint base.html nav to real routes — 536 green | Done |
+| 12-1 | Chronicle compiler: `compile_chronicle()` → ChronicleBook (reign chapters via reign_start_year, NOT is_monarch; Founding chapter; ChronicleEntryDB prose bucketed by year; weighted HistoryLogEntryDB highlights top-5/chapter). Live-smoke caught + fixed nullable-year crash. Sonnet on live main; Opus verify — 547 green | Done |
 | 11-2 | Flask-Migrate/Alembic adoption: baseline migration (24 tables, circular FKs via use_alter, render_as_batch); retired ad-hoc ALTER TABLE + db_version path; live DB stamped; CLAUDE.md migration workflow. Verified fresh-DB `flask db upgrade` == `create_all()` schema; app boots 8091 (Sonnet worktree agent; Opus verify+integrate) — 536 green | Done |
 | 11-3 | Perf: composite indexes `ix_history_dynasty_year` + `ix_project_dynasty_status_completion` via Alembic migration (chained off baseline, hand-cleaned of SQLite autogen noise); memoized `get_dynasty_theme_config()`; turn_processor N+1 audit (no relationship traversal → no eager-load). Verified upgrade==create_all incl. indexes; live DB migrated to head; app boots 8091 — 536 green | Done |
 | 11-4 | Logging + SQLAlchemy 2.0 warnings: RotatingFileHandler (5MB×3) for app log; conditional atexit (skip under pytest, kills test-exit noise); `.query.get()`/`session.query().get()` → `session.get()` (180+ sites); print()→logger (map_renderer); utcnow()→now(UTC). Warnings ~1982→0 (real fixes + narrowed message-specific SAWarning suppress for the unfixable circular-FK teardown). app boots 8091 (Sonnet subagent on live main — no worktree, to avoid stale-base conflicts; Opus verify+integrate) — 536 green. **Epic 11 complete** | Done |

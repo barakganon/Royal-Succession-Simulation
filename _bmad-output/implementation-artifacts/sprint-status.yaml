@@ -39,7 +39,7 @@
 # - Each story should have a corresponding file: {story_key}.md in story_location
 
 generated: 2026-05-02
-last_updated: 2026-06-12  # updated: Story 12-1 created (ready-for-dev); Epic 12 in-progress
+last_updated: 2026-06-14  # updated: Story 12-1 done (chronicle compiler, 547 green)
 project: Royal-Succession-Simulation
 project_key: RSS
 tracking_system: file-system
@@ -348,7 +348,7 @@ development_status:
   # models/chronicle_compiler.py with compile_chronicle(dynasty_id); highlight
   # selection algorithm (top events by importance score); group paragraphs into
   # chapters by reigning monarch; ChronicleBook dataclass.
-  12-1-chronicle-compiler: ready-for-dev
+  12-1-chronicle-compiler: done
 
   # Story 12-2: Foreword + epilogue prompts
   # build_foreword_prompt(dynasty, first_3_paragraphs) → 200 tokens;
