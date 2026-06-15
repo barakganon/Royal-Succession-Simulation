@@ -268,6 +268,33 @@ PROJECT_TYPE_CATALOGUE: Dict[str, Dict] = {
         'slot': True,
         'requires_building': None,
     },
+    'espionage_intel': {
+        'duration_years': 1,
+        'yearly_cost_gold': 50,
+        'yearly_cost_iron': 0,
+        'yearly_cost_timber': 0,
+        'yearly_cost_food': 0,
+        'slot': True,
+        'requires_building': None,
+    },
+    'espionage_sabotage': {
+        'duration_years': 2,
+        'yearly_cost_gold': 120,
+        'yearly_cost_iron': 0,
+        'yearly_cost_timber': 0,
+        'yearly_cost_food': 0,
+        'slot': True,
+        'requires_building': None,
+    },
+    'espionage_assassinate': {
+        'duration_years': 3,
+        'yearly_cost_gold': 250,
+        'yearly_cost_iron': 0,
+        'yearly_cost_timber': 0,
+        'yearly_cost_food': 0,
+        'slot': True,
+        'requires_building': None,
+    },
 }
 
 
@@ -425,6 +452,24 @@ def _effect_build_building(session: Session, project: Project) -> None:
     )
 
 
+def _effect_espionage_intel(session: Session, project: Project) -> None:
+    """Thin adapter: delegate to EspionageSystem.resolve_mission."""
+    from models.espionage_system import EspionageSystem
+    EspionageSystem(session).resolve_mission(project)
+
+
+def _effect_espionage_sabotage(session: Session, project: Project) -> None:
+    """Thin adapter: delegate to EspionageSystem.resolve_mission."""
+    from models.espionage_system import EspionageSystem
+    EspionageSystem(session).resolve_mission(project)
+
+
+def _effect_espionage_assassinate(session: Session, project: Project) -> None:
+    """Thin adapter: delegate to EspionageSystem.resolve_mission."""
+    from models.espionage_system import EspionageSystem
+    EspionageSystem(session).resolve_mission(project)
+
+
 EFFECT_DISPATCHER: Dict[str, Callable[[Session, Project], None]] = {
     'recruit_infantry': _effect_recruit_infantry,
     'recruit_cavalry': _stub_effect,
@@ -435,6 +480,9 @@ EFFECT_DISPATCHER: Dict[str, Callable[[Session, Project], None]] = {
     'envoy_mission': _stub_effect,
     'march_army_cross_realm': _stub_effect,
     'build_building': _effect_build_building,
+    'espionage_intel': _effect_espionage_intel,
+    'espionage_sabotage': _effect_espionage_sabotage,
+    'espionage_assassinate': _effect_espionage_assassinate,
 }
 
 

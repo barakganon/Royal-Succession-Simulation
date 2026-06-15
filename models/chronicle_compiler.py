@@ -21,6 +21,7 @@ EVENT_WEIGHTS: dict[str, int] = {
     'siege_success': 8,
     'succession_end': 8,
     'natural_disaster': 8,
+    'sabotage': 8,
     # weight 6
     'peace_treaty': 6,
     'siege_start': 6,
@@ -34,6 +35,7 @@ EVENT_WEIGHTS: dict[str, int] = {
     'birth': 4,
     'building_completed': 4,
     'army_formation': 4,
+    'intel_report': 4,
     # weight 2
     'military_recruitment': 2,
     'commander_assignment': 2,

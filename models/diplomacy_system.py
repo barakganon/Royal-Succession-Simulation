@@ -39,7 +39,6 @@ class DiplomacySystem:
             "spread_rumors": -5,
             "bribe_officials": 3,
             "incite_unrest": -15,
-            "assassinate": -30,
             "gift": 8,
             "insult": -8,
             "demand_tribute": -12,
@@ -159,7 +158,6 @@ class DiplomacySystem:
                 "spread_rumors": f"We have discovered that {actor_name} is spreading rumors about us",
                 "bribe_officials": f"Some of our officials have been bribed by {actor_name}",
                 "incite_unrest": f"{actor_name} is attempting to incite unrest in our territories",
-                "assassinate": f"An assassination attempt from {actor_name} has been discovered",
                 "gift": f"{actor_name} has sent us a generous gift",
                 "insult": f"{actor_name} has publicly insulted us",
                 "demand_tribute": f"{actor_name} is demanding tribute from us",
@@ -181,7 +179,6 @@ class DiplomacySystem:
                 "spread_rumors": f"We are spreading rumors about {target_name}",
                 "bribe_officials": f"We have bribed officials in {target_name}'s court",
                 "incite_unrest": f"We are inciting unrest in {target_name}'s territories",
-                "assassinate": f"We have attempted to assassinate a member of {target_name}'s dynasty",
                 "gift": f"We have sent a generous gift to {target_name}",
                 "insult": f"We have publicly insulted {target_name}",
                 "demand_tribute": f"We are demanding tribute from {target_name}",
@@ -230,10 +227,14 @@ class DiplomacySystem:
         Returns:
             Tuple of (success, message)
         """
+        # Assassination is now handled by the Espionage system.
+        if action_type == "assassinate":
+            return False, "Assassination is handled by the Espionage system."
+
         # Get dynasties
         actor_dynasty = self.session.get(DynastyDB, actor_dynasty_id)
         target_dynasty = self.session.get(DynastyDB, target_dynasty_id)
-        
+
         if not actor_dynasty or not target_dynasty:
             return False, "One or both dynasties not found"
             
@@ -296,60 +297,6 @@ class DiplomacySystem:
         if action_type == "declare_rivalry":
             # Update reputation
             actor_dynasty.infamy += 5
-            
-        elif action_type == "assassinate":
-            # High risk action
-            success_chance = 0.3  # 30% base chance
-            
-            # Modify based on target's court security (placeholder)
-            # success_chance -= target_court_security * 0.1
-            
-            if random.random() > success_chance:
-                # Failed assassination
-                actor_dynasty.infamy += 20
-                actor_dynasty.honor -= 10
-                
-                # Create additional log entries for failed assassination
-                failed_log = HistoryLogEntryDB(
-                    dynasty_id=actor_dynasty_id,
-                    year=actor_dynasty.current_simulation_year,
-                    event_string=f"Our assassination attempt against {target_dynasty.name} has failed and been discovered!",
-                    event_type="failed_assassination"
-                )
-                self.session.add(failed_log)
-                
-                target_failed_log = HistoryLogEntryDB(
-                    dynasty_id=target_dynasty_id,
-                    year=target_dynasty.current_simulation_year,
-                    event_string=f"We have uncovered an assassination plot by {actor_dynasty.name}!",
-                    event_type="failed_assassination"
-                )
-                self.session.add(target_failed_log)
-                
-                # Apply severe relation penalty
-                relation.update_relation("failed_assassination", -50)
-                
-                self.session.commit()
-                return False, f"Assassination attempt against {target_dynasty.name} failed and was discovered!"
-            else:
-                # Successful assassination (would need to handle actual character death)
-                actor_dynasty.infamy += 10
-                actor_dynasty.honor -= 5
-                
-                # In a real implementation, this would kill a character
-                # For now, just log it
-                success_log = HistoryLogEntryDB(
-                    dynasty_id=actor_dynasty_id,
-                    year=actor_dynasty.current_simulation_year,
-                    event_string=f"Our assassination against {target_dynasty.name} was successful!",
-                    event_type="successful_assassination"
-                )
-                self.session.add(success_log)
-                
-                # No log for target - they don't know it was an assassination
-                
-                self.session.commit()
-                return True, f"Assassination against {target_dynasty.name} was successful!"
 
         # General path (declare_rivalry, send_envoy, issue_ultimatum, gift, etc.):
         # the special-action branches above return early; everything else commits
