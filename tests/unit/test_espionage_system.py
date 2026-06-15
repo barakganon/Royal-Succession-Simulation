@@ -389,9 +389,9 @@ class TestResolveMission:
 
         assert success is True
         refreshed = session.get(Building, building.id)
-        # condition was 1.0 → halved to 0.5, which is < 5 so it gets deleted
-        # but 1.0/2=0.5 < 5 → deleted
-        assert refreshed is None or refreshed.condition == pytest.approx(0.5)
+        # condition is a 0.0-1.0 float: 1.0 halved to 0.5 (still > 0.1) → survives, damaged.
+        assert refreshed is not None
+        assert refreshed.condition == pytest.approx(0.5)
 
     def test_sabotage_success_high_condition_halved(self, session):
         _, actor = _make_user_and_dynasty(session, 'SabHighActor')
@@ -399,7 +399,7 @@ class TestResolveMission:
         _, target_d = _make_user_and_dynasty(session, 'SabHighTarget')
         _make_monarch(session, target_d, name='SabHighKing')
         terr = _make_territory(session, target_d)
-        building = _make_building(session, terr, condition=20.0)
+        building = _make_building(session, terr, condition=0.8)
         agent = _make_person(session, actor)
         project = _make_active_project(
             session, actor, target_d, 'espionage_sabotage', agent, building=building
@@ -411,7 +411,28 @@ class TestResolveMission:
 
         assert success is True
         session.refresh(building)
-        assert building.condition == pytest.approx(10.0)
+        assert building.condition == pytest.approx(0.4)
+
+    def test_sabotage_destroys_building_below_threshold(self, session):
+        """A building already in poor repair (condition 0.15) is destroyed when
+        halved below the 0.1 floor — repeated sabotage eventually wrecks it."""
+        _, actor = _make_user_and_dynasty(session, 'SabDestroyActor')
+        _make_monarch(session, actor)
+        _, target_d = _make_user_and_dynasty(session, 'SabDestroyTarget')
+        _make_monarch(session, target_d, name='SabDestroyKing')
+        terr = _make_territory(session, target_d)
+        building = _make_building(session, terr, condition=0.15)
+        agent = _make_person(session, actor)
+        project = _make_active_project(
+            session, actor, target_d, 'espionage_sabotage', agent, building=building
+        )
+
+        es = EspionageSystem(session)
+        with patch('random.random', return_value=0.0):
+            success, _ = es.resolve_mission(project)
+
+        assert success is True
+        assert session.get(Building, building.id) is None  # 0.15 → 0.075 < 0.1 → destroyed
 
     def test_sabotage_failure_applies_relation_penalty(self, session):
         _, actor = _make_user_and_dynasty(session, 'SabFailActor')

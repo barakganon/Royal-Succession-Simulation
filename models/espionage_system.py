@@ -358,12 +358,15 @@ class EspionageSystem:
         actor_dynasty_id = project.dynasty_id
 
         if success and building:
+            # Building.condition is a 0.0-1.0 float. Halve it; if it falls below
+            # 10% the building is wrecked beyond use and removed (so repeated
+            # sabotage eventually destroys it: 1.0 → 0.5 → 0.25 → 0.125 → 0.06 → gone).
             old_condition = building.condition or 0
             building.condition = old_condition / 2.0
-            if building.condition < 5:
+            if building.condition < 0.1:
                 self.session.delete(building)
                 logger.info(
-                    "Sabotage project %s: building %s destroyed (condition < 5)",
+                    "Sabotage project %s: building %s destroyed (condition < 0.1)",
                     project.id, building_id,
                 )
             log = HistoryLogEntryDB(
