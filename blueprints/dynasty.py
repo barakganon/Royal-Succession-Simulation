@@ -42,6 +42,7 @@ from utils.llm_prompts import (
 )
 from models.chronicle_compiler import compile_chronicle
 from visualization.heraldry_renderer import generate_coat_of_arms
+from utils.tts_narrator import tts_available, synthesize, get_latest_chronicle_paragraph
 
 logger = logging.getLogger('royal_succession.dynasty')
 
@@ -509,11 +510,40 @@ def turn_report(dynasty_id):
                 ],
             })
 
+    narration_text = get_latest_chronicle_paragraph(dynasty.epic_story_text or '')
+    if not narration_text:
+        narration_text = f'The chronicle of House {dynasty.name} has yet to be written.'
+
     return render_template(
         'turn_report.html',
         dynasty=dynasty,
         summary=summary,
         ai_news=ai_news,
+        tts_available=tts_available(),
+        narration_text=narration_text,
+    )
+
+
+@dynasty_bp.route('/dynasty/<int:dynasty_id>/turn_narration.mp3')
+@login_required
+def turn_narration(dynasty_id):
+    """Return MP3 audio of the latest chronicle paragraph, or 204 when no TTS key."""
+    dynasty = db.get_or_404(DynastyDB, dynasty_id)
+    if dynasty.owner_user != current_user:
+        return redirect(url_for('auth.dashboard'))
+
+    text = get_latest_chronicle_paragraph(dynasty.epic_story_text or '')
+    if not text:
+        text = f'The chronicle of House {dynasty.name} has yet to be written.'
+
+    audio = synthesize(text)
+    if audio is None:
+        return Response('', status=204)
+
+    return Response(
+        audio,
+        mimetype='audio/mpeg',
+        headers={'Content-Disposition': 'inline; filename="narration.mp3"'},
     )
 
 

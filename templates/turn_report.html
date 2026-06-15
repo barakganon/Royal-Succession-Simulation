@@ -208,6 +208,69 @@
   {% endif %}
   {% endif %}
 
+  <!-- ── Chronicle of this Turn (TTS Narration) ── -->
+  {% if narration_text %}
+  <div class="row mb-4 justify-content-center">
+    <div class="col-lg-10">
+      <div class="card">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <h4 class="mb-0">&#128218; Chronicle of this Turn</h4>
+          <span style="font-family:'Cinzel',serif;font-size:.85rem;color:var(--gold);">&#9835; Narrate</span>
+        </div>
+        <div class="card-body">
+          <p id="tts-narration-text"
+             style="font-family:'Crimson Text',serif;font-size:1.15rem;line-height:1.7;
+                    font-style:italic;color:var(--text-primary);margin-bottom:1rem;">
+            {{ narration_text }}
+          </p>
+
+          {% if tts_available %}
+          {# ElevenLabs premium audio path #}
+          <div class="text-center">
+            <audio controls preload="none"
+                   style="width:100%;max-width:480px;filter:sepia(30%) hue-rotate(10deg);">
+              <source src="{{ url_for('dynasty.turn_narration', dynasty_id=dynasty.id) }}"
+                      type="audio/mpeg">
+              Your browser does not support the audio element.
+            </audio>
+          </div>
+          {% else %}
+          {# Browser Web Speech API fallback (no API key required) #}
+          <div class="text-center" id="tts-controls">
+            {% if true %}
+            <button class="btn btn-outline-warning mr-2"
+                    onclick="(function(){
+                      if(!('speechSynthesis' in window)){
+                        alert('Your browser does not support speech synthesis.');
+                        return;
+                      }
+                      var text = document.getElementById('tts-narration-text').innerText;
+                      var utt = new SpeechSynthesisUtterance(text);
+                      utt.rate = 0.9;
+                      utt.pitch = 0.95;
+                      window.speechSynthesis.cancel();
+                      window.speechSynthesis.speak(utt);
+                    })()"
+                    title="Narrate this chronicle aloud using your browser's built-in speech">
+              &#128266; Narrate
+            </button>
+            <button class="btn btn-outline-secondary"
+                    onclick="if('speechSynthesis' in window){ window.speechSynthesis.cancel(); }"
+                    title="Stop narration">
+              &#9632; Stop
+            </button>
+            <p class="text-muted mt-2" style="font-size:.8rem;">
+              Using browser speech (no ElevenLabs key configured)
+            </p>
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <!-- ── Actions ── -->
   <div class="text-center mt-2 mb-4">
     <a href="{{ url_for('dynasty.view_dynasty', dynasty_id=dynasty.id) }}"

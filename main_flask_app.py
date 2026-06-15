@@ -134,6 +134,15 @@ app.config['FLASK_APP_LLM_MODEL'] = FLASK_APP_LLM_MODEL
 
 # --- End LLM Setup ---
 
+# --- ElevenLabs TTS Setup ---
+app.config['FLASK_APP_ELEVENLABS_API_KEY'] = os.environ.get('ELEVENLABS_API_KEY')
+app.config['FLASK_APP_ELEVENLABS_VOICE_ID'] = os.environ.get('ELEVENLABS_VOICE_ID')
+if app.config['FLASK_APP_ELEVENLABS_API_KEY']:
+    logger.info("ElevenLabs TTS: API key configured")
+else:
+    logger.info("ElevenLabs TTS: No API key — browser speech fallback active")
+# --- End ElevenLabs TTS Setup ---
+
 # --- Signal Handling ---
 def signal_handler(sig, frame):
     """Handle interrupt signals gracefully"""
