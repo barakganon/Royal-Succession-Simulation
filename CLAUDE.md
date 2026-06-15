@@ -186,6 +186,10 @@ pytest tests/integration/ -v     # integration tests only
 
 # LLM features require:
 export GOOGLE_API_KEY="your_key_here"
+
+# Premium TTS narration (optional — falls back to browser speechSynthesis if unset):
+export ELEVENLABS_API_KEY="your_key_here"
+export ELEVENLABS_VOICE_ID="21m00Tcm4TlvDq8ikWAM"   # optional; defaults to Rachel
 ```
 
 Default login: username `test_user`, password `password`
