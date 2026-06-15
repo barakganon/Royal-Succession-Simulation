@@ -96,6 +96,8 @@ from blueprints.diplomacy import diplomacy_bp
 app.register_blueprint(diplomacy_bp)
 from blueprints.map import map_bp
 app.register_blueprint(map_bp)
+from blueprints.espionage import espionage_bp
+app.register_blueprint(espionage_bp)
 
 # Flask-Login Configuration
 login_manager = LoginManager(app)

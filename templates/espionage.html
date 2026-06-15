@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+
+{% block title %}Espionage — {{ dynasty.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-3">
+
+  <!-- ── Page header breadcrumb ── -->
+  <div class="page-header-bar mb-3">
+    <nav aria-label="breadcrumb" class="breadcrumb mb-0">
+      <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="{{ url_for('auth.dashboard') }}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('dynasty.view_dynasty', dynasty_id=dynasty.id) }}">{{ dynasty.name }}</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Espionage</li>
+      </ol>
+    </nav>
+  </div>
+
+  <!-- ── Dynasty title ── -->
+  <div class="d-flex align-items-center mb-4 pb-2 border-bottom">
+    {% if dynasty.coat_of_arms_svg %}
+      <div class="dynasty-coa mr-3" style="width:44px; height:54px; flex-shrink:0;">
+        {{ dynasty.coat_of_arms_svg | safe }}
+      </div>
+    {% endif %}
+    <div>
+      <h1 class="mb-0" style="font-size:1.7rem;">&#128373; Espionage</h1>
+      <p class="mb-0" style="font-family:'Crimson Text',serif; color:var(--text-muted); font-style:italic;">
+        House {{ dynasty.name }} — Year {{ dynasty.current_simulation_year }}
+      </p>
+    </div>
+  </div>
+
+  <!-- ── Quick links ── -->
+  <div class="mb-3">
+    <a href="{{ url_for('diplomacy.diplomacy_view', dynasty_id=dynasty.id) }}" class="btn btn-outline-secondary btn-sm">
+      &#9876; Diplomacy
+    </a>
+    <a href="{{ url_for('dynasty.view_dynasty', dynasty_id=dynasty.id) }}" class="btn btn-outline-secondary btn-sm ml-1">
+      &#127963; Dynasty Overview
+    </a>
+  </div>
+
+  <!-- ── Mission forms ── -->
+  <div class="row mb-4">
+
+    {% if not enemy_dynasties %}
+      <div class="col-12">
+        <div class="alert alert-info">No rival dynasties exist yet. Espionage requires a target dynasty.</div>
+      </div>
+    {% elif not agents %}
+      <div class="col-12">
+        <div class="alert alert-warning">No living members available to act as agents.</div>
+      </div>
+    {% else %}
+
+    <!-- Intel Mission -->
+    <div class="col-md-4 mb-3">
+      <div class="card h-100">
+        <div class="card-header" style="background:var(--dark-accent,#2a2a2a);">
+          <strong>&#128269; Gather Intelligence</strong>
+        </div>
+        <div class="card-body">
+          <p class="small text-muted" style="font-family:'Crimson Text',serif;">
+            Send a spy to gather intelligence on a rival dynasty.
+            Cost: <strong>{{ mission_costs.espionage_intel.gold_cost }} gold</strong> /
+            Duration: <strong>{{ mission_costs.espionage_intel.duration_years }} year(s)</strong> /
+            Base success: <strong>{{ mission_costs.espionage_intel.base_success }}%</strong>
+          </p>
+          <form method="POST" action="{{ url_for('espionage.dispatch_mission', dynasty_id=dynasty.id) }}">
+            <input type="hidden" name="mission_type" value="espionage_intel">
+
+            <div class="form-group">
+              <label for="intel_agent">Agent</label>
+              <select name="agent_person_id" id="intel_agent" class="form-control form-control-sm" required>
+                <option value="">— Select Agent —</option>
+                {% for agent in agents %}
+                  <option value="{{ agent.id }}">{{ agent.name }} (skill {{ agent.espionage_skill }})</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="intel_target_dynasty">Target Dynasty</label>
+              <select name="target_dynasty_id" id="intel_target_dynasty" class="form-control form-control-sm" required>
+                <option value="">— Select Target —</option>
+                {% for ed in enemy_dynasties %}
+                  <option value="{{ ed.id }}">{{ ed.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <button type="submit" class="btn btn-info btn-sm btn-block">Dispatch Intel Mission</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sabotage Mission -->
+    <div class="col-md-4 mb-3">
+      <div class="card h-100">
+        <div class="card-header" style="background:var(--dark-accent,#2a2a2a);">
+          <strong>&#128293; Sabotage</strong>
+        </div>
+        <div class="card-body">
+          <p class="small text-muted" style="font-family:'Crimson Text',serif;">
+            Send agents to damage an enemy building.
+            Cost: <strong>{{ mission_costs.espionage_sabotage.gold_cost }} gold</strong> /
+            Duration: <strong>{{ mission_costs.espionage_sabotage.duration_years }} year(s)</strong> /
+            Base success: <strong>{{ mission_costs.espionage_sabotage.base_success }}%</strong>
+          </p>
+          <form method="POST" action="{{ url_for('espionage.dispatch_mission', dynasty_id=dynasty.id) }}">
+            <input type="hidden" name="mission_type" value="espionage_sabotage">
+
+            <div class="form-group">
+              <label for="sabotage_agent">Agent</label>
+              <select name="agent_person_id" id="sabotage_agent" class="form-control form-control-sm" required>
+                <option value="">— Select Agent —</option>
+                {% for agent in agents %}
+                  <option value="{{ agent.id }}">{{ agent.name }} (skill {{ agent.espionage_skill }})</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="sabotage_target_dynasty">Target Dynasty</label>
+              <select name="target_dynasty_id" id="sabotage_target_dynasty" class="form-control form-control-sm" required>
+                <option value="">— Select Target —</option>
+                {% for ed in enemy_dynasties %}
+                  <option value="{{ ed.id }}">{{ ed.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="sabotage_building">Target Building</label>
+              <select name="building_id" id="sabotage_building" class="form-control form-control-sm">
+                <option value="">— Select Building —</option>
+                {% for b in all_enemy_buildings %}
+                  <option value="{{ b.id }}">{{ b.name }}</option>
+                {% endfor %}
+              </select>
+              {% if not all_enemy_buildings %}
+                <small class="form-text text-muted">No enemy buildings found.</small>
+              {% endif %}
+            </div>
+
+            <button type="submit" class="btn btn-warning btn-sm btn-block">Dispatch Sabotage Mission</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Assassination Mission -->
+    <div class="col-md-4 mb-3">
+      <div class="card h-100">
+        <div class="card-header" style="background:var(--dark-accent,#2a2a2a);">
+          <strong>&#9760; Assassination</strong>
+        </div>
+        <div class="card-body">
+          <p class="small text-muted" style="font-family:'Crimson Text',serif;">
+            Eliminate a key enemy noble. High risk, high reward.
+            Cost: <strong>{{ mission_costs.espionage_assassinate.gold_cost }} gold</strong> /
+            Duration: <strong>{{ mission_costs.espionage_assassinate.duration_years }} year(s)</strong> /
+            Base success: <strong>{{ mission_costs.espionage_assassinate.base_success }}%</strong>
+          </p>
+          <form method="POST" action="{{ url_for('espionage.dispatch_mission', dynasty_id=dynasty.id) }}">
+            <input type="hidden" name="mission_type" value="espionage_assassinate">
+
+            <div class="form-group">
+              <label for="assassinate_agent">Agent</label>
+              <select name="agent_person_id" id="assassinate_agent" class="form-control form-control-sm" required>
+                <option value="">— Select Agent —</option>
+                {% for agent in agents %}
+                  <option value="{{ agent.id }}">{{ agent.name }} (skill {{ agent.espionage_skill }})</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="assassinate_target_dynasty">Target Dynasty</label>
+              <select name="target_dynasty_id" id="assassinate_target_dynasty" class="form-control form-control-sm" required>
+                <option value="">— Select Target —</option>
+                {% for ed in enemy_dynasties %}
+                  <option value="{{ ed.id }}">{{ ed.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="assassinate_target_person">Target Person</label>
+              <select name="target_person_id" id="assassinate_target_person" class="form-control form-control-sm" required>
+                <option value="">— Select Target Person —</option>
+                {% for p in all_enemy_persons %}
+                  <option value="{{ p.id }}">{{ p.name }}</option>
+                {% endfor %}
+              </select>
+              {% if not all_enemy_persons %}
+                <small class="form-text text-muted">No living enemy nobles found.</small>
+              {% endif %}
+            </div>
+
+            <button type="submit" class="btn btn-danger btn-sm btn-block">Dispatch Assassination</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    {% endif %}
+  </div><!-- /row -->
+
+  <!-- ── Active Missions ── -->
+  <div class="card mb-4">
+    <div class="card-header">
+      <strong>&#8987; Active Missions</strong>
+    </div>
+    <div class="card-body">
+      {% if active_missions %}
+        <table class="table table-sm table-dark mb-0">
+          <thead>
+            <tr>
+              <th>Mission</th>
+              <th>Target Dynasty</th>
+              <th>Completes Year</th>
+              <th>Years Remaining</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in active_missions %}
+            <tr>
+              <td>{{ m.mission_type | replace('espionage_', '') | title }}</td>
+              <td>{{ m.target_dynasty_name }}</td>
+              <td>{{ m.completion_year }}</td>
+              <td>
+                {% if m.years_remaining <= 0 %}
+                  <span class="badge badge-success">Resolving</span>
+                {% else %}
+                  {{ m.years_remaining }}
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="text-muted mb-0" style="font-family:'Crimson Text',serif; font-style:italic;">
+          No active espionage missions. Dispatch an agent above.
+        </p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── Intel Reports ── -->
+  <div class="card mb-4">
+    <div class="card-header">
+      <strong>&#128196; Intel Reports</strong>
+    </div>
+    <div class="card-body" style="max-height:400px; overflow-y:auto;">
+      {% if intel_reports %}
+        {% for report in intel_reports %}
+          <div class="mb-3 pb-2 border-bottom">
+            <small class="text-muted">Year {{ report.year }}</small>
+            <p class="mb-0" style="font-family:'Crimson Text',serif;">{{ report.text }}</p>
+          </div>
+        {% endfor %}
+      {% else %}
+        <p class="text-muted mb-0" style="font-family:'Crimson Text',serif; font-style:italic;">
+          No intelligence reports yet. Dispatch an intel mission to gather information on rivals.
+        </p>
+      {% endif %}
+    </div>
+  </div>
+
+</div><!-- /container -->
+{% endblock %}

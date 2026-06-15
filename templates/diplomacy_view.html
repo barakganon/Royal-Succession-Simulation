@@ -33,6 +33,15 @@
     </div>
   </div>
 
+  <!-- ── Quick links ── -->
+  <div class="mb-3">
+    {% if dynasty %}
+      <a href="{{ url_for('espionage.espionage_view', dynasty_id=dynasty.id) }}" class="btn btn-outline-secondary btn-sm">
+        &#128373; Espionage
+      </a>
+    {% endif %}
+  </div>
+
   <!-- ── Reputation + Relations ── -->
   <div class="row mb-4">
 
