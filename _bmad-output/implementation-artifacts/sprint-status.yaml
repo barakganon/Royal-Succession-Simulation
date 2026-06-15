@@ -39,7 +39,7 @@
 # - Each story should have a corresponding file: {story_key}.md in story_location
 
 generated: 2026-05-02
-last_updated: 2026-06-15  # updated: Story L-2 done; Epic L complete (650 green)
+last_updated: 2026-06-15  # updated: Epic L retrospective done — master plan complete
 project: Royal-Succession-Simulation
 project_key: RSS
 tracking_system: file-system
@@ -389,4 +389,4 @@ development_status:
   # utils/tts_narrator.py; requires ELEVENLABS_API_KEY; wire into turn_report.
   L-2-elevenlabs-tts-narrator: done
 
-  epic-L-retrospective: optional
+  epic-L-retrospective: done
