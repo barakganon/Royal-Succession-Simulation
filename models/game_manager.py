@@ -328,6 +328,7 @@ class GameManager:
                     birth_year=founder_birth_year,
                     is_noble=True,
                     is_monarch=True,
+                    reign_start_year=start_year,  # the founder reigns from the founding year
                     diplomatic_skill=random.randint(3, 8),
                     stewardship_skill=random.randint(3, 8),
                     military_skill=random.randint(3, 8),
@@ -347,10 +348,11 @@ class GameManager:
                     birth_year=start_year - 30,
                     is_noble=True,
                     is_monarch=True,
-                    diplomacy_skill=5,
+                    reign_start_year=start_year,
+                    diplomatic_skill=5,
                     stewardship_skill=5,
-                    martial_skill=5,
-                    intrigue_skill=5
+                    military_skill=5,
+                    espionage_skill=5
                 )
                 self.session.add(founder)
                 self.session.flush()  # Get ID

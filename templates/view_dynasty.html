@@ -80,10 +80,12 @@
 
               <div class="d-flex flex-wrap mb-2" style="gap:.4rem;">
                 <span class="badge badge-secondary">Age {{ current_monarch_age }}</span>
+                {% if current_monarch.reign_start_year %}
                 <span class="badge badge-secondary">
                   Reign {{ current_monarch.reign_start_year }} — Present
                   ({{ current_year - current_monarch.reign_start_year }} yr)
                 </span>
+                {% endif %}
               </div>
 
               <!-- Trait badges -->
