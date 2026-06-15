@@ -723,8 +723,6 @@ class EconomySystem:
 
         No Building row is created immediately; one is materialised when the
         project completes (via _effect_build_building in project_system.py).
-        This eliminates the phantom is_under_construction / completion_year
-        columns that Building does not actually declare.
 
         Args:
             territory_id: ID of the territory
