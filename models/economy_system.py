@@ -669,11 +669,8 @@ class EconomySystem:
                 # Deteriorate condition slightly
                 building.condition = max(0, building.condition - 0.05)
                 
-                # Complete construction if needed
-                if building.is_under_construction and dynasty.current_simulation_year >= building.completion_year:
-                    building.is_under_construction = False
-                    if building.level < 5:  # If this was an upgrade
-                        building.level += 1
+                # Building completion is now handled by ProjectSystem._effect_build_building.
+                pass
         
         # Update trade routes
         trade_routes = self.session.query(TradeRoute).filter(
@@ -722,83 +719,74 @@ class EconomySystem:
             
     def construct_building(self, territory_id: int, building_type: BuildingType) -> Tuple[bool, str]:
         """
-        Start construction of a building in a territory.
-        
+        Commission construction of a building in a territory via the ProjectSystem.
+
+        No Building row is created immediately; one is materialised when the
+        project completes (via _effect_build_building in project_system.py).
+        This eliminates the phantom is_under_construction / completion_year
+        columns that Building does not actually declare.
+
         Args:
             territory_id: ID of the territory
             building_type: Type of building to construct
-            
+
         Returns:
             Tuple of (success, message)
         """
+        import logging as _logging
+        _logger = _logging.getLogger('royal_succession.economy')
+
         territory = self.session.get(Territory, territory_id)
         if not territory:
             return False, "Territory not found"
-        
-        # Check if territory has a controller
+
         if not territory.controller_dynasty_id:
             return False, "Territory has no controller"
-        
+
         dynasty = self.session.get(DynastyDB, territory.controller_dynasty_id)
         if not dynasty:
             return False, "Controlling dynasty not found"
-        
+
         # Check if building already exists
         existing_building = self.session.query(Building).filter_by(
             territory_id=territory_id,
-            building_type=building_type
+            building_type=building_type,
         ).first()
-        
         if existing_building:
             return False, f"A {building_type.value} already exists in this territory"
-        
-        # Check if we can afford it
+
+        # Compute costs and duration from instance dicts
         costs = self.building_construction_costs.get(building_type, {"gold": 100})
-        
-        if dynasty.current_wealth < costs.get("gold", 0):
-            return False, "Not enough gold"
-        
-        # Check for other resources
-        for resource_name, amount in costs.items():
-            if resource_name != "gold":
-                # This is simplified - in a real implementation, you'd check
-                # the dynasty's resource stockpile
-                pass
-        
-        # Deduct costs
-        dynasty.current_wealth -= costs.get("gold", 0)
-        
-        # Create building
-        construction_time = self.building_construction_time.get(building_type, 1)
-        
-        new_building = Building(
-            territory_id=territory_id,
-            building_type=building_type,
-            name=f"{building_type.value.replace('_', ' ').title()}",
-            level=1,
-            condition=1.0,
-            construction_year=dynasty.current_simulation_year,
-            completion_year=dynasty.current_simulation_year + construction_time,
-            is_under_construction=True
-        )
-        
-        # Set effects JSON
-        effects = self.building_production_bonuses.get(building_type, {})
-        effects_dict = {}
-        
-        for key, value in effects.items():
-            if isinstance(key, ResourceType):
-                effects_dict[key.value] = value
-            else:
-                effects_dict[key] = value
-        
-        new_building.effects_json = json.dumps(effects_dict)
-        
-        # Add to database
-        self.session.add(new_building)
-        self.session.commit()
-        
-        return True, f"Started construction of {building_type.value.replace('_', ' ').title()}"
+        gold_cost = costs.get("gold", 0)
+        iron_cost = costs.get("iron", 0)
+        timber_cost = costs.get("timber", 0)
+        food_cost = costs.get("food", 0)
+        duration = self.building_construction_time.get(building_type, 2)
+
+        from models.project_system import ProjectSystem, InsufficientResourcesError
+        try:
+            ProjectSystem(self.session).start_project(
+                dynasty.id,
+                'build_building',
+                dynasty.current_simulation_year,
+                target_territory_id=territory_id,
+                params={'building_type': building_type.value},
+                duration_years=duration,
+                yearly_cost_gold=gold_cost,
+                yearly_cost_iron=iron_cost,
+                yearly_cost_timber=timber_cost,
+                yearly_cost_food=food_cost,
+            )
+        except InsufficientResourcesError:
+            return False, "Not enough resources"
+        except ValueError as ve:
+            msg = str(ve)
+            if "no living monarch" in msg.lower():
+                return False, "No reigning monarch to commission construction"
+            return False, msg
+
+        label = building_type.value.replace('_', ' ').title()
+        return True, f"Commissioned construction of {label} (completes in {duration} years)"
     
     def upgrade_building(self, building_id: int) -> Tuple[bool, str]:
         """
@@ -813,10 +801,6 @@ class EconomySystem:
         building = self.session.get(Building, building_id)
         if not building:
             return False, "Building not found"
-        
-        # Check if building is under construction
-        if building.is_under_construction:
-            return False, "Building is still under construction"
         
         # Check if building is at max level
         if building.level >= 5:
@@ -845,14 +829,13 @@ class EconomySystem:
         # Deduct costs
         dynasty.current_wealth -= upgrade_costs.get("gold", 0)
         
-        # Set building under construction for upgrade
-        building.is_under_construction = True
-        building.completion_year = dynasty.current_simulation_year + 1  # Upgrades take 1 year
-        
+        # Apply upgrade immediately (single-year upgrades are instant in this model).
+        building.level += 1
+
         # Commit changes
         self.session.commit()
-        
-        return True, f"Started upgrade of {building.name} to level {building.level + 1}"
+
+        return True, f"Upgraded {building.name} to level {building.level}"
     
     def repair_building(self, building_id: int) -> Tuple[bool, str]:
         """

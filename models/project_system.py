@@ -259,6 +259,15 @@ PROJECT_TYPE_CATALOGUE: Dict[str, Dict] = {
         'slot': True,
         'requires_building': None,
     },
+    'build_building': {
+        'duration_years': 2,
+        'yearly_cost_gold': 50,
+        'yearly_cost_iron': 0,
+        'yearly_cost_timber': 0,
+        'yearly_cost_food': 0,
+        'slot': True,
+        'requires_building': None,
+    },
 }
 
 
@@ -346,6 +355,76 @@ def _effect_develop_territory(session: Session, project: Project) -> None:
     )
 
 
+def _effect_build_building(session: Session, project: Project) -> None:
+    """Create a finished Building row when a build_building project completes."""
+    import json as _json
+    params = project.get_params() if project.params_json else {}
+    building_type_value = params.get('building_type')
+    if not building_type_value:
+        logger.warning(
+            "build_building project %s has no building_type in params — skipping",
+            project.id,
+        )
+        return
+    if project.target_territory_id is None:
+        logger.warning(
+            "build_building project %s has no target_territory_id — skipping",
+            project.id,
+        )
+        return
+
+    try:
+        bt = BuildingType(building_type_value)
+    except ValueError:
+        logger.warning(
+            "build_building project %s: unknown building_type %r — skipping",
+            project.id, building_type_value,
+        )
+        return
+
+    # Compute effects_json using the EconomySystem's bonus table (import inline
+    # to avoid module-level circular import between project_system ↔ economy_system).
+    try:
+        from models.economy_system import EconomySystem as _ES
+        from models.db_models import ResourceType as _RT
+        # Construct a bare EconomySystem just to read the bonus dict.
+        _es = _ES.__new__(_ES)
+        _es.session = session
+        _es.territory_manager = None
+        # Re-run __init__ via a minimal shim that only sets the bonus dict.
+        # Safer: import the module-level bonus constant directly.
+        # Since it's an instance dict built in __init__, we call __init__ properly.
+        _es.__init__(session)
+        bonuses = _es.building_production_bonuses.get(bt, {})
+        effects_dict = {
+            rt.value: bonuses.get(rt, 0)
+            for rt in _RT
+        }
+        effects_json_str = _json.dumps(effects_dict)
+    except Exception as eff_exc:
+        logger.warning(
+            "build_building project %s: failed to compute effects_json (%s) — using empty",
+            project.id, eff_exc,
+        )
+        effects_json_str = _json.dumps({})
+
+    building = Building(
+        territory_id=project.target_territory_id,
+        building_type=bt,
+        name=building_type_value.replace('_', ' ').title(),
+        level=1,
+        condition=1.0,
+        construction_year=project.started_year,
+        effects_json=effects_json_str,
+    )
+    session.add(building)
+    session.flush()
+    logger.info(
+        "Project %s completed: built %s in territory %s for dynasty %s",
+        project.id, bt.value, project.target_territory_id, project.dynasty_id,
+    )
+
+
 EFFECT_DISPATCHER: Dict[str, Callable[[Session, Project], None]] = {
     'recruit_infantry': _effect_recruit_infantry,
     'recruit_cavalry': _stub_effect,
@@ -355,6 +434,7 @@ EFFECT_DISPATCHER: Dict[str, Callable[[Session, Project], None]] = {
     'develop_territory': _effect_develop_territory,
     'envoy_mission': _stub_effect,
     'march_army_cross_realm': _stub_effect,
+    'build_building': _effect_build_building,
 }
 
 
@@ -382,10 +462,15 @@ class ProjectSystem:
     # Lifecycle
     # ------------------------------------------------------------------
     def start_project(self, dynasty_id: int, project_type: str, started_year: int,
-                      **kwargs) -> Project:
+                      target_territory_id=None, params=None, **kwargs) -> Project:
         if project_type not in PROJECT_TYPE_CATALOGUE:
             raise ValueError(f"Unknown project_type: {project_type!r}")
         meta = PROJECT_TYPE_CATALOGUE[project_type]
+        # Allow callers to override catalogue defaults (e.g. duration, yearly costs).
+        meta = {**meta, **{k: kwargs[k] for k in (
+            'duration_years', 'yearly_cost_gold', 'yearly_cost_iron',
+            'yearly_cost_timber', 'yearly_cost_food',
+        ) if k in kwargs}}
 
         dynasty = self.session.get(DynastyDB, dynasty_id)
         if dynasty is None:
@@ -432,13 +517,14 @@ class ProjectSystem:
             yearly_cost_food=meta['yearly_cost_food'],
             status='active',
             initiated_by_monarch_id=monarch.id,
-            target_territory_id=kwargs.get('target_territory_id'),
+            target_territory_id=target_territory_id if target_territory_id is not None else kwargs.get('target_territory_id'),
             target_dynasty_id=kwargs.get('target_dynasty_id'),
             target_person_id=kwargs.get('target_person_id'),
         )
-        params = kwargs.get('params')
         if params is not None:
             project.set_params(params)
+        elif kwargs.get('params') is not None:
+            project.set_params(kwargs['params'])
 
         self.session.add(project)
         try:
