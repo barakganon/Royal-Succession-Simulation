@@ -191,7 +191,7 @@
                         <div class="card-body">
                             <p>Top producing territories:</p>
                             <ol>
-                                {% for territory_resource in territory_resources|selectattr('resource.resource_type', 'eq', resource_type)|sort(attribute='base_production', reverse=True)|slice(0, 3) %}
+                                {% for territory_resource in (territory_resources|selectattr('resource.resource_type', 'eq', resource_type)|sort(attribute='base_production', reverse=True)|list)[:3] %}
                                 <li>{{ territory_resource.territory.name }} ({{ territory_resource.base_production|round(1) }})</li>
                                 {% else %}
                                 <li>No data available</li>

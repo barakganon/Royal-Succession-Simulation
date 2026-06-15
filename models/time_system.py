@@ -207,13 +207,30 @@ class TimeSystem:
             "negotiate_peace": 3
         }
     
+    def get_current_phase(self, dynasty_id: int) -> GamePhase:
+        """
+        Get the current game phase for a dynasty.
+
+        Turns process every phase in sequence, so between turns a dynasty is in
+        the PLANNING phase (the player is deciding what to do next). Returned for
+        display on the military/overview screens.
+
+        Args:
+            dynasty_id: Dynasty to report the phase for (reserved for future
+                per-dynasty phase tracking)
+
+        Returns:
+            The current GamePhase (PLANNING between turns)
+        """
+        return GamePhase.PLANNING
+
     def get_current_season(self, year: int) -> Season:
         """
         Get the current season based on the year.
-        
+
         Args:
             year: Current game year
-            
+
         Returns:
             Current season
         """
