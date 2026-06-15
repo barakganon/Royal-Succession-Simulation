@@ -387,6 +387,6 @@ development_status:
 
   # Story L-2: ElevenLabs TTS narrator (old 10D)
   # utils/tts_narrator.py; requires ELEVENLABS_API_KEY; wire into turn_report.
-  L-2-elevenlabs-tts-narrator: backlog
+  L-2-elevenlabs-tts-narrator: ready-for-dev
 
   epic-L-retrospective: optional
