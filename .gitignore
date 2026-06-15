@@ -27,3 +27,4 @@ static/visualizations/
 .claude/worktrees/
 *.bak
 cookies.txt
+playtest-screenshots/
