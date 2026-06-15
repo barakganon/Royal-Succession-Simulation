@@ -337,6 +337,13 @@ development_status:
   # datetime.utcnow() → datetime.now(UTC). Target: <50 warnings.
   11-4-logging-and-warnings: done
 
+  # Story 11-5: Route building construction through the Project system (fix phantom-column bug)
+  # construct_building referenced non-existent Building.is_under_construction/completion_year
+  # → TypeError on every direct construction (swallowed by route try/except). Project-Lead
+  # decision (2026-06-15): route through the Project system (build_building project + effect);
+  # purge phantom-column reads in update_dynasty_economy + upgrade_building.
+  11-5-construct-building-via-projects: ready-for-dev
+
   epic-11-retrospective: done
 
   # ── EPIC 12: Compile the Chronicle (Sprint 12) ─────────────────────────────
