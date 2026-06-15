@@ -39,7 +39,7 @@
 # - Each story should have a corresponding file: {story_key}.md in story_location
 
 generated: 2026-05-02
-last_updated: 2026-06-14  # updated: Epic 12 complete (chronicle compile + book + PDF) 590 green
+last_updated: 2026-06-15  # updated: Story 11-5 done (construct_building via Projects, 599 green)
 project: Royal-Succession-Simulation
 project_key: RSS
 tracking_system: file-system
@@ -342,7 +342,7 @@ development_status:
   # → TypeError on every direct construction (swallowed by route try/except). Project-Lead
   # decision (2026-06-15): route through the Project system (build_building project + effect);
   # purge phantom-column reads in update_dynasty_economy + upgrade_building.
-  11-5-construct-building-via-projects: ready-for-dev
+  11-5-construct-building-via-projects: done
 
   epic-11-retrospective: done
 
