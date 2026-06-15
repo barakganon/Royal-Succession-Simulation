@@ -1,4 +1,13 @@
 # main_flask_app.py
+# Force a non-interactive matplotlib backend BEFORE any blueprint/renderer imports
+# pyplot. On macOS the default GUI backend crashes the threaded server the instant a
+# chart-rendering page (economy/military/diplomacy/map/time) is opened — so the app
+# must set this itself rather than relying on the operator exporting MPLBACKEND=Agg.
+import os as _os
+_os.environ.setdefault("MPLBACKEND", "Agg")
+import matplotlib
+matplotlib.use("Agg")
+
 from flask import Flask, render_template, redirect, url_for, flash, request, jsonify, session as flask_session
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, current_user, login_required
