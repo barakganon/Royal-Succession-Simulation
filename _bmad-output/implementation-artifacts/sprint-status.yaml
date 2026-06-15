@@ -376,10 +376,14 @@ development_status:
   # can be worked at any time. 10A (chronicles panel) and 10B (banking) are done.
   epic-L: in-progress
 
-  # Story L-1: Espionage system (old 10C)
-  # new models/espionage_system.py, blueprints/espionage.py, espionage template.
-  # Spy missions: assassinate, sabotage, intel gathering.
-  L-1-espionage-system: backlog
+  # Story L-1: Espionage system (old 10C) — split into L-1a (backend) + L-1b (UI)
+  # Design: epic-L-1-espionage-design.md. Dispatched multi-turn missions via the
+  # Project system; court-member agent (espionage_skill); sabotage→building;
+  # replaces the shallow DiplomacySystem assassinate. No schema change.
+  # L-1a: models/espionage_system.py + project wiring + diplomacy consolidation + unit tests.
+  L-1a-espionage-system: ready-for-dev
+  # L-1b: blueprints/espionage.py + templates/espionage.html + registration + integration + live check.
+  L-1b-espionage-ui: backlog
 
   # Story L-2: ElevenLabs TTS narrator (old 10D)
   # utils/tts_narrator.py; requires ELEVENLABS_API_KEY; wire into turn_report.
