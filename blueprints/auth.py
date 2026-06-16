@@ -104,13 +104,16 @@ def dashboard():
     # Story 3-5 AC3: the world map is the primary game screen. Users who already
     # own at least one dynasty are routed straight to the map. Passing ?manage=1
     # escapes back to the dashboard (e.g. to create/manage additional dynasties).
+    # Only the user's own PLAYER dynasties count here — create_new_game assigns the
+    # rival AI dynasties to the same user as an implementation detail, but they are
+    # not playable and must not appear on the dashboard or trigger the map redirect.
     if (request.args.get('manage') != '1'
-            and DynastyDB.query.filter_by(user_id=current_user.id).first() is not None):
+            and DynastyDB.query.filter_by(user_id=current_user.id, is_ai_controlled=False).first() is not None):
         return redirect(url_for('map.world_map'))
 
-    # Query DynastyDB for the user's dynasties (paginated)
+    # Query DynastyDB for the user's (non-AI) dynasties (paginated)
     page = request.args.get('page', 1, type=int)
-    user_dynasties = DynastyDB.query.filter_by(user_id=current_user.id).order_by(DynastyDB.name).paginate(page=page, per_page=20, error_out=False)
+    user_dynasties = DynastyDB.query.filter_by(user_id=current_user.id, is_ai_controlled=False).order_by(DynastyDB.name).paginate(page=page, per_page=20, error_out=False)
 
     # Initialize game systems
     game_manager = GameManager(db.session)

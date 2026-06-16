@@ -76,7 +76,10 @@ def world_map():
     """Display the full-viewport interactive hex-canvas world map."""
     from models.db_models import HistoryLogEntryDB, PersonDB
 
-    dynasty = DynastyDB.query.filter_by(user_id=current_user.id).first()
+    # Show the player's own dynasty, not a rival AI dynasty that create_new_game
+    # happens to assign to the same user (fall back to any owned dynasty if none).
+    dynasty = (DynastyDB.query.filter_by(user_id=current_user.id, is_ai_controlled=False).first()
+               or DynastyDB.query.filter_by(user_id=current_user.id).first())
     dynasty_id = dynasty.id if dynasty else None
 
     # --- Recent chronicle events for the side-panel feed ---
