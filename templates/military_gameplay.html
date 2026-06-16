@@ -58,7 +58,7 @@
                 </div>
                 <div class="card-body">
                     {% if map_image %}
-                    <img src="{{ map_image }}" class="img-fluid" alt="World Map" id="worldMap">
+                    <img src="data:image/png;base64,{{ map_image }}" class="img-fluid" alt="World Map" id="worldMap">
                     {% else %}
                     <div class="alert alert-warning">Map not available</div>
                     {% endif %}
