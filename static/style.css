@@ -135,7 +135,10 @@ a:hover {
 }
 
 .card-header::before {
-  content: '\2694\FE0E ';
+  /* Four-pointed star (BMP, monochrome) renders in every font/OS — the previous
+     crossed-swords emoji (U+2694 + VS) showed an empty box where the emoji font
+     was unavailable. */
+  content: '\2726 ';
   color: var(--gold);
   font-size: 0.9em;
   margin-right: 4px;
