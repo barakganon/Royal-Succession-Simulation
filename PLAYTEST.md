@@ -42,7 +42,7 @@ python main_flask_app.py        # then open the URL it prints (http://127.0.0.1:
 ## Known limitations / rough edges (so they don't surprise you)
 - **No LLM key set** → narrative text (chronicle paragraphs, foreword/epilogue, advisor) uses **deterministic fallback prose**, not AI-written. Set `GOOGLE_API_KEY` for AI narration. Everything still works without it.
 - **Chronicle Book is sparse at year 1000** — it grows a chapter per reign and fills with events as you play. Advance ~10+ turns (and through a succession) to see it become a real book.
-- **Secondary matplotlib map images** on some pages fall back to no-image (the main canvas map is unaffected) — `visualization/map_renderer.py` has two methods physically defined outside the class (`render_territory_map`, `_get_dynasty_colors`); a known cosmetic bug, deferred (didn't risk a refactor right before your session). The primary play surface (the hex canvas) is fine.
+- **Matplotlib map images now render** (this was the deferred `map_renderer` bug — now fixed): `render_world_map`/`render_territory_map` were unreachable methods + the templates were missing the base64 data-URI prefix. Territory detail pages and the military-operations world map now show their maps. (The main hex-canvas play surface was always fine; these are the secondary static-image maps.)
 - Some monarch display names read a bit awkwardly (e.g. "Lady Yuj the Strong House Aldermoor Dynasty") — the name concatenates given name + surname where the surname is the house name. Cosmetic.
 
 ## If something breaks
