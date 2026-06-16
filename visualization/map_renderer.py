@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger('royal_succession.map_renderer')
 from models.db_models import (
     Territory, Region, Province, TerrainType, Settlement,
-    Resource, TerritoryResource, Building, MilitaryUnit, Army
+    Resource, TerritoryResource, Building, MilitaryUnit, Army, DynastyDB
 )
 
 class MapRenderer:
@@ -553,7 +553,6 @@ def _get_dynasty_colors(self) -> Dict[int, str]:
     dynasties = self.session.query(DynastyDB).all()
 
     # Create mapping
-    from models.db_models import DynastyDB
     dynasty_colors = {}
 
     for i, dynasty in enumerate(dynasties):
@@ -567,6 +566,15 @@ def _get_dynasty_colors(self) -> Dict[int, str]:
         dynasty_colors[dynasty.id] = color
 
     return dynasty_colors
+
+
+# `render_territory_map` and `_get_dynasty_colors` are defined at module level (a
+# historical refactor artifact) but take `self` and belong to MapRenderer. Bind them
+# as methods so `self._get_dynasty_colors()` (called inside render_world_map) and
+# `map_renderer.render_territory_map(...)` (called from blueprints/map.py) resolve —
+# previously they raised AttributeError and the matplotlib map render fell back to blank.
+MapRenderer.render_territory_map = render_territory_map
+MapRenderer._get_dynasty_colors = _get_dynasty_colors
 
 
 def _make_hex_polygon(cx: float, cy: float, radius: float = 20) -> List[List[float]]:
