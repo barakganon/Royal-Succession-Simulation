@@ -106,6 +106,11 @@ def _node_svg(p, x: float, y: float) -> str:
 
     cx = x + _CARD_W / 2.0
     full_name = f'{p.name or ""} {p.surname or ""}'.strip()
+    # The card text column is only ~90px wide; truncate so long names don't spill
+    # out of the node and collide with neighbours. The full name stays available
+    # via the <title> tooltip and the click-through detail panel.
+    _MAX_NAME_CHARS = 16
+    disp_name = full_name if len(full_name) <= _MAX_NAME_CHARS else full_name[:_MAX_NAME_CHARS - 1].rstrip() + '…'
     dates = _life_dates(p, None)
 
     father_id = getattr(p, 'father_sim_id', None)
@@ -119,6 +124,8 @@ def _node_svg(p, x: float, y: float) -> str:
         f'data-spouse-id="{spouse_id if spouse_id is not None else ""}" '
         f'opacity="{opacity}">'
     ]
+    # Native hover tooltip with the untruncated name + dates.
+    parts.append(f'<title>{_esc(full_name)} ({_life_dates(p, None)})</title>')
 
     # Card body
     parts.append(
@@ -154,7 +161,7 @@ def _node_svg(p, x: float, y: float) -> str:
     parts.append(
         f'<text x="{text_x:.1f}" y="{y + 24:.1f}" '
         f'font-family="Georgia,serif" font-size="12" font-weight="bold" '
-        f'fill="{name_color}">{_esc(full_name)}</text>'
+        f'fill="{name_color}">{_esc(disp_name)}</text>'
     )
     parts.append(
         f'<text x="{text_x:.1f}" y="{y + 42:.1f}" '

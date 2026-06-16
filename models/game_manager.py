@@ -28,6 +28,23 @@ from models.time_system import TimeSystem, GamePhase
 from models.ai_controller import AIController
 
 
+def family_surname(dynasty_name: str) -> str:
+    """Derive a short family surname from a dynasty's display name.
+
+    Dynasty names are full display strings like "House Aldermoor Dynasty"; using
+    the whole thing as a person's surname produces awkward, overflowing names
+    ("Lady Yuj the Strong House Aldermoor Dynasty"). Strip a leading "House " and
+    a trailing " Dynasty" to get the bare family name ("Aldermoor"). Falls back to
+    the original if stripping leaves nothing.
+    """
+    n = (dynasty_name or "").strip()
+    if n.lower().startswith("house "):
+        n = n[6:].strip()
+    if n.lower().endswith(" dynasty"):
+        n = n[:-8].strip()
+    return n or (dynasty_name or "").strip()
+
+
 class GameManager:
     """
     Core game manager that provides a high-level API for game operations,
@@ -323,7 +340,7 @@ class GameManager:
                 founder = PersonDB(
                     dynasty_id=dynasty_id,
                     name=founder_name,
-                    surname=dynasty.name,
+                    surname=family_surname(dynasty.name),
                     gender=founder_gender,
                     birth_year=founder_birth_year,
                     is_noble=True,
@@ -343,7 +360,7 @@ class GameManager:
                 founder = PersonDB(
                     dynasty_id=dynasty_id,
                     name="Emergency Founder",
-                    surname=dynasty.name,
+                    surname=family_surname(dynasty.name),
                     gender="MALE",
                     birth_year=start_year - 30,
                     is_noble=True,
