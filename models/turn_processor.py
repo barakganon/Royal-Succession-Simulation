@@ -109,8 +109,16 @@ def process_dynasty_turn(dynasty_id: int, years_to_advance: int = 5):
             # Custom theme stored as JSON
             try:
                 theme_config = json.loads(dynasty.theme_identifier_or_json)
-            except json.JSONDecodeError:
-                return False, "Invalid theme configuration"
+            except (json.JSONDecodeError, ValueError):
+                # An unrecognised/cosmetic theme string must NOT block the whole
+                # turn — fall back to an empty config and carry on. (Returning
+                # False here previously made every game created with a non-JSON,
+                # non-registered theme key unable to advance past turn 1.)
+                logger.warning(
+                    "Dynasty %s has an unrecognised theme %r; using empty theme config.",
+                    dynasty_id, dynasty.theme_identifier_or_json,
+                )
+                theme_config = {}
 
     # Get all living persons in the dynasty.
     # Story 11-3 N+1 audit: the per-person loop (lines ~174-254) accesses only

@@ -169,7 +169,7 @@ class GameManager:
             player_dynasty = DynastyDB(
                 user_id=user_id,
                 name=f"{game_name} Dynasty",
-                theme_identifier_or_json="medieval_europe",  # Default theme
+                theme_identifier_or_json="MEDIEVAL_EUROPEAN",  # Default theme (must be a valid theme key)
                 current_wealth=100,
                 start_year=start_year,
                 current_simulation_year=start_year,
@@ -186,7 +186,7 @@ class GameManager:
                 ai_dynasty = DynastyDB(
                     user_id=user_id,  # Same user owns the AI dynasties for now
                     name=f"AI Dynasty {i+1}",
-                    theme_identifier_or_json="medieval_europe",  # Default theme
+                    theme_identifier_or_json="MEDIEVAL_EUROPEAN",  # Default theme (must be a valid theme key)
                     current_wealth=100,
                     start_year=start_year,
                     current_simulation_year=start_year,
