@@ -1293,6 +1293,30 @@ document.addEventListener('keydown', function (e) {
     return { x: col, y: row };
   }
 
+  /* ── Tessellated hex layout ──
+   * The server stores semi-random pixel positions in col/row, which makes the
+   * R-radius hexes overlap/collide wherever two territories sit close together.
+   * Re-map every territory onto a clean flat-top honeycomb grid (stable order
+   * by territory id) so the hexes interlock without overlapping. For flat-top
+   * hexes of radius R: columns are 1.5·R apart, rows √3·R apart, and odd columns
+   * are nudged down by half a row. We overwrite properties.col/row with the
+   * resulting pixel centres so hexCenter() and every call site stay unchanged. */
+  function layoutHexGrid() {
+    if (!features.length) return;
+    var ordered = features.slice().sort(function (a, b) {
+      var ai = a.properties.territory_id != null ? a.properties.territory_id : (a.properties.id || 0);
+      var bi = b.properties.territory_id != null ? b.properties.territory_id : (b.properties.id || 0);
+      return ai - bi;
+    });
+    var cols = Math.ceil(Math.sqrt(ordered.length));
+    var dx = R * 1.5, dy = R * Math.sqrt(3);
+    ordered.forEach(function (f, i) {
+      var gc = i % cols, gr = Math.floor(i / cols);
+      f.properties.col = gc * dx;
+      f.properties.row = gr * dy + (gc % 2) * (dy / 2);
+    });
+  }
+
   function hexPath(cx, cy) {
     var pts = [];
     for (var i = 0; i < 6; i++) {
@@ -2166,6 +2190,7 @@ document.addEventListener('keydown', function (e) {
       .then(function (r) { return r.json(); })
       .then(function (data) {
         features = data.features || [];
+        layoutHexGrid();   // re-map onto a non-overlapping honeycomb
         computeOffset();
         resizeCanvas();
       })
