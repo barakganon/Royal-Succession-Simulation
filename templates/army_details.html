@@ -189,7 +189,7 @@
                         <label for="target_territory_id">Target Territory:</label>
                         <select class="form-select" name="target_territory_id" id="target_territory_id" required>
                             {% if army.territory_id %}
-                            {% for territory in army.current_territory.adjacent_territories() %}
+                            {% for territory in (army.current_territory.adjacent_territories() if army.current_territory.adjacent_territories is defined else []) %}
                             <option value="{{ territory.id }}">{{ territory.name }}</option>
                             {% endfor %}
                             {% else %}
