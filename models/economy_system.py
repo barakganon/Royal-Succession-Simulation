@@ -776,7 +776,18 @@ class EconomySystem:
                 yearly_cost_food=food_cost,
             )
         except InsufficientResourcesError:
-            return False, "Not enough resources"
+            # Tell the player exactly which resource is short rather than a vague
+            # "Not enough resources" (start_project enforces gold/iron/timber).
+            shorts = []
+            if (dynasty.current_wealth or 0) < gold_cost:
+                shorts.append(f"{gold_cost} gold (have {dynasty.current_wealth or 0})")
+            if (dynasty.current_iron or 0) < iron_cost:
+                shorts.append(f"{iron_cost} iron (have {dynasty.current_iron or 0})")
+            if (dynasty.current_timber or 0) < timber_cost:
+                shorts.append(f"{timber_cost} timber (have {dynasty.current_timber or 0})")
+            detail = "; ".join(shorts) if shorts else "more resources"
+            label = building_type.value.replace('_', ' ')
+            return False, f"Not enough resources to build a {label}: needs {detail}."
         except ValueError as ve:
             msg = str(ve)
             if "no living monarch" in msg.lower():
